@@ -34,7 +34,7 @@ const { fromHalfFloat, toHalfFloat } = THREE.DataUtils;
  * Sky mode: three's physical Sky shader, re-baked into a PMREM as the sun moves.
  */
 export class SkyEnvironment {
-  constructor(renderer, scene) {
+  constructor(renderer, scene, { fogDensity = 0.0026 } = {}) {
     this.renderer = renderer;
     this.scene = scene;
     this.pmrem = new THREE.PMREMGenerator(renderer);
@@ -58,7 +58,7 @@ export class SkyEnvironment {
     this.lastBakeDir = new THREE.Vector3(0, -1, 0);
 
     // Distance haze so the ground plane melts into the horizon.
-    scene.fog = new THREE.FogExp2(0xffffff, 0.0026);
+    scene.fog = new THREE.FogExp2(0xffffff, fogDensity);
   }
 
   async loadHDRI(onStatus = () => {}) {
@@ -80,6 +80,14 @@ export class SkyEnvironment {
   setMode(mode) {
     this.mode = mode === 'hdri' && this.hdri ? 'hdri' : 'sky';
     this.lastBakeDir.set(0, -1, 0);
+  }
+
+  /** Takes the sky out of the scene (used by the schematic view). */
+  hide() {
+    if (this.sky.parent) this.scene.remove(this.sky);
+    this.scene.environment = null;
+    this.scene.backgroundRotation.set(0, 0, 0);
+    this.scene.environmentRotation.set(0, 0, 0);
   }
 
   /** Call whenever the sun moves. */

@@ -20,7 +20,6 @@
     "@dgreenheck/ez-tree": "^1.1.0",
     "n8ao": "^2.0.1",
     "postprocessing": "^6.39.5",
-    "suncalc": "^2.0.2",
     "three": "~0.186.1"
   },
   "devDependencies": {

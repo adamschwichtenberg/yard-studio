@@ -1,122 +1,392 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Yard Studio · Shade Simulator</title>
-    <link rel="stylesheet" href="/src/style.css" />
-  </head>
-  <body>
-    <canvas id="viewport"></canvas>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Yard Shade Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
 
-    <div id="loading">
-      <div class="spinner"></div>
-      <p id="loading-text">Starting…</p>
+<svg style="position:absolute;width:0;height:0" aria-hidden="true"><defs>
+  <symbol id="i-cursor" viewBox="0 0 16 16"><path d="M3.5 2.2l9.2 6.3-4 .9 2 4.2-1.8.8-2-4.3-3.4 2.9z"/></symbol>
+  <symbol id="i-pan" viewBox="0 0 16 16"><path d="M8 1.6v12.8M1.6 8h12.8M8 1.6L6.1 3.7M8 1.6l1.9 2.1M8 14.4l-1.9-2.1M8 14.4l1.9-2.1M1.6 8l2.1-1.9M1.6 8l2.1 1.9M14.4 8l-2.1-1.9M14.4 8l-2.1 1.9"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 16 16"><path d="M8 14.5v-3.2"/><path d="M8 1.8c2.4 0 4.3 1.9 4.3 4.2 0 2.4-1.9 5.3-4.3 5.3S3.7 8.4 3.7 6 5.6 1.8 8 1.8z"/></symbol>
+  <symbol id="i-bed" viewBox="0 0 16 16"><rect x="1.8" y="4.6" width="12.4" height="7.4" rx="1.3"/><path d="M1.8 7.3h12.4M1.8 9.6h12.4"/></symbol>
+  <symbol id="i-house" viewBox="0 0 16 16"><path d="M2.2 6.9L8 2.3l5.8 4.6v6.8H2.2z"/><path d="M6.4 13.7V9.4h3.2v4.3"/></symbol>
+  <symbol id="i-deck" viewBox="0 0 16 16"><rect x="1.8" y="3.4" width="12.4" height="9.2" rx="1.2"/><path d="M5 3.4v9.2M8 3.4v9.2M11 3.4v9.2"/></symbol>
+  <symbol id="i-driveway" viewBox="0 0 16 16"><path d="M4 2h8l2 12H2zM8 3v2M8 7v2M8 11v2"/></symbol>
+  <symbol id="i-sidewalk" viewBox="0 0 16 16"><path d="M5 2h6v12H5zM5 5h6M5 8h6M5 11h6"/></symbol>
+  <symbol id="i-ruler" viewBox="0 0 16 16"><rect x="-1" y="5.4" width="15.5" height="5.2" rx="1.1" transform="rotate(-28 8 8)"/><path d="M4.1 6.1l.9 1.5M6.6 4.7l.9 1.5M9.1 3.4l.9 1.5"/></symbol>
+  <symbol id="i-plan" viewBox="0 0 16 16"><rect x="2.4" y="2.4" width="11.2" height="11.2" rx="1.6"/><circle cx="8" cy="8" r="1.3"/></symbol>
+  <symbol id="i-cube" viewBox="0 0 16 16"><path d="M8 1.7l5.6 3.1v6.4L8 14.3l-5.6-3.1V4.8z"/><path d="M2.4 4.8L8 8l5.6-3.2M8 8v6.3"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 16 16"><path d="M1.4 8s2.6-4.1 6.6-4.1S14.6 8 14.6 8s-2.6 4.1-6.6 4.1S1.4 8 1.4 8z"/><circle cx="8" cy="8" r="1.8"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 16 16"><path d="M2.2 6V2.2h3.8M13.8 6V2.2H10M2.2 10v3.8h3.8M13.8 10v3.8H10"/></symbol>
+  <symbol id="i-focus" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.1"/><path d="M8 1.2v2.4M8 12.4v2.4M1.2 8h2.4M12.4 8h2.4"/></symbol>
+  <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.6 2.9l8.2 5.1-8.2 5.1z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 16 16"><path d="M5 3h2.1v10H5zM8.9 3H11v10H8.9z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M3.6 6l4.4 4.3L12.4 6"/></symbol>
+  <symbol id="i-line" viewBox="0 0 16 16"><path d="M2 12.4L14 3.6"/><circle cx="2.6" cy="12" r="1.5"/><circle cx="13.4" cy="4" r="1.5"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 16 16"><rect x="2.2" y="2.2" width="11.6" height="11.6" rx="1.2"/><path d="M6.1 2.2v11.6M9.9 2.2v11.6M2.2 6.1h11.6M2.2 9.9h11.6"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 16 16"><path d="M2.6 4.2v3.6h3.6"/><path d="M3.1 7.5A5.3 5.3 0 1 1 4.4 12"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 16 16"><path d="M13.4 4.2v3.6H9.8"/><path d="M12.9 7.5A5.3 5.3 0 1 0 11.6 12"/></symbol>
+  <symbol id="i-dockside" viewBox="0 0 16 16"><rect x="2" y="2.6" width="12" height="10.8" rx="1.4"/><path d="M6.6 2.6v10.8"/></symbol>
+  <symbol id="i-dockbottom" viewBox="0 0 16 16"><rect x="2" y="2.6" width="12" height="10.8" rx="1.4"/><path d="M2 9.6h12"/></symbol>
+</defs></svg>
+
+<div id="view"><canvas id="gl"></canvas></div>
+<div id="labels">
+  <div id="treeCenter" role="img" aria-label="Selected tree center" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 1v6m0 10v6M1 12h6m10 0h6"/>
+      <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+    </svg>
+  </div>
+</div>
+<div id="shapeEdit"><svg id="shapeSvg"></svg><div id="shTip"></div></div>
+
+<div id="boot"><div>
+  <div class="ring"></div><h1>Yard Shade Studio</h1><p id="bootmsg">Loading the scene</p>
+</div></div>
+
+<div id="sunpanel" class="panel">
+  <div id="sunhead">
+    <div class="who">
+      <div class="clock num" id="clockbig">1:00 PM</div>
+      <div class="date" id="datelbl">—</div>
+      <div class="date" id="loclbl"></div>
     </div>
+    <button class="ibtn" id="sunToggle" title="Hide the sun panel"><svg class="ic"><use href="#i-chev"/></svg></button>
+  </div>
+  <div id="sunbody">
+    <svg id="arc" viewBox="0 0 320 78" preserveAspectRatio="none"></svg>
+    <div id="sunctl">
+      <button class="ibtn primary" id="playbtn" title="Play the day"><svg class="ic fill"><use href="#i-play"/></svg></button>
+      <input type="date" id="date">
+    </div>
+    <div class="seg tiny" id="seasons" style="justify-content:space-between">
+      <button data-jump="03-21">Mar 21</button><button data-jump="06-21">Jun 21</button>
+      <button data-jump="09-21">Sep 21</button><button data-jump="12-21">Dec 21</button>
+    </div>
+    <div class="readout num">
+      <div class="k">Sun height</div><div class="v hot" id="rEl">—</div>
+      <div class="k">Bearing</div><div class="v" id="rAz">—</div>
+      <div class="k">Shadow of 10 ft</div><div class="v" id="rShad">—</div>
+      <div class="k">Daylight</div><div class="v" id="rDay">—</div>
+      <div class="k">Solar noon</div><div class="v" id="rNoon">—</div>
+    </div>
+  </div>
+</div>
 
-    <aside id="panel">
-      <header>
-        <h1>Yard Studio</h1>
-        <p class="sub">Shade simulator</p>
-      </header>
+<div id="compass" class="panel" title="Drag to spin the view · double-click for north up"><svg viewBox="0 0 100 100" id="compsvg"></svg></div>
 
-      <section>
-        <h2>Sun</h2>
-        <label class="row">
-          <span>Location</span>
-          <select id="location"></select>
-        </label>
-        <div class="row coords">
-          <label>Lat <input id="lat" type="number" step="0.01" /></label>
-          <label>Lon <input id="lon" type="number" step="0.01" /></label>
-        </div>
-        <label class="row">
-          <span>Date</span>
-          <input id="date" type="date" />
-        </label>
-        <div class="seasons">
-          <button data-date="03-20">Mar 20</button>
-          <button data-date="06-21">Jun 21</button>
-          <button data-date="07-15">Jul 15</button>
-          <button data-date="09-22">Sep 22</button>
-          <button data-date="12-21">Dec 21</button>
-        </div>
-        <label class="row stacked">
-          <span>Time <b id="time-label">17:00</b></span>
-          <input id="time" type="range" min="0" max="1439" step="1" />
-        </label>
-        <div class="row">
-          <button id="play" class="wide">▶ Play day</button>
-          <select id="speed" title="Simulated minutes per second">
-            <option value="10">10×</option>
-            <option value="30" selected>30×</option>
-            <option value="90">90×</option>
-          </select>
-        </div>
-        <dl class="readout">
-          <dt>Sunrise</dt><dd id="sunrise">–</dd>
-          <dt>Sunset</dt><dd id="sunset">–</dd>
-          <dt>Altitude</dt><dd id="altitude">–</dd>
-          <dt>Azimuth</dt><dd id="azimuth">–</dd>
-        </dl>
-      </section>
+<div id="top" class="panel">
+  <div class="seg" role="group" aria-label="Tools">
+    <button data-tool="select" aria-pressed="true" title="Select and move"><svg class="ic fill"><use href="#i-cursor"/></svg><span class="lbl-t">Select</span></button>
+    <button data-tool="pan" title="Pan the view"><svg class="ic"><use href="#i-pan"/></svg><span class="lbl-t">Pan</span></button>
+    <button data-tool="tree" title="Place a tree"><svg class="ic"><use href="#i-tree"/></svg><span class="lbl-t">Tree</span></button>
+    <button data-tool="bed" title="Place a bed"><svg class="ic"><use href="#i-bed"/></svg><span class="lbl-t">Bed</span></button>
+    <button data-tool="structure" title="Place a building"><svg class="ic"><use href="#i-house"/></svg><span class="lbl-t">Building</span></button>
+    <button data-tool="deck" title="Place a deck"><svg class="ic"><use href="#i-deck"/></svg><span class="lbl-t">Deck</span></button>
+    <button data-tool="driveway" title="Place an editable driveway"><svg class="ic"><use href="#i-driveway"/></svg><span class="lbl-t">Driveway</span></button>
+    <button data-tool="sidewalk" title="Place an editable sidewalk"><svg class="ic"><use href="#i-sidewalk"/></svg><span class="lbl-t">Sidewalk</span></button>
+    <button data-tool="measure" title="Measure"><svg class="ic"><use href="#i-ruler"/></svg><span class="lbl-t">Measure</span></button>
+  </div>
+  <div class="div"></div>
+  <div class="seg icons" role="group" aria-label="View">
+    <button id="vplan" title="Straight down (1)"><svg class="ic"><use href="#i-plan"/></svg></button>
+    <button id="v3d" aria-pressed="true" title="Tilted (2)"><svg class="ic"><use href="#i-cube"/></svg></button>
+    <button id="veye" title="Eye level (3)"><svg class="ic"><use href="#i-eye"/></svg></button>
+    <button id="vfit" title="Frame the whole lot (0)"><svg class="ic"><use href="#i-fit"/></svg></button>
+    <button id="vfocus" title="Centre on the selection (F)"><svg class="ic"><use href="#i-focus"/></svg></button>
+    <button id="vsimple" title="Simple schematic view (G)"><svg class="ic"><use href="#i-grid"/></svg></button>
+  </div>
+  <button class="btn" id="sheetbtn" style="display:none">Edit</button>
+</div>
 
-      <section>
-        <h2>Trees</h2>
-        <p class="hint">Pick a species, then click the lawn to plant. Click a tree to select it, drag to move.</p>
-        <div id="species" class="species"></div>
-        <label class="row stacked">
-          <span>Years after planting <b id="age-label">10</b></span>
-          <input id="age" type="range" min="0" max="40" step="1" value="10" />
-        </label>
-        <div id="selection" class="selection" hidden>
-          <div>
-            <strong id="sel-name"></strong>
-            <em id="sel-latin"></em>
-            <span id="sel-size"></span>
+<div id="legend" class="panel">
+  <div class="t">Daily sun hours</div><div class="ramp"></div>
+  <div class="ends"><span>0</span><span id="legmax">14 h</span></div>
+  <div class="mark"><i></i><span id="legline">6 h line</span></div>
+</div>
+
+<div id="inspector" class="panel">
+  <div id="insphead">
+    <h2 id="seltitle">Nothing selected</h2>
+    <span class="tag" id="seltag"></span>
+    <button class="btn" id="closesheet" style="display:none;padding:5px 10px">Done</button>
+  </div>
+  <div id="inspbody"><div id="props"></div></div>
+</div>
+
+<div id="dock" class="panel">
+  <div id="dockgrip" role="separator" tabindex="0" aria-label="Resize menu height"
+    aria-orientation="horizontal" aria-controls="dockbody"
+    title="Drag up or down to resize; arrow keys also resize; double-click to reset">Drag to resize height</div>
+  <div id="dockwidthgrip" role="separator" tabindex="0" aria-label="Resize sidebar width"
+    aria-orientation="vertical" aria-controls="dockbody" title="Drag left or right to resize sidebar width"></div>
+  <div id="dockbar">
+    <div id="tabs"><div class="seg tiny">
+      <button data-tab="prop" aria-pressed="true">Property &amp; fence</button>
+      <button data-tab="site">Site &amp; sky</button>
+      <button data-tab="objs">Everything in the yard</button>
+      <button data-tab="file">Plan file</button>
+    </div></div>
+    <button class="ibtn" id="undoBtn" title="Undo (Ctrl+Z)" disabled><svg class="ic"><use href="#i-undo"/></svg></button>
+    <button class="ibtn" id="redoBtn" title="Redo (Ctrl+Shift+Z)" disabled><svg class="ic"><use href="#i-redo"/></svg></button>
+    <button class="ibtn" id="dockSide" aria-pressed="false" title="Dock this panel to the left, under the sun panel"><svg class="ic"><use href="#i-dockside"/></svg></button>
+    <button class="ibtn" id="dockToggle" title="Collapse"><svg class="ic"><use href="#i-chev"/></svg></button>
+  </div>
+  <div id="dockbody">
+
+    <section class="pane on" data-pane="prop">
+      <div class="cols">
+        <div>
+          <h4>Lot outline</h4>
+          <div class="btnrow" style="margin-top:0"><button class="btn accent" id="editBoundary">Reshape the lot</button></div>
+          <div class="btnrow"><button class="btn" data-import-property>Import property image</button></div>
+          <p class="hint" id="boundary-image-state"></p>
+          <div class="field"><span class="lab">Corners</span><span class="val num" id="bcount">4</span></div>
+          <div class="field"><span class="lab">Area</span><span class="val num" id="barea">—</span></div>
+          <div class="field"><span class="lab">Perimeter</span><span class="val num" id="bperim">—</span></div>
+        </div>
+        <div>
+          <h4>Overall size</h4>
+          <div class="field"><label for="yardw">Width across</label>
+            <span class="inp"><input type="number" id="yardw" min="10" max="900" value="110"><span class="u">ft</span></span></div>
+          <div class="field"><label for="yardh">Depth</label>
+            <span class="inp"><input type="number" id="yardh" min="10" max="900" value="90"><span class="u">ft</span></span></div>
+          <p class="hint">These stretch the whole outline, whatever shape it is.</p>
+          <div class="btnrow"><button class="btn" id="rectBoundary">Make it a rectangle</button></div>
+        </div>
+        <div>
+          <h4>Fence</h4>
+          <select id="fencestyle"></select>
+          <div class="field" style="margin-top:8px"><label for="fenceh">Height</label>
+            <span class="inp"><input type="number" id="fenceh" min="0" max="12" step="0.5" value="5"><span class="u">ft</span></span></div>
+          <div class="field"><label for="fenced">Sun it blocks</label>
+            <span class="inp"><input type="number" id="fenced" min="0" max="1" step="0.05" value="0.5"><span class="u">×</span></span></div>
+          <div class="sliderow"><input type="range" id="fenced2" min="0" max="1" step="0.05" value="0.5"></div>
+          <div class="btnrow"><button class="btn" id="fenceall">All sides</button><button class="btn" id="fencenone">None</button></div>
+        </div>
+        <div>
+          <h4>Fence by side</h4>
+          <div class="edgelist" id="fenceedges"></div>
+        </div>
+        <div>
+          <h4>Grid</h4>
+          <div class="field"><label for="showgrid">Show grid</label><input type="checkbox" class="sw" id="showgrid" checked></div>
+          <div class="field"><label for="grid">Grid size</label>
+            <span class="inp"><input type="number" id="grid" min="1" max="50" value="5"><span class="u">ft</span></span></div>
+          <div class="field"><label for="snap">Snap to grid</label><input type="checkbox" class="sw" id="snap" checked></div>
+          <div class="field"><label for="simpleview">Simple schematic view</label><input type="checkbox" class="sw" id="simpleview"></div>
+          <div class="btnrow"><button class="btn" id="gridReferenceButton">Square grid to a side</button></div>
+          <p class="hint">Simple view drops the textures and foliage so the grid, trunks and outlines read clearly. Every fifth grid line is called out.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="site">
+      <div class="cols">
+        <div>
+          <h4>Orientation</h4>
+          <div class="field"><label for="northnum">House angle vs. north</label>
+            <span class="inp"><input type="number" id="northnum" min="0" max="359" step="1" value="0"><span class="u">&deg;</span></span></div>
+          <div class="sliderow"><input type="range" id="north" min="0" max="359" step="1" value="0"></div>
+          <p class="hint">Build square to the screen, then turn this until the compass matches reality.</p>
+        </div>
+        <div>
+          <h4>Location</h4>
+          <select id="locpreset" aria-label="Location preset"></select>
+          <div class="field" style="margin-top:8px"><label for="lat">Latitude</label><span class="inp"><input type="number" id="lat" min="-90" max="90" step="0.0001" value="46.8772"><span class="u">&deg;</span></span></div>
+          <div class="field"><label for="lon">Longitude</label><span class="inp"><input type="number" id="lon" min="-180" max="180" step="0.0001" value="-96.7898"><span class="u">&deg;</span></span></div>
+          <div class="btnrow"><button class="btn" id="geolocate">Use my location</button></div>
+          <p class="hint" id="lochint">North and east are positive. South and west are negative.</p>
+        </div>
+        <div>
+          <h4>Clock</h4>
+          <div class="field"><label for="tzmode">Time from</label>
+            <span style="flex:1.3"><select id="tzmode">
+              <option value="zone">Time zone (handles daylight saving)</option>
+              <option value="manual">Fixed UTC offset</option>
+            </select></span></div>
+          <div id="tzzonerow"><select id="tzzone" aria-label="Time zone"></select></div>
+          <div id="tzmanual">
+            <div class="field"><label for="tz">UTC offset</label><span class="inp"><input type="number" id="tz" min="-12" max="14" step="0.25" value="-6"><span class="u">h</span></span></div>
+            <div class="field"><label for="dst">US daylight saving rule</label><input type="checkbox" class="sw" id="dst" checked></div>
+            <div class="btnrow"><button class="btn" id="tzguess">Offset from longitude</button></div>
           </div>
-          <button id="sel-remove">Remove</button>
+          <p class="hint" id="tzhint"></p>
         </div>
-        <button id="reset-trees" class="link">Reset to example planting</button>
-      </section>
+        <div>
+          <h4>Sun map</h4>
+          <div class="field"><label for="heat">Show sun-hours map</label><input type="checkbox" class="sw" id="heat"></div>
+          <div class="field"><label for="mins">Hours for full sun</label>
+            <span class="inp"><input type="number" id="mins" min="1" max="14" step="0.5" value="6"><span class="u">h</span></span></div>
+          <div class="sliderow"><input type="range" id="mins2" min="1" max="14" step="0.5" value="6"></div>
+          <div class="field"><label for="leaf">Bare branches off-season</label><input type="checkbox" class="sw" id="leaf" checked></div>
+        </div>
+        <div>
+          <h4>Rendering</h4>
+          <div class="field"><label for="rsky">Sky</label><span style="flex:1.3"><select id="rsky">
+            <option value="hdri">HDRI photo</option><option value="sky">Physical sky</option></select></span></div>
+          <div class="field"><label for="rgrass">Grass blades</label><span style="flex:1.3"><select id="rgrass">
+            <option value="0">Off</option><option value="4">Low</option><option value="8">Medium</option><option value="16">High</option></select></span></div>
+          <div class="field"><label for="rshadow">Shadow detail</label><span style="flex:1.3"><select id="rshadow">
+            <option value="2048">2048</option><option value="4096">4096</option><option value="8192">8192</option></select></span></div>
+          <div class="field"><label for="rao">Ambient occlusion</label><input type="checkbox" class="sw" id="rao" checked></div>
+          <div class="field"><label for="rwind">Wind</label><input type="checkbox" class="sw" id="rwind" checked></div>
+          <div class="field"><label for="rexp">Exposure</label>
+            <span class="inp"><input type="number" id="rexp" min="0.3" max="2.5" step="0.05" value="1"><span class="u">×</span></span></div>
+          <div class="sliderow"><input type="range" id="rexp2" min="0.3" max="2.5" step="0.05" value="1"></div>
+          <p class="hint" id="rsource">Saved in this browser, not in the plan file.</p>
+        </div>
+      </div>
+    </section>
 
-      <section>
-        <h2>Render</h2>
-        <label class="row">
-          <span>Sky</span>
-          <select id="sky">
-            <option value="hdri">HDRI photo</option>
-            <option value="sky">Physical sky</option>
-          </select>
-        </label>
-        <label class="row">
-          <span>Grass</span>
-          <select id="grass">
-            <option value="0">Off</option>
-            <option value="40">Low</option>
-            <option value="90" selected>Medium</option>
-            <option value="180">High</option>
-          </select>
-        </label>
-        <label class="row">
-          <span>Shadow map</span>
-          <select id="shadow">
-            <option value="2048">2048</option>
-            <option value="4096" selected>4096</option>
-            <option value="8192">8192</option>
-          </select>
-        </label>
-        <label class="row check"><input id="ao" type="checkbox" checked /> Ambient occlusion (N8AO)</label>
-        <label class="row stacked">
-          <span>Exposure <b id="exposure-label">1.0</b></span>
-          <input id="exposure" type="range" min="0.3" max="2" step="0.05" value="1" />
-        </label>
-        <p class="hint" id="sky-source"></p>
-      </section>
-    </aside>
+    <section class="pane" data-pane="objs"><div class="objlist" id="objlist"></div></section>
 
-    <div id="stats"></div>
+    <section class="pane" data-pane="file">
+      <div class="cols">
+        <div>
+          <h4>Plan file</h4>
+          <div class="btnrow" style="margin-top:0">
+            <button class="btn" id="savebtn">Save</button><button class="btn" id="loadbtn">Open</button>
+            <button class="btn danger" id="resetbtn">Start over</button>
+          </div>
+          <div class="btnrow"><button class="btn" data-import-property>Import property image</button></div>
+          <p class="hint">Detect and review an outline, name its sides, then enter one known length to scale the whole property.</p>
+        </div>
+        <div>
+          <h4>Changes</h4>
+          <div class="btnrow" style="margin-top:0">
+            <button class="btn" id="undoBtn2">Undo</button><button class="btn" id="redoBtn2">Redo</button>
+          </div>
+          <p class="hint">Ctrl+Z steps back, Ctrl+Shift+Z steps forward. The last 60 edits are kept.</p>
+        </div>
+        <div>
+          <h4>Getting around</h4>
+          <p class="hint">Drag empty ground to pan in Plan, or orbit in 3D · Pan tool, middle mouse button, two fingers, or shift-drag to slide · pinch or scroll to zoom · double-click the ground to re-centre there · arrow keys nudge · F centres on the selection · 0 frames the lot · G toggles the simple view.</p>
+        </div>
+      </div>
+    </section>
 
-    <script type="module" src="/src/main.js"></script>
-  </body>
+  </div>
+</div>
+
+<div id="toast" class="panel"></div>
+<div id="modal"><div id="modalbox" class="panel">
+  <h3 id="modaltitle"></h3><p id="modalmsg"></p>
+  <div id="modalbtns"></div>
+</div></div>
+<input type="file" id="fileinput" accept="application/json" hidden>
+<!-- PROPERTY_IMPORT_HTML_BEGIN -->
+<!-- Place directly under body, outside any existing form or inert panel. -->
+<dialog id="pii-dialog" aria-labelledby="pii-title" aria-describedby="pii-intro">
+  <header class="pii-header">
+    <h2 id="pii-title">Import property boundary</h2>
+    <button type="button" id="pii-close" aria-label="Cancel property import">✕</button>
+  </header>
+  <div class="pii-body">
+    <p id="pii-intro">Local image → review corners → name and measure a side → import boundary. Your image stays on this device.</p>
+    <p class="pii-notice"><strong>Use a plan-view, to-scale diagram or orthorectified aerial.</strong> One side cannot correct perspective in an ordinary oblique photo or a survey marked “not to scale.” Results are estimates, not a legal survey. No OCR is performed: enter a printed length yourself.</p>
+    <label class="pii-file" for="pii-file">Choose PNG, JPEG or WebP
+      <input id="pii-file" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp">
+    </label>
+    <p id="pii-source" class="pii-dim">Maximum 20 MiB, 8,192 px per dimension and 24 megapixels. Processing is limited to 1 megapixel / 1,200 px.</p>
+    <p id="pii-status" role="status" aria-live="polite" aria-atomic="true">Choose an image to begin.</p>
+    <fieldset id="pii-work" disabled>
+      <legend class="pii-sr">Image detection and boundary review</legend>
+      <div class="pii-detection">
+        <label>Line type<select id="pii-detect-mode">
+          <option value="auto">Automatic: dark + colored outlines</option>
+          <option value="dark">Dark lines on a light plan</option>
+          <option value="color">Saturated colored outline</option>
+        </select></label>
+        <label>Sensitivity <output id="pii-sensitivity-value">50</output>
+          <input id="pii-sensitivity" type="range" min="0" max="100" value="50">
+        </label>
+        <label>Bridge gaps (processing px)
+          <select id="pii-gap"><option value="0">0 — exact lines</option><option value="1" selected>1 — small gaps</option><option value="2">2</option><option value="3">3 — inspect carefully</option></select>
+        </label>
+        <label>Simplify corners (processing px)
+          <input id="pii-simplify" type="number" min="0.5" max="10" step="0.5" value="2">
+        </label>
+        <button type="button" id="pii-detect">Detect again</button>
+        <button type="button" id="pii-sample">Pick outline color</button>
+        <button type="button" id="pii-clear-color" disabled>Clear color filter</button>
+      </div>
+      <p class="pii-dim">Settings apply on Detect again or Find enclosed region. Bridging thickens lines and can merge gaps; preview uses the inner edge of the outline. Buildings, text and page frames may also be candidates. Interior holes are not imported.</p>
+      <div class="pii-row">
+        <label class="pii-grow">Detected candidates<select id="pii-candidates" disabled><option>No candidates yet</option></select></label>
+        <button type="button" id="pii-recover">Find enclosed region</button>
+        <button type="button" id="pii-trace">Start new manual trace</button>
+        <button type="button" id="pii-finish" disabled>Finish trace</button>
+        <button type="button" id="pii-undo" disabled>Undo edit</button>
+      </div>
+      <p id="pii-help">Drag corners to edit a closed boundary. While tracing, hover near Start (corner 1) to preview closure, then click or tap to close without losing corners. Enter or Finish trace also closes. Arrow keys move a focused corner by 1 processing pixel; Shift moves 10. Delete removes it.</p>
+      <p id="pii-trace-help" class="pii-notice" role="status" aria-live="polite" hidden></p>
+      <div id="pii-viewport" class="pii-viewport">
+        <div id="pii-stage" class="pii-stage">
+          <canvas id="pii-image" aria-hidden="true"></canvas>
+          <svg id="pii-overlay" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Property boundary image editor" aria-describedby="pii-help pii-trace-help" tabindex="0" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+      <div class="pii-row">
+        <label>Image zoom<select id="pii-zoom"><option value="1">Fit width</option><option value="1.5">150%</option><option value="2">200%</option><option value="3">300%</option></select></label>
+        <button type="button" id="pii-pan" aria-pressed="false">Pan / scroll image</button>
+        <span class="pii-dim">Use Pan to scroll by touch without moving or adding corners. Side values update live.</span>
+      </div>
+      <div class="pii-edit-grid">
+        <section aria-labelledby="pii-corner-title">
+          <h3 id="pii-corner-title">Corners</h3>
+          <label>Selected corner<select id="pii-corner"></select></label>
+          <div class="pii-row">
+            <label>X (image px)<input id="pii-x" type="number" min="0" step="0.1"></label>
+            <label>Y (image px)<input id="pii-y" type="number" min="0" step="0.1"></label>
+          </div>
+          <div class="pii-row">
+            <button type="button" id="pii-add">Add corner after selected</button>
+            <button type="button" id="pii-remove">Remove corner</button>
+          </div>
+          <p class="pii-dim">Coordinates use the reduced preview image. Splitting keeps the old name on the first half; merging keeps both names. Editing the reference side’s topology clears its calibration. Undo restores it.</p>
+        </section>
+        <section aria-labelledby="pii-scale-title">
+          <h3 id="pii-scale-title">Side names &amp; uniform scale</h3>
+          <label>Selected side<select id="pii-edge"></select></label>
+          <label>Side name (optional)<input id="pii-label" type="text" maxlength="80" placeholder="e.g. Back"></label>
+          <label>Known length of this side (feet)<input id="pii-feet" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 140"></label>
+          <div class="pii-row">
+            <button type="button" id="pii-calibrate">Use this side as reference</button>
+            <button type="button" id="pii-unscale">Clear scale</button>
+          </div>
+          <p id="pii-reference" class="pii-dim">Unscaled — feet and square feet are unknown.</p>
+          <p class="pii-dim">Choose any side and enter its known length. Only one side is the reference; all other lengths use the same feet-per-pixel ratio. Selecting another side does not change the reference until you apply it.</p>
+        </section>
+      </div>
+      <div class="pii-table-wrap">
+        <table class="pii-table"><caption>Calculated boundary measurements</caption>
+          <thead><tr><th scope="col">Side</th><th scope="col">Name</th><th scope="col">Length</th></tr></thead>
+          <tbody id="pii-measures"></tbody>
+        </table>
+      </div>
+      <p id="pii-area"></p>
+      <p id="pii-validity" role="status" aria-live="polite"></p>
+      <label class="pii-check"><input id="pii-reviewed" type="checkbox"> I reviewed the corners and calibration on a suitable to-scale, plan-view image.</label>
+    </fieldset>
+    <p class="pii-notice"><strong>Boundary only.</strong> Existing trees, buildings and other objects are retained at their current feet coordinates. They are not moved, scaled or replaced to fit this image.</p>
+  </div>
+  <footer class="pii-footer">
+    <button type="button" id="pii-cancel">Cancel</button>
+    <button type="button" id="pii-save-draft" disabled>Keep unscaled draft</button>
+    <button type="button" id="pii-commit" class="pii-primary" disabled>Import reviewed boundary</button>
+  </footer>
+</dialog>
+<!-- PROPERTY_IMPORT_HTML_END -->
+
+<script type="module" src="/src/app.js"></script>
+</body>
 </html>

@@ -1,56 +1,65 @@
-# Yard Studio: shade simulator
+# Yard Shade Studio
 
-A three.js yard shade simulator. Plant real species, then scrub the date and time to see where shade falls. The sun position is astronomically correct for your location.
+Plan a yard and see where the shade falls, at any time of day, on any date, anywhere on Earth. This is the original Yard Shade Studio planner with a realistic three.js renderer underneath it.
 
-![Yard Studio](docs/screenshot.png)
+![Eye-level view with the tree inspector](docs/screenshot.png)
 
 ```bash
 npm install
+npm run dev            # http://localhost:5173
 npm run fetch-assets   # optional: 4k Poly Haven sky HDRI (~25 MB) into public/hdri
-npm run dev
 ```
 
-## What's in this first pass
+The original single-file app is kept for reference at `legacy/yard-shade-studio-original.html`.
 
-| Piece | Where | Notes |
-| --- | --- | --- |
-| **HDRI image-based lighting** | `src/scene/environment.js` | Uses `HDRLoader`, which replaced `RGBELoader` in r180. The raw equirect goes to `scene.background` (sharp), and a copy with the photographed sun clamped out goes to `scene.environment`, because the `DirectionalLight` supplies the direct sun. The HDRI's sun is detected automatically, and background and environment are rotated so it matches the simulated sun's azimuth. Sources are tried in order: local 4k file, Poly Haven CDN 2k, then the bundled 1k quarry HDRI. A three.js physical `Sky` mode re-bakes a PMREM as the sun moves. |
-| **Sun from latitude, date and time** | `src/scene/sun.js` | Uses suncalc. The time is wall-clock time in the location's time zone, so 17:00 in Fargo means 17:00 CDT whatever time zone your browser is in. Includes a hemisphere fill light, a 4k shadow map fitted to the lot (2k or 8k selectable), and shadows that only re-render when the sun or trees change. |
-| **Instanced grass** | `src/scene/grass.js` | 3-blade clumps on one `InstancedMesh`, about 60k clumps at Medium. A patched `MeshStandardMaterial` adds wind while keeping receive-shadow and IBL support. Density is adjustable. |
-| **ACES + SSAO** | `src/post.js` | pmndrs `postprocessing`: RenderPass → N8AO → ACES `ToneMappingEffect` → SMAA. The renderer's own tone mapping is off, the frame buffers are half-float, and MSAA is off. |
-| **Trees** | `src/trees/` | Generated at runtime with `@dgreenheck/ez-tree`, then rescaled to real mature height and spread. |
+## What it does
 
-### Species (zone 4a)
+All of the original planner's features and navigation are unchanged:
 
-| Species | Mature size | Built from |
-| --- | --- | --- |
-| Autumn Blaze maple | 15 × 11 m | Oak leaves recoloured; upright oval |
-| Redmond linden | 14 × 9 m | Aspen leaves on a conical "evergreen" skeleton, giving a dense pyramid |
-| Prairie Horizon alder | 11 × 5.5 m | Aspen leaves; narrow upright oval |
-| Tannenbaum mugo pine | 3.5 × 2.6 m | Pine needles; dense and bushy |
-| Columnar Norway spruce | 10 × 1.8 m | Pine needles; very narrow column |
-| Moonglow juniper | 6 × 2.6 m | Pine needles tinted silver-blue; pyramidal |
+- **Tools:** select and move, pan, measure, and place trees, beds, buildings, decks, driveways and sidewalks.
+- **Views:** plan, tilted, eye level, frame the lot, centre on the selection, and a simple schematic view. Keyboard: 1 / 2 / 3 / 0 / F / G.
+- **Sun panel:** drag the sun arc to set the time, play the day, pick a date, or jump to a solstice or equinox. Readouts show sun height, bearing, the shadow cast by a 10 ft object, daylight and solar noon.
+- **Property & fence:** reshape the lot corner by corner, type exact side lengths, stretch the lot, and set the fence style, height, density and sides. Set up the grid and snapping.
+- **Site & sky:**
+  - House angle versus north.
+  - Location and clock (see below).
+  - The sun-hours heat map and bare branches in the off-season.
+  - Rendering settings.
+- **Everything in the yard:** every object with its size, distance to the property line and sun hours.
+- **Plan file:** save and open JSON plans, start over, undo and redo (60 steps), and import a property image to trace and scale the lot.
+- **Inspector:**
+  - Tree presets and crown shapes, with property-line clearance.
+  - Bed sun hours with a planting verdict.
+  - Reshaping and height for buildings, decks and paving.
+  - Duplicate and delete.
 
-The deciduous trees follow the calendar. Leaf-out runs early to late May, fall colour peaks in early October, and the leaves drop in late October. Scrub the date to compare July shade with December shade. The **Years after planting** slider grows every tree from nursery size toward maturity.
+All units are feet.
 
-Leaf textures only supply shape and light/dark detail. Each species' colour is set in `species.js`, and leaf normals point out from the crown centre so the canopy shades as a volume.
+## Location, clock and sun angles
 
-## Controls
+The sun position comes from the original's NOAA-based solar maths. It matches suncalc to within 0.2° from Fargo to Sydney to Tromsø; the remaining difference is atmospheric refraction.
 
-- **Orbit / pan / zoom:** drag, right-drag, scroll
-- **Plant:** pick a species, then click the lawn. Hold Shift to keep planting.
-- **Select / move / delete:** click a tree, drag it, then press Delete or use **Remove**
-- The layout and settings persist in `localStorage`.
+- **Location:**
+  - Pick a preset, or type any latitude (−90 to 90) and longitude (−180 to 180). North and east are positive.
+  - **Use my location** fills them in where the browser allows it.
+- **Clock:**
+  - **Time zone** (the default) uses the zone's own daylight-saving rules through the browser's time-zone data. That covers Phoenix (no DST), Europe and the southern hemisphere.
+  - **Fixed UTC offset** keeps the original manual offset and its US daylight-saving switch. **Offset from longitude** suggests one.
+  - If the clock is more than about 2.5 hours from what the longitude implies, the Clock section warns you, because every sun time would look wrong.
+- **Edge cases:**
+  - Inside the polar circles, the panel reports "Sun up all day" or "Sun below horizon all day" instead of inventing a sunrise.
+  - South of the equator, leaf-out and leaf-drop dates shift six months, and the sun arcs through the north.
 
-## Conventions
+## Rendering
 
-- 1 unit = 1 metre. +X = east, −Z = north.
-- suncalc ≥ 2 returns **degrees** and **compass azimuth from north**. suncalc 1.x snippets online use radians measured from south, so don't mix the two.
-- `postprocessing` 6.x supports three < 0.187, so three is pinned to `~0.186`.
+| Piece | Where |
+| --- | --- |
+| HDRI or physical sky. The HDRI's sun is detected, clamped out of the lighting, and rotated to the solar-maths sun, with house angle vs. north applied. | `src/scene/environment.js` |
+| RenderPass → N8AO → ACES → SMAA, half-float buffers, with no tone mapping on the renderer. It switches cleanly between the perspective and plan (orthographic) cameras. | `src/post.js` |
+| Instanced grass, limited to the lot and cut out around buildings, decks, paving and beds | `src/scene/grass.js` |
+| EZ-Tree trees built from each tree's crown shape, height, spread and density, so what you see matches the shade engine. Per-variety leaf colour, fall colour before leaf drop, bare branches in winter. | `src/trees/trees.js` |
+| Procedural lawn, siding and shingle textures with normal maps | `src/scene/textures.js` |
 
-## Next steps
-
-- Shade-hours heatmap: accumulate shadow-map samples over a day or season into a lawn texture.
-- Editable lot, house footprint and patio.
-- Scanned Poly Haven ground and bark textures to replace the procedural ones.
-- LOD or impostors for large plantings. EZ-Tree trees are about 15–40k triangles each.
+- **Sun-hours numbers:** the original's analytic shade engine calculates them. The 3D shadows are for looking; the numbers don't depend on them.
+- **Heat-map colours:** they're pre-compensated for the tone curve, so the colour ramp reads the same in the realistic and simple views.
+- **Rendering settings:** sky, grass density, shadow detail, ambient occlusion, wind and exposure are saved per browser, not in plan files.
