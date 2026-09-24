@@ -1,0 +1,5 @@
+node_modules
+dist
+# Large HDRIs pulled by `npm run fetch-assets`
+public/hdri/*_2k.hdr
+public/hdri/*_4k.hdr

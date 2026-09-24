@@ -1,0 +1,31 @@
+{
+  "name": "yard-studio",
+  "version": "0.1.0",
+  "description": "Realistic yard shade simulator built on three.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "fetch-assets": "node scripts/fetch-assets.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adamschwichtenberg/yard-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/adamschwichtenberg/yard-studio/issues"
+  },
+  "homepage": "https://github.com/adamschwichtenberg/yard-studio#readme",
+  "dependencies": {
+    "@dgreenheck/ez-tree": "^1.1.0",
+    "n8ao": "^2.0.1",
+    "postprocessing": "^6.39.5",
+    "suncalc": "^2.0.2",
+    "three": "~0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.1"
+  },
+  "private": true,
+  "type": "module"
+}

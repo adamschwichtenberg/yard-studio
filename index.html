@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yard Studio · Shade Simulator</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="viewport"></canvas>
+
+    <div id="loading">
+      <div class="spinner"></div>
+      <p id="loading-text">Starting…</p>
+    </div>
+
+    <aside id="panel">
+      <header>
+        <h1>Yard Studio</h1>
+        <p class="sub">Shade simulator</p>
+      </header>
+
+      <section>
+        <h2>Sun</h2>
+        <label class="row">
+          <span>Location</span>
+          <select id="location"></select>
+        </label>
+        <div class="row coords">
+          <label>Lat <input id="lat" type="number" step="0.01" /></label>
+          <label>Lon <input id="lon" type="number" step="0.01" /></label>
+        </div>
+        <label class="row">
+          <span>Date</span>
+          <input id="date" type="date" />
+        </label>
+        <div class="seasons">
+          <button data-date="03-20">Mar 20</button>
+          <button data-date="06-21">Jun 21</button>
+          <button data-date="07-15">Jul 15</button>
+          <button data-date="09-22">Sep 22</button>
+          <button data-date="12-21">Dec 21</button>
+        </div>
+        <label class="row stacked">
+          <span>Time <b id="time-label">17:00</b></span>
+          <input id="time" type="range" min="0" max="1439" step="1" />
+        </label>
+        <div class="row">
+          <button id="play" class="wide">▶ Play day</button>
+          <select id="speed" title="Simulated minutes per second">
+            <option value="10">10×</option>
+            <option value="30" selected>30×</option>
+            <option value="90">90×</option>
+          </select>
+        </div>
+        <dl class="readout">
+          <dt>Sunrise</dt><dd id="sunrise">–</dd>
+          <dt>Sunset</dt><dd id="sunset">–</dd>
+          <dt>Altitude</dt><dd id="altitude">–</dd>
+          <dt>Azimuth</dt><dd id="azimuth">–</dd>
+        </dl>
+      </section>
+
+      <section>
+        <h2>Trees</h2>
+        <p class="hint">Pick a species, then click the lawn to plant. Click a tree to select it, drag to move.</p>
+        <div id="species" class="species"></div>
+        <label class="row stacked">
+          <span>Years after planting <b id="age-label">10</b></span>
+          <input id="age" type="range" min="0" max="40" step="1" value="10" />
+        </label>
+        <div id="selection" class="selection" hidden>
+          <div>
+            <strong id="sel-name"></strong>
+            <em id="sel-latin"></em>
+            <span id="sel-size"></span>
+          </div>
+          <button id="sel-remove">Remove</button>
+        </div>
+        <button id="reset-trees" class="link">Reset to example planting</button>
+      </section>
+
+      <section>
+        <h2>Render</h2>
+        <label class="row">
+          <span>Sky</span>
+          <select id="sky">
+            <option value="hdri">HDRI photo</option>
+            <option value="sky">Physical sky</option>
+          </select>
+        </label>
+        <label class="row">
+          <span>Grass</span>
+          <select id="grass">
+            <option value="0">Off</option>
+            <option value="40">Low</option>
+            <option value="90" selected>Medium</option>
+            <option value="180">High</option>
+          </select>
+        </label>
+        <label class="row">
+          <span>Shadow map</span>
+          <select id="shadow">
+            <option value="2048">2048</option>
+            <option value="4096" selected>4096</option>
+            <option value="8192">8192</option>
+          </select>
+        </label>
+        <label class="row check"><input id="ao" type="checkbox" checked /> Ambient occlusion (N8AO)</label>
+        <label class="row stacked">
+          <span>Exposure <b id="exposure-label">1.0</b></span>
+          <input id="exposure" type="range" min="0.3" max="2" step="0.05" value="1" />
+        </label>
+        <p class="hint" id="sky-source"></p>
+      </section>
+    </aside>
+
+    <div id="stats"></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
