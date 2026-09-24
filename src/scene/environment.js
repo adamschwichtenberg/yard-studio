@@ -6,12 +6,14 @@ import { Sky } from 'three/addons/objects/Sky.js';
 // copy pulled by `npm run fetch-assets`, then the Poly Haven CDN directly.
 // The bundled 1k quarry HDRI keeps the app working offline.
 export const HDRI_SOURCES = [
-  { label: 'Partly cloudy sky (local 4k)', url: '/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr' },
+  { label: 'Partly cloudy sky (local 4k)', url: `${import.meta.env.BASE_URL}hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr` },
   {
     label: 'Partly cloudy sky (Poly Haven 2k)',
     url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloofendal_48d_partly_cloudy_puresky_2k.hdr',
   },
-  { label: 'Quarry (bundled 1k)', url: '/hdri/quarry_01_1k.hdr' },
+  { label: 'Quarry (bundled 1k)', url: `${import.meta.env.BASE_URL}hdri/quarry_01_1k.hdr` },
+  // Same file base64-wrapped, for static hosts that won't serve .hdr.
+  { label: 'Quarry (bundled 1k)', url: `${import.meta.env.BASE_URL}hdri/quarry_01_1k.hdr.b64.txt` },
 ];
 
 // Target sky radiance after normalisation. The directional sun delivers ~3.2
@@ -64,7 +66,7 @@ export class SkyEnvironment {
     for (const src of HDRI_SOURCES) {
       try {
         onStatus(`Loading ${src.label}…`);
-        const tex = await loader.loadAsync(src.url);
+        const tex = await loadHDR(loader, src.url);
         this.hdri = prepareHDRI(tex, src.label);
         return src.label;
       } catch (err) {
@@ -119,6 +121,24 @@ export class SkyEnvironment {
       scene.environment = this.skyTarget.texture;
     }
   }
+}
+
+async function loadHDR(loader, url) {
+  if (!url.endsWith('.b64.txt')) return loader.loadAsync(url);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${res.status} ${url}`);
+  const bin = Uint8Array.from(atob((await res.text()).trim()), (c) => c.charCodeAt(0));
+  const d = loader.parse(bin.buffer);
+  const tex = new THREE.DataTexture(d.data, d.width, d.height, THREE.RGBAFormat, d.type);
+  Object.assign(tex, {
+    colorSpace: d.colorSpace,
+    minFilter: d.minFilter,
+    magFilter: d.magFilter,
+    generateMipmaps: d.generateMipmaps,
+    flipY: d.flipY,
+  });
+  tex.needsUpdate = true;
+  return tex;
 }
 
 /**
