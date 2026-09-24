@@ -18,7 +18,8 @@ All of the original planner's features and navigation are unchanged:
 
 - **Tools:** select and move, pan, measure, and place trees, beds, buildings, decks, driveways and sidewalks.
 - **Views:** plan, tilted, eye level, frame the lot, centre on the selection, and a simple schematic view. Keyboard: 1 / 2 / 3 / 0 / F / G.
-- **Sun panel:** drag the sun arc to set the time, play the day, pick a date, or jump to a solstice or equinox. Readouts show sun height, bearing, the shadow cast by a 10 ft object, daylight and solar noon.
+- **Layout:** a sidebar with Lot & fence, Location & sun, Yard items, Display and Plan file; a sun timeline along the bottom; tools, views and undo along the top; and the inspector on the right while something is selected. On phones the sidebar becomes a bottom sheet.
+- **Sun timeline:** drag the sun arc to set the time, play the day, pick a date, or jump to a solstice or equinox. Readouts show sun height, bearing, the shadow cast by a 10 ft object, daylight and solar noon.
 - **Property & fence:** reshape the lot corner by corner, type exact side lengths, stretch the lot, and set the fence style, height, density and sides. Set up the grid and snapping.
 - **Site & sky:**
   - House angle versus north.
@@ -56,10 +57,25 @@ The sun position comes from the original's NOAA-based solar maths. It matches su
 | --- | --- |
 | HDRI or physical sky. The HDRI's sun is detected, clamped out of the lighting, and rotated to the solar-maths sun, with house angle vs. north applied. | `src/scene/environment.js` |
 | RenderPass → N8AO → ACES → SMAA, half-float buffers, with no tone mapping on the renderer. It switches cleanly between the perspective and plan (orthographic) cameras. | `src/post.js` |
-| Instanced grass, limited to the lot and cut out around buildings, decks, paving and beds | `src/scene/grass.js` |
 | EZ-Tree trees built from each tree's crown shape, height, spread and density, so what you see matches the shade engine. Per-variety leaf colour, fall colour before leaf drop, bare branches in winter. | `src/trees/trees.js` |
-| Procedural lawn, siding and shingle textures with normal maps | `src/scene/textures.js` |
+| Buildings: foundation, corner boards, fascia and soffit, windows and a door on the wall facing the patio, generated for any outline and merged into a few draw calls | `src/app.js` (`buildingDetails`) |
+| Procedural maple sprig (palmate, serrated, red petioles) for every maple | `src/trees/mapleLeaf.js` |
+| Procedural lawn (blade strokes plus normal map, mowing stripes along the grid), concrete, pavers, siding and shingles | `src/scene/textures.js` |
 
 - **Sun-hours numbers:** the original's analytic shade engine calculates them. The 3D shadows are for looking; the numbers don't depend on them.
 - **Heat-map colours:** they're pre-compensated for the tone curve, so the colour ramp reads the same in the realistic and simple views.
-- **Rendering settings:** sky, grass density, shadow detail, ambient occlusion, wind and exposure are saved per browser, not in plan files.
+- **Display settings** (render quality, sky and exposure) are saved per browser, not in plan files.
+
+## Performance
+
+- **Renders on demand.** Nothing draws unless something changes: the camera, the sun, the plan or a setting. When idle, the GPU does no work.
+- **Shadows only when needed.** The shadow map re-renders only when the sun or the yard changes, never for camera moves.
+- **Lighter while moving.** While you orbit, drag or play the day, frames render at 1× resolution without ambient occlusion. One full-quality frame follows when the view settles.
+- **No wind and no grass geometry.** The lawn is a texture, not millions of blades.
+- **Render quality presets** in the Display section:
+
+| Preset | Resolution | Ambient occlusion | Shadow map |
+| --- | --- | --- | --- |
+| Performance | 1× | off | 2048 |
+| Balanced (default) | up to 1.5× | half resolution | 4096 |
+| Quality | display resolution | full | 4096 |

@@ -419,3 +419,124 @@
   #pii-dialog .pii-footer button { flex:1; }
 }
 /* PROPERTY_IMPORT_CSS_END */
+
+/* ======================================================================
+   Layout: sidebar navigation (left), sun timeline (bottom), toolbar (top),
+   inspector (right, only while something is selected).
+   ====================================================================== */
+:root{--sideW:292px;--tlH:112px;--inspW:320px;--gut:14px;--ease:cubic-bezier(.3,.8,.35,1)}
+body.navmin{--sideW:64px}
+[hidden]{display:none !important}
+
+/* ---------- sidebar ---------- */
+#dock{top:var(--gut);left:var(--gut);bottom:var(--gut);right:auto;width:var(--sideW);height:auto;
+  display:flex;flex-direction:column;overflow:hidden;transition:width .22s var(--ease)}
+#dock.min{height:auto}
+#dockgrip,#dockwidthgrip{display:none !important}
+#dockbar{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px 6px;
+  padding:14px 12px 12px;border-bottom:1px solid var(--line-2);flex:none}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;padding-left:2px}
+.brand .mark{width:26px;height:26px;flex:none}
+.brand .name{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.brand b{font-size:14px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.brand span{font-size:11px;color:var(--faint);white-space:nowrap}
+#tabs{grid-column:1/-1;display:flex;flex-direction:column;gap:2px;overflow:visible;flex:none}
+#tabs button{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:9px;
+  color:var(--dim);font-size:13px;font-weight:500;cursor:pointer;text-align:left;white-space:nowrap;
+  transition:background .14s,color .14s}
+#tabs button:hover{background:var(--ghost);color:var(--text)}
+#tabs button[aria-pressed="true"]{background:var(--amber-dim);color:var(--amber)}
+#tabs button .ic{width:17px;height:17px}
+#tabs .count{margin-left:auto;font-size:11px;font-weight:500;color:var(--faint)}
+#tabs button[aria-pressed="true"] .count{color:var(--amber)}
+#dockbody{flex:1;min-height:0;position:relative;overflow:hidden}
+.pane{padding:14px 16px 22px}
+.panetitle{margin:0 0 4px;font-size:15px;font-weight:600;letter-spacing:-.01em}
+#dock .cols{display:block}
+#dock .cols > div + div,#dock .cols > section + div,#dock .cols > div + section{border-top:1px solid var(--line-2);margin-top:14px}
+#dockbody .btnrow .btn{flex:1 1 auto}
+#dock .objlist{grid-template-columns:1fr}
+.qseg{display:flex}
+.qseg button{flex:1;justify-content:center}
+body.navmin #dock .brand .name,body.navmin #tabs button span,body.navmin #tabs .count{display:none}
+body.navmin #dockbody{display:none}
+body.navmin #dockbar{grid-template-columns:1fr;justify-items:center;padding:12px 8px}
+body.navmin #dockToggle svg{transform:rotate(180deg)}
+body.navmin #tabs button{justify-content:center;padding:9px}
+
+/* ---------- sun timeline ---------- */
+#sunpanel{top:auto;bottom:var(--gut);left:calc(var(--sideW) + var(--gut)*2);right:var(--gut);width:auto;
+  display:flex;align-items:stretch;padding:0;overflow:hidden;transition:left .22s var(--ease)}
+#sunhead{flex:none;display:flex;align-items:center;gap:12px;padding:12px 14px;min-width:238px;
+  border-right:1px solid var(--line-2);cursor:default}
+#sunhead .who{flex:1;min-width:0}
+#sunhead .clock{font-size:24px}
+#sunhead .date{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sunhead .date.loc{color:var(--faint);font-size:11px}
+#sunhead #playbtn{width:38px;height:38px;border-radius:50%}
+#sunToggle{align-self:flex-start}
+#sunpanel.min #sunToggle{transform:rotate(180deg)}
+#sunbody{flex:1;min-width:0;display:flex;align-items:center;gap:18px;padding:8px 16px;border-top:0}
+#sunpanel.min #sunbody{display:flex}
+#sunpanel.min #sunctl,#sunpanel.min .readout{display:none}
+#arc{flex:1 1 260px;min-width:160px;height:88px;margin:0}
+#sunctl{flex:none;width:228px;display:flex;flex-direction:column;gap:8px;margin:0}
+#sunctl input[type=date]{width:100%}
+#seasons{justify-content:space-between}
+#sunpanel .readout{flex:none;min-width:214px;padding:0 0 0 16px;border-top:0;border-left:1px solid var(--line-2);
+  grid-template-columns:auto auto;gap:3px 14px}
+
+/* ---------- toolbar, inspector, overlays ---------- */
+#top{top:var(--gut);left:calc(var(--sideW) + var(--gut)*2);right:auto;
+  max-width:calc(100vw - var(--sideW) - var(--gut)*4 - 80px);transition:left .22s var(--ease)}
+#top .lbl-t{display:none}
+@media (min-width:1560px){ #top [aria-label="Add to the yard"] .lbl-t{display:inline} }
+#inspector{top:calc(var(--gut) + 84px);bottom:calc(var(--tlH) + var(--gut)*2);right:var(--gut)}
+#inspector.empty{display:none}
+#legend{left:calc(var(--sideW) + var(--gut)*2);bottom:calc(var(--tlH) + var(--gut)*2);top:auto}
+#toast{bottom:calc(var(--tlH) + var(--gut)*2 + 12px);left:calc(50% + var(--sideW)/2)}
+#shTip{top:calc(var(--gut) + 64px)}
+
+/* ---------- phones and small tablets ---------- */
+@media (max-width:1020px){
+  :root{--gut:10px;--dockH:44vh}
+  body.navmin{--sideW:0px}
+  #dock{top:auto;left:var(--gut);right:var(--gut);bottom:0;width:auto;height:var(--dockH);
+    border-radius:18px 18px 0 0;border-bottom:0;transition:height .22s var(--ease)}
+  #dockbar{padding:10px 12px 8px;gap:8px 6px}
+  .brand .name span{display:none}
+  #dockToggle svg{transform:rotate(-90deg)}
+  #tabs{flex-direction:row;overflow-x:auto;scrollbar-width:none}
+  #tabs::-webkit-scrollbar{display:none}
+  #tabs button{padding:7px 10px;font-size:12.5px;flex:none}
+  body.navmin #dock{height:auto}
+  body.navmin #dock .brand .name{display:flex}
+  body.navmin #tabs button span,body.navmin #tabs .count{display:inline}
+  body.navmin #dockbar{grid-template-columns:1fr auto;justify-items:stretch;padding:10px 12px 8px}
+  body.navmin #dockToggle svg{transform:rotate(90deg)}
+  body.navmin #tabs button{justify-content:flex-start;padding:7px 10px}
+
+  #sunpanel{top:var(--gut);bottom:auto;left:var(--gut);right:76px;flex-direction:column}
+  #sunhead{border-right:0;min-width:0;padding:8px 10px}
+  #sunhead .clock{font-size:18px}
+  #sunhead #playbtn{width:32px;height:32px}
+  #sunbody{flex-direction:column;align-items:stretch;gap:8px;padding:0 12px 12px}
+  #sunpanel.min #sunbody{display:none}
+  #arc{flex:none;width:100%;height:70px}
+  #sunctl{width:auto}
+  #sunpanel .readout{min-width:0;padding:8px 0 0;border-left:0;border-top:1px solid var(--line-2);grid-template-columns:auto 1fr}
+
+  #top{top:auto;left:var(--gut);right:var(--gut);max-width:none;bottom:calc(var(--dockH) + var(--gut))}
+  body.navmin #top{bottom:calc(var(--barH,104px) + var(--gut))}
+  #inspector{top:auto;bottom:0;left:0;right:0;width:auto;max-height:66vh}
+  #legend{left:var(--gut);bottom:calc(var(--dockH) + var(--gut) + 62px)}
+  body.navmin #legend{bottom:calc(var(--barH,104px) + var(--gut) + 62px)}
+  #toast{left:50%;bottom:calc(var(--dockH) + 72px)}
+  #shTip{top:auto;bottom:calc(var(--dockH) + var(--gut) + 62px)}
+}
+@media (min-width:1021px) and (max-width:1400px){
+  #sunhead{min-width:200px}
+  #sunctl{width:180px}
+  #seasons button{padding:5px 6px}
+  #sunpanel .readout{min-width:180px;gap:3px 10px}
+}

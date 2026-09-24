@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Tree as EzTree } from '@dgreenheck/ez-tree';
+import { mapleLeafTexture } from './mapleLeaf.js';
 
 /*
  * Realistic trees for the planner.
@@ -184,7 +185,8 @@ const RECIPES = {
 function leafTypeFor(t) {
   if (t.evergreen) return 'pine';
   const n = (t.name || '').toLowerCase();
-  if (/maple|oak/.test(n)) return 'oak';
+  if (/maple/.test(n)) return 'maple';
+  if (/oak/.test(n)) return 'oak';
   if (/linden|alder|crab|hydrangea|birch|aspen|poplar|serviceberry/.test(n)) return 'aspen';
   if (/elm|ash|locust|honey|willow/.test(n)) return 'ash';
   return { round: 'oak', spreading: 'oak', vase: 'ash', weeping: 'ash' }[t.shape] || 'aspen';
@@ -202,7 +204,6 @@ const DEFAULT_NEEDLE = 0x2c4a26;
 export class TreeLibrary {
   constructor() {
     this.templates = new Map();
-    this.uniforms = { uTime: { value: 0 }, uWind: { value: 1 } };
   }
 
   /** Normalised template: trunk at origin, height 1, crown diameter 1. */
@@ -222,7 +223,8 @@ export class TreeLibrary {
     ez.loadPreset(recipe.preset);
     const opts = structuredClone(recipe.options);
     opts.seed = 1009 + variant * 7919 + recipeKey.length * 131;
-    opts.leaves = { ...opts.leaves, type: leafType };
+    // EZ-Tree has no maple leaf; grow with oak cards and swap the texture below.
+    opts.leaves = { ...opts.leaves, type: leafType === 'maple' ? 'oak' : leafType };
     // Where limbs start up the trunk tracks the plan's crown-base fraction.
     opts.branch.start = { ...(opts.branch.start || {}), 1: Math.min(0.6, Math.max(0.02, crownBase)) };
     ez.options.copy(opts);
@@ -309,7 +311,7 @@ export class TreeLibrary {
       bark,
       leaves,
       barkMat,
-      leafMap: ez.leavesMesh.material.map,
+      leafMap: leafType === 'maple' ? mapleLeafTexture().map : ez.leavesMesh.material.map,
       leafType,
       alphaTest: recipe.options.leaves.alphaTest ?? 0.5,
       quads: quadCount,
@@ -321,7 +323,7 @@ export class TreeLibrary {
       uLeafColor: { value: new THREE.Color(leafColor) },
       uFallColor: { value: new THREE.Color(fallColor) },
       uFall: { value: 0 },
-      uLumaNorm: { value: 1 / LEAF_TEX_LUMA[t.leafType] },
+      uLumaNorm: { value: 1 / (t.leafType === 'maple' ? mapleLeafTexture().luma : LEAF_TEX_LUMA[t.leafType]) },
     };
     const mat = new THREE.MeshStandardMaterial({
       map: t.leafMap,
@@ -332,27 +334,16 @@ export class TreeLibrary {
     mat.userData.uniforms = uniforms;
     mat.customProgramCacheKey = () => 'ez-leaf';
     mat.onBeforeCompile = (shader) => {
-      Object.assign(shader.uniforms, this.uniforms, uniforms);
+      Object.assign(shader.uniforms, uniforms);
       shader.vertexShader = shader.vertexShader
         .replace(
           '#include <common>',
           `#include <common>
-          uniform float uTime;
-          uniform float uWind;
           attribute float aRand;
           varying float vRand;`,
         )
-        .replace(
-          '#include <begin_vertex>',
-          `#include <begin_vertex>
-          vRand = aRand;
-          vec3 origin = modelMatrix[3].xyz;
-          // Sway grows with height; the template is 1 unit tall.
-          float sway = position.y * 0.012 * uWind;
-          float ph = aRand * 6.2831 + origin.x * 0.1 + origin.z * 0.07;
-          transformed.x += sway * (sin(uTime * 1.1 + ph) + 0.4 * sin(uTime * 2.7 + ph * 1.7));
-          transformed.z += sway * 0.7 * cos(uTime * 0.9 + ph * 1.3);`,
-        );
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          vRand = aRand;`);
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
@@ -437,8 +428,4 @@ export class TreeLibrary {
     });
   }
 
-  update(time, wind) {
-    this.uniforms.uTime.value = time;
-    this.uniforms.uWind.value = wind;
-  }
 }

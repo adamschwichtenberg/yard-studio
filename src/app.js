@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import "./importer.js";
 import { SkyEnvironment } from "./scene/environment.js";
-import { Grass } from "./scene/grass.js";
-import { lawnTextures, sidingTextures, shingleTextures } from "./scene/textures.js";
+import { lawnTextures, sidingTextures, shingleTextures, concreteTile, paverTextures } from "./scene/textures.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { TreeLibrary } from "./trees/trees.js";
 import { createPost } from "./post.js";
 
@@ -159,7 +159,7 @@ function freshState(){
     leafOut:"05-05", leafDrop:"10-12",
     objects:[
       {id:nid(), type:"structure", name:"House", x:0, y:-28, rot:0, height:22, poly:rectPoly(44,26)},
-      {id:nid(), type:"deck", name:"Patio", x:0, y:-8, rot:0, height:0.5, poly:rectPoly(24,12)},
+      {id:nid(), type:"deck", name:"Patio", x:0, y:-8, rot:0, height:0.5, surface:"concrete", poly:rectPoly(24,12)},
       fromPreset("Sienna Glen Maple", -32, 8),
       fromPreset("Black Hills spruce", 34, -2),
       {id:nid(), type:"bed", name:"Vegetable bed", x:2, y:20, w:16, h:8, rot:0},
@@ -172,7 +172,13 @@ let S = freshState();
 
 /* Rendering preferences belong to this browser, not to the plan file. */
 const PREFS_KEY = "yard-shade-studio:render";
-const prefs = Object.assign({sky:"hdri", grass:8, shadow:4096, ao:true, wind:true, exposure:1}, (()=>{
+const QUALITY = {
+  /* pixel ratio cap, ambient occlusion, shadow map, AO at half resolution */
+  performance:{dpr:1,   ao:false, shadow:2048, half:true},
+  balanced:   {dpr:1.5, ao:true,  shadow:4096, half:true},
+  quality:    {dpr:2,   ao:true,  shadow:4096, half:false}
+};
+const prefs = Object.assign({sky:"hdri", quality:"balanced", exposure:1}, (()=>{
   try{ return JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"); }catch{ return {}; }
 })());
 function savePrefs(){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }catch{ /* private mode */ } }
@@ -498,7 +504,6 @@ let onComputeDone = ()=>{};
 
 function scheduleCompute(){
   sceneVer++;
-  if(grass) scheduleGrass();
   scheduleHist();
   edgeCache.key = null;
   if(computeJob) cancelAnimationFrame(computeJob.raf);
@@ -596,7 +601,7 @@ function insideLot(o){ return pointInPoly(S.boundary, o.x, o.y); }
 /* ============================================================ three.js scene */
 const canvas = document.getElementById("gl");
 let renderer, scene, camera, perspectiveCamera, planCamera, sunLight, hemi, fillLight, groundMesh, gridLines, majorLines,
-    post, sky, grass, trees, lawnMat, apronMat,
+    post, sky, trees, lawnMat, apronMat,
     fenceGroup, heatMesh, measureLine, edgeLine;
 const objGroup = new THREE.Group();
 const helperGroup = new THREE.Group();
@@ -615,8 +620,11 @@ function mulberry(a){
   };
 }
 function markDirty(){ dirty = true; }
-/* Overlays (grid, outlines, heat map) float just above the grass tips. */
-const OVER = .44;
+/* Overlays (grid, outlines, heat map) sit just above the ground. */
+const OVER = .06;
+/* Anything that changes shadows (sun, objects, fence, lot) bumps this; camera moves do not. */
+let shadowStamp = 0;
+function markShadows(){ shadowStamp++; dirty = true; }
 
 const SKYSTOPS = [
   {el:-12, top:0x060912, bot:0x121a2e, sun:0x223055, i:0.0,  amb:0x1b2440, ai:0.30, cl:0.25},
@@ -810,6 +818,116 @@ function hipRoof(poly, peak, overhang){
   g.computeVertexNormals();
   return g;
 }
+/* ---------- building details ----------
+   Foundation, corner boards, fascia and soffit, windows and a door, generated
+   for any outline and merged per material so a house costs a handful of draw
+   calls. Coordinates are the building's local plan (x, y) → scene (x, z). */
+const MAT_TRIM = new THREE.MeshStandardMaterial({color:0xf1eee7, roughness:.55, metalness:0});
+const MAT_GLASS = new THREE.MeshStandardMaterial({color:0x1b2733, roughness:.06, metalness:.85, envMapIntensity:1.4});
+const MAT_FOUND = new THREE.MeshStandardMaterial({color:0x8d887e, roughness:.95, metalness:0});
+const MAT_DOOR = new THREE.MeshStandardMaterial({color:0x34414d, roughness:.45, metalness:0});
+const _m4 = new THREE.Matrix4(), _q4 = new THREE.Quaternion(), _up4 = new THREE.Vector3(0,1,0);
+function placedBox(w, h, d, x, y, z, rotY){
+  const g = new THREE.BoxGeometry(w, h, d);
+  _q4.setFromAxisAngle(_up4, rotY);
+  g.applyMatrix4(_m4.compose(new THREE.Vector3(x, y, z), _q4, new THREE.Vector3(1,1,1)));
+  return g;
+}
+function scaledPoly(poly, grow){
+  const c = polyCentroid(poly);
+  let avg = 0;
+  for(const p of poly) avg += Math.hypot(p.x-c.x, p.y-c.y);
+  avg = Math.max(.5, avg/poly.length);
+  const s = 1 + grow/avg;
+  return poly.map(p=>({x:c.x+(p.x-c.x)*s, y:c.y+(p.y-c.y)*s}));
+}
+function buildingDetails(o, poly, eave){
+  const parts = {trim:[], glass:[], found:[], door:[]};
+  const c = polyCentroid(poly);
+  const overhang = Math.min(1.6, eave*.12);
+
+  /* foundation band, a hand's width proud of the siding */
+  const fnd = extrudePoly(scaledPoly(poly, .12), .9);
+  parts.found.push(fnd);
+
+  /* fascia board and soffit around the roof edge */
+  const outer = scaledPoly(poly, overhang);
+  for(let i=0;i<outer.length;i++){
+    const A = outer[i], B = outer[(i+1)%outer.length], len = Math.hypot(B.x-A.x, B.y-A.y);
+    parts.trim.push(placedBox(len+.1, .75, .14, (A.x+B.x)/2, eave-.28, (A.y+B.y)/2, -Math.atan2(B.y-A.y, B.x-A.x)));
+  }
+  /* soffit: the roof-edge outline, facing down */
+  const soffit = flatPoly(outer).toNonIndexed();
+  const sp = soffit.attributes.position, sn = soffit.attributes.normal;
+  for(let i=0;i<sp.count;i+=3){
+    const x = sp.getX(i+1), y = sp.getY(i+1), z = sp.getZ(i+1);
+    sp.setXYZ(i+1, sp.getX(i+2), sp.getY(i+2), sp.getZ(i+2));
+    sp.setXYZ(i+2, x, y, z);
+  }
+  for(let i=0;i<sn.count;i++) sn.setXYZ(i, 0, -1, 0);
+  soffit.translate(0, eave-.02, 0);
+  parts.trim.push(soffit);
+
+  /* which wall gets the door: the one facing the nearest deck or patio */
+  let doorWall = -1, best = Infinity;
+  const decks = S.objects.filter(d=>d.type === "deck");
+  const edges = poly.map((A,i)=>{
+    const B = poly[(i+1)%poly.length], len = Math.hypot(B.x-A.x, B.y-A.y);
+    const dx = (B.x-A.x)/(len||1), dy = (B.y-A.y)/(len||1);
+    let nx = dy, ny = -dx;
+    const mx = (A.x+B.x)/2, my = (A.y+B.y)/2;
+    if(nx*(mx-c.x) + ny*(my-c.y) < 0){ nx = -nx; ny = -ny; }
+    return {A, B, len, dx, dy, nx, ny, mx, my};
+  });
+  edges.forEach((e,i)=>{
+    if(e.len < 6) return;
+    for(const d of decks){
+      const p = localOf(o, d.x, d.y), dist = Math.hypot(p.x-e.mx, p.y-e.my);
+      if((p.x-e.mx)*e.nx + (p.y-e.my)*e.ny > 0 && dist < best){ best = dist; doorWall = i; }
+    }
+  });
+  if(doorWall < 0) doorWall = edges.reduce((bi,e,i,a)=>e.len > a[bi].len ? i : bi, 0);
+
+  const opening = (e, t, w, h, sill, glass)=>{
+    const x = e.A.x + e.dx*t, y = e.A.y + e.dy*t, rot = -Math.atan2(e.dy, e.dx);
+    const out = .06;
+    parts.trim.push(placedBox(w+.5, h+.5, .16, x + e.nx*out, sill + h/2, y + e.ny*out, rot));
+    const pane = placedBox(w, h, .1, x + e.nx*(out+.05), sill + h/2, y + e.ny*(out+.05), rot);
+    (glass ? parts.glass : parts.door).push(pane);
+    if(glass){
+      /* muntins and a sill */
+      parts.trim.push(placedBox(.12, h, .06, x + e.nx*(out+.11), sill + h/2, y + e.ny*(out+.11), rot));
+      parts.trim.push(placedBox(w, .12, .06, x + e.nx*(out+.11), sill + h/2, y + e.ny*(out+.11), rot));
+      parts.trim.push(placedBox(w+.8, .2, .45, x + e.nx*(out+.12), sill - .25, y + e.ny*(out+.12), rot));
+    }
+  };
+  const rows = eave >= 16 ? [3, eave - 5.6] : eave >= 7 ? [3] : [];
+  edges.forEach((e,i)=>{
+    /* corner board at the start of every wall */
+    parts.trim.push(placedBox(.5, eave-.9, .5, e.A.x, .9 + (eave-.9)/2, e.A.y, -Math.atan2(e.dy, e.dx)));
+    if(e.len < 7 || !rows.length) return;
+    const doorAt = i === doorWall ? e.len*(e.len > 20 ? .38 : .5) : null;
+    if(doorAt != null) opening(e, doorAt, 3, 6.8, .9, false);
+    const n = Math.max(1, Math.floor(e.len/11));
+    for(let k=0;k<n;k++){
+      const t = (k+.5)*e.len/n;
+      for(const [r, sill] of rows.entries()){
+        if(r === 0 && doorAt != null && Math.abs(t - doorAt) < 4.5) continue;
+        if(t < 2.6 || t > e.len - 2.6) continue;
+        opening(e, t, 3, Math.min(4.2, eave - sill - 1.4), sill, true);
+      }
+    }
+  });
+  const grp = new THREE.Group();
+  for(const [key, mat] of [["trim",MAT_TRIM],["glass",MAT_GLASS],["found",MAT_FOUND],["door",MAT_DOOR]]){
+    if(!parts[key].length) continue;
+    const geos = parts[key].map(g=>{ const n = g.index ? g.toNonIndexed() : g; n.deleteAttribute("uv"); return n; });
+    const m = new THREE.Mesh(mergeGeometries(geos, false), mat);
+    m.castShadow = key !== "glass"; m.receiveShadow = true;
+    grp.add(m);
+  }
+  return grp;
+}
 function buildStructure(o){
   const grp = new THREE.Group();
   const poly = o.poly && o.poly.length > 2 ? o.poly : rectPoly(12,10);
@@ -823,14 +941,32 @@ function buildStructure(o){
   roof.castShadow = roof.receiveShadow = true;
   grp.add(roof);
   if(S.simple){ addWire(grp, walls, WIRE.structure); addWire(grp, roof, WIRE.structure); }
+  else grp.add(buildingDetails(o, poly, eave));
   return grp;
 }
 function deckHeight(o){ return Math.max(.1, o.height ?? .5); }
+const SURFACES = {concrete:"Broom-finished concrete", pavers:"Concrete pavers", wood:"Wood decking"};
+function deckSurface(o){ return SURFACES[o.surface] ? o.surface : /patio/i.test(o.name||"") ? "concrete" : "wood"; }
+/* One shared material per surface; top-face UVs are in feet. */
+const deckMats = {};
+function deckMaterial(kind){
+  if(deckMats[kind]) return deckMats[kind];
+  let mat;
+  if(kind === "concrete"){
+    const t = concreteTile();
+    for(const x of [t.map, t.roughnessMap, t.normalMap]) x.repeat.set(1/5, 1/5);   // 5 ft control joints
+    mat = new THREE.MeshStandardMaterial({...t, roughness:1, metalness:0});
+  } else if(kind === "pavers"){
+    const t = paverTextures();
+    for(const x of [t.map, t.normalMap]) x.repeat.set(1/5.3, 1/5.3);                 // 8 in × 16 in pavers
+    mat = new THREE.MeshStandardMaterial({...t, roughness:.9, metalness:0});
+  } else mat = new THREE.MeshStandardMaterial({map:TEX.deck, roughness:.85, metalness:0});
+  return deckMats[kind] = mat;
+}
 function buildDeck(o){
   const poly = o.poly && o.poly.length > 2 ? o.poly : rectPoly(16,12);
   const H = deckHeight(o);
-  const mat = S.simple ? MAT_SIMPLE.deck
-    : new THREE.MeshStandardMaterial({map:TEX.deck, roughness:.85, metalness:0});
+  const mat = S.simple ? MAT_SIMPLE.deck : deckMaterial(deckSurface(o));
   const m = new THREE.Mesh(extrudePoly(poly, H), mat);
   m.castShadow = m.receiveShadow = true;
   const grp = new THREE.Group();
@@ -897,6 +1033,7 @@ function buildBed(b){
 function buildFence(){
   if(fenceGroup){ scene.remove(fenceGroup); disposeTree(fenceGroup); fenceGroup = null; }
   const sides = ensureFenceSides();
+  markShadows();
   if(!S.fence.on || S.fence.height <= 0 || !sides.some(Boolean)) return;
   const st = FENCE_STYLES[S.fence.style] || FENCE_STYLES.picket;
   const H = S.fence.height, g = new THREE.Group();
@@ -988,33 +1125,42 @@ function buildFence(){
   }
   fenceGroup = g;
   scene.add(g);
+  markShadows();
 }
 
 /* ---------- ground, boundary, grid ---------- */
-function lawnMaterial(repeat){
-  const lawn = lawnTextures(1);
-  for(const t of [lawn.map, lawn.normalMap]) t.repeat.set(repeat, repeat);
-  const mat = new THREE.MeshStandardMaterial({map:lawn.map, normalMap:lawn.normalMap,
-    normalScale:new THREE.Vector2(.6,.6), roughness:.95, metalness:0});
-  /* low-frequency world-space tint hides the texture repeat (coords in feet) */
+let lawnTex = null;
+const stripeUniform = {value:new THREE.Vector2(1, 0)};
+function lawnMaterial(repeat, stripes){
+  lawnTex ??= lawnTextures(1);
+  const map = lawnTex.map.clone(), normalMap = lawnTex.normalMap.clone();
+  for(const t of [map, normalMap]){ t.repeat.set(repeat, repeat); t.needsUpdate = true; }
+  const mat = new THREE.MeshStandardMaterial({map, normalMap,
+    normalScale:new THREE.Vector2(.8,.8), roughness:.95, metalness:0});
+  /* world-space colour drift hides the texture repeat; mowing stripes run
+     along the grid's axis, 6 ft wide (coords in feet) */
   mat.onBeforeCompile = shader=>{
+    shader.uniforms.uStripe = stripeUniform;
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec2 vGroundXZ;")
       .replace("#include <begin_vertex>", "#include <begin_vertex>\nvGroundXZ = (modelMatrix * vec4(position, 1.0)).xz;");
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", "#include <common>\nvarying vec2 vGroundXZ;")
+      .replace("#include <common>", "#include <common>\nvarying vec2 vGroundXZ;\nuniform vec2 uStripe;")
       .replace("#include <map_fragment>", `#include <map_fragment>
         vec2 gp = vGroundXZ * .3048;
         float macro = sin(gp.x*.071 + sin(gp.y*.053)*2.) * sin(gp.y*.067 + sin(gp.x*.041)*2.);
         float micro = sin(gp.x*.37 + gp.y*.21) * sin(gp.y*.31 - gp.x*.17);
-        diffuseColor.rgb *= .9 + .12*macro + .05*micro;
-        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(1.08,1.,.8), .5 + .5*macro);`);
+        diffuseColor.rgb *= .92 + .1*macro + .04*micro;
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(1.06,1.,.84), .5 + .5*macro);
+        float along = dot(vGroundXZ, vec2(-uStripe.y, uStripe.x));
+        float stripe = smoothstep(-.15, .15, sin(along * 3.14159 / 6.));
+        diffuseColor.rgb *= mix(1., mix(.965, 1.035, stripe), ${stripes ? "1." : "0."});`);
   };
   return mat;
 }
 function buildGround(){
   if(groundMesh){ scene.remove(groundMesh); groundMesh.geometry.dispose(); }
-  if(!lawnMat){ lawnMat = lawnMaterial(1/6.5); apronMat = lawnMaterial(2600/6.5); }
+  if(!lawnMat){ lawnMat = lawnMaterial(1/6.5, true); apronMat = lawnMaterial(2600/6.5, false); apronMat.color.setRGB(.9,.92,.86); }
   const mat = S.simple
     ? new THREE.MeshStandardMaterial({color:0x1d2731, roughness:1, metalness:0})
     : lawnMat;
@@ -1032,29 +1178,7 @@ function buildGround(){
   apron.material = S.simple ? new THREE.MeshStandardMaterial({color:0x11171d, roughness:1}) : apronMat;
   buildEdgeLine();
   buildGrid();
-  scheduleGrass();
-}
-/* Turf grows inside the lot, outside buildings, decks, paving and beds. */
-function isLawn(x, y){
-  if(!pointInPoly(S.boundary, x, y)) return false;
-  for(const o of S.objects){
-    if(o.type === "tree") continue;
-    if(o.type === "bed"){
-      const q = rot2(x-o.x, y-o.y, -(o.rot||0)*DEG);
-      if(Math.abs(q.x) < o.w/2+.2 && Math.abs(q.y) < o.h/2+.2) return false;
-    } else if(o.poly && Math.hypot(x-o.x, y-o.y) < objReach(o)*1.5 && pointInPoly(worldPoly(o), x, y)) return false;
-  }
-  return true;
-}
-let grassTimer = null;
-function scheduleGrass(){
-  clearTimeout(grassTimer);
-  grassTimer = setTimeout(()=>{
-    if(S.simple || !prefs.grass){ grass.dispose(); markDirty(); return; }
-    const b = yardBounds();
-    grass.rebuild({bounds:{x0:b.x0, x1:b.x1, y0:b.y0, y1:b.y1}, isLawn, density:prefs.grass});
-    markDirty();
-  }, 350);
+  markShadows();
 }
 function buildEdgeLine(){
   if(edgeLine){ helperGroup.remove(edgeLine); edgeLine.geometry.dispose(); edgeLine = null; }
@@ -1070,6 +1194,8 @@ function buildEdgeLine(){
 function buildGrid(){
   if(gridLines){ helperGroup.remove(gridLines); gridLines.geometry.dispose(); gridLines = null; }
   if(majorLines){ helperGroup.remove(majorLines); majorLines.geometry.dispose(); majorLines = null; }
+  const ga = gridFrame().angle*DEG;
+  stripeUniform.value.set(Math.cos(ga), Math.sin(ga));
   if(!S.showGrid) return;
   const polygon = S.boundary.map(worldToGrid);
   const b = bbox(polygon), g = S.grid, pts = [], major = [], step = Math.max(.6, g/4);
@@ -1097,7 +1223,7 @@ function buildGrid(){
     helperGroup.add(m);
     return m;
   };
-  gridLines = mk(pts, S.simple ? .34 : .07, 0xffffff);
+  gridLines = mk(pts, S.simple ? .34 : .05, 0xffffff);
   majorLines = mk(major, .8, 0x8fc4ff);
 }
 
@@ -1206,6 +1332,7 @@ function rebuildObject(o){
   m.traverse(n=>{ n.userData.id = o.id; });
   objGroup.add(m);
   meshes.set(o.id, m);
+  shadowStamp++;
   if(activeView === "vplan") applyCamera();
 }
 function rebuildAll(){
@@ -1220,7 +1347,7 @@ function placeObject(o){
   if(!m) return rebuildObject(o);
   m.position.set(o.x, 0, o.y);
   m.rotation.y = -(o.rot||0)*DEG;
-  markDirty();
+  markShadows();
 }
 let pendingRebuild = null, rebuildQueued = false;
 function queueRebuild(o){
@@ -1506,30 +1633,48 @@ function resize(){
   updateCameraProjection();
   markDirty();
 }
-let lastFrame = performance.now(), windTime = 0;
+/* Rendering is on demand: nothing draws unless something changed. While the
+   view is being dragged or animated, frames render at 1× pixel ratio without
+   ambient occlusion, then one full-quality frame lands when it settles. */
+let lastSunKey = "", lastShadowStamp = -1, lastInput = 0, lowQ = false;
+function qualityPreset(){ return QUALITY[prefs.quality] || QUALITY.balanced; }
+function applyQuality(low){
+  const q = qualityPreset(), dpr = Math.min(window.devicePixelRatio || 1, q.dpr);
+  const want = low ? Math.min(dpr, 1) : dpr;
+  if(renderer.getPixelRatio() !== want){
+    renderer.setPixelRatio(want);
+    post.setSize(window.innerWidth, window.innerHeight);
+  }
+  if(post.ao.configuration.halfRes !== q.half) post.ao.configuration.halfRes = q.half;
+  post.setAO(q.ao && !low);
+  if(sunLight.shadow.mapSize.x !== q.shadow){
+    sunLight.shadow.mapSize.set(q.shadow, q.shadow);
+    sunLight.shadow.map?.dispose(); sunLight.shadow.map = null;
+    shadowStamp++;
+  }
+}
+document.addEventListener("pointermove", e=>{ if(e.buttons) lastInput = performance.now(); }, {passive:true});
+canvas.addEventListener("wheel", ()=>{ lastInput = performance.now(); }, {passive:true});
 function loop(){
   requestAnimationFrame(loop);
   if(camAnim) camAnim();
-  const animate = prefs.wind && !S.simple && !document.hidden;
-  if(!dirty && !playing && !animate) return;
-  const now = performance.now(), dt = Math.min(.1, (now - lastFrame)/1000);
-  lastFrame = now;
-  const changed = dirty || playing;
+  const now = performance.now();
+  const moving = !!camAnim || playing || now - lastInput < 160;
+  if(moving !== lowQ && (dirty || !moving)){ lowQ = moving; applyQuality(lowQ); dirty = true; }
+  if(!dirty && !playing) return;
   dirty = false;
   const sp = updateSun();
-  /* wind never moves shadows, so the shadow map only re-renders on real changes */
-  if(changed) renderer.shadowMap.needsUpdate = true;
-  if(animate) windTime += dt;
-  const wind = animate ? 1 : 0;
-  grass.update(windTime, wind);
-  trees.update(windTime, wind);
-  post.render(dt);
-  if(changed){
-    updateLabels();
-    updateShapeEditor();
-    updateReadout(sp);
-    updateCompass();
+  /* shadows depend on the sun and the yard, never on the camera */
+  const sunKey = sunLight.position.x.toFixed(2)+","+sunLight.position.y.toFixed(2)+","+sunLight.position.z.toFixed(2);
+  if(sunKey !== lastSunKey || shadowStamp !== lastShadowStamp){
+    renderer.shadowMap.needsUpdate = true;
+    lastSunKey = sunKey; lastShadowStamp = shadowStamp;
   }
+  post.render();
+  updateLabels();
+  updateShapeEditor();
+  updateReadout(sp);
+  updateCompass();
 }
 
 /* ============================================================ labels ------- */
@@ -1786,12 +1931,15 @@ const arcSvg = document.getElementById("arc");
 let arcGeom = null;
 function buildArc(){
   const {rise, set, peak} = dayEdges();
-  const W = 320, x0 = 22, x1 = W-22, base = 58, top = 22, pts = [], N = 70;
+  /* draw at the arc's real aspect so labels don't stretch in a wide timeline */
+  const W = Math.max(220, Math.round(arcSvg.clientWidth*78/Math.max(1, arcSvg.clientHeight))) || 320;
+  arcSvg.setAttribute("viewBox", "0 0 "+W+" 78");
+  const x0 = 22, x1 = W-22, base = 58, top = 22, pts = [], N = 70;
   for(let i=0;i<=N;i++){
     const m = rise + (set-rise)*i/N;
     pts.push([x0 + (x1-x0)*i/N, base - (Math.max(0,solarPos(m).el)/Math.max(1,peak))*(base-top)]);
   }
-  arcGeom = {rise, set, peak, x0, x1, base, top};
+  arcGeom = {rise, set, peak, x0, x1, base, top, W};
   const d = pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
   let ni = 0;
   for(let i=1;i<pts.length;i++) if(pts[i][1] < pts[ni][1]) ni = i;
@@ -1827,8 +1975,8 @@ function moveBead(sp){
 function arcSet(clientX){
   if(!arcGeom) return;
   const r = arcSvg.getBoundingClientRect();
-  const {rise, set, x0, x1} = arcGeom;
-  const t = clamp(((clientX - r.left)/r.width*320 - x0)/(x1-x0), 0, 1);
+  const {rise, set, x0, x1, W} = arcGeom;
+  const t = clamp(((clientX - r.left)/r.width*W - x0)/(x1-x0), 0, 1);
   S.minutes = Math.round(rise + (set-rise)*t);
   markDirty();
 }
@@ -2092,7 +2240,7 @@ function addObject(kind, p){
 function removeSelected(){
   if(S.sel === BOUNDARY) return;
   const m = meshes.get(S.sel);
-  if(m){ objGroup.remove(m); disposeTree(m); meshes.delete(S.sel); }
+  if(m){ objGroup.remove(m); disposeTree(m); meshes.delete(S.sel); markShadows(); }
   S.objects = S.objects.filter(o=>o.id !== S.sel);
   nodeEdit = false; activeNode = null;
   select(null);
@@ -2230,11 +2378,12 @@ function gridReferenceHTML(){
 function drawPanel(){
   const o = selected();
   const title = document.getElementById("seltitle"), tag = document.getElementById("seltag");
+  document.getElementById("inspector").classList.toggle("empty", !o);
   if(!o){
     title.textContent = "Nothing selected";
     tag.textContent = "";
     if(panelFor !== null){
-      props.innerHTML = `<p class="hint">Tap anything in the yard to edit it here. Site-wide settings live along the bottom.</p>`;
+      props.innerHTML = `<p class="hint">Tap anything in the yard to edit it here. Site-wide settings are in the sidebar.</p>`;
       panelFor = null;
     }
     return;
@@ -2300,7 +2449,7 @@ function drawPanel(){
       + `<h4>Stretch the whole lot</h4>`
       + numRow("Width across", 'data-fitlot="w"', b.w.toFixed(0))
       + numRow("Depth", 'data-fitlot="h"', b.h.toFixed(0))
-      + `<p class="hint">Fence sides, style and height are in the Property &amp; fence panel below.</p>`;
+      + `<p class="hint">Fence sides, style and height are under Lot &amp; fence in the sidebar.</p>`;
   } else {
     const b = bbox(o.poly);
     html += outlineHTML(o)
@@ -2308,7 +2457,9 @@ function drawPanel(){
       + numRow("Width", 'data-fit="w"', b.w.toFixed(0))
       + numRow("Depth", 'data-fit="h"', b.h.toFixed(0))
       + (o.type === "structure" ? slider("Height to peak","height",4,80,1,o.height) : "")
-      + (o.type === "deck" ? slider("Deck height","height",0,20,.5,(o.height ?? .5).toFixed(1)) : "")
+      + (o.type === "deck" ? slider("Deck height","height",0,20,.5,(o.height ?? .5).toFixed(1))
+          + `<div class="field"><span class="lab">Surface</span><span style="flex:1.4"><select data-key="surface">${
+            Object.entries(SURFACES).map(([k,v])=>`<option value="${k}" ${k===deckSurface(o)?"selected":""}>${v}</option>`).join("")}</select></span></div>` : "")
       + field("Rotation","rot",`min="-180" max="180" step="1" value="${o.rot}"`,"°")
       + `<h4>Position</h4>` + field("Left–right","x",`step="1" value="${o.x}"`)
       + field("Up–down","y",`step="1" value="${o.y}"`)
@@ -2320,7 +2471,7 @@ function drawPanel(){
   props.innerHTML = html;
   syncRanges(props);
 }
-const GEOKEYS = new Set(["height","spread","density","shape","evergreen","w","h"]);
+const GEOKEYS = new Set(["height","spread","density","shape","evergreen","w","h","surface"]);
 props.addEventListener("input", e=>{
   const o = selected();
   if(!o) return;
@@ -2438,6 +2589,7 @@ function drawList(){
         <span class="tx"><span class="nm">${o.name}</span><span class="mt">${mt}</span></span></button>`);
     }
     el.innerHTML = rows.join("");
+    $("objcount").textContent = S.objects.length;
   }
   syncLotFields();
   drawFenceEdges();
@@ -2524,114 +2676,37 @@ function setSimple(v){
 $("vsimple").addEventListener("click", ()=>setSimple(!S.simple));
 $("simpleview").addEventListener("change", e=>setSimple(e.target.checked));
 
-/* ---------- dock: resize grip and left-side docking ---------- */
+/* ---------- layout: sidebar and sun timeline ---------- */
 const root = document.documentElement;
+let arcW = 0;
 function syncSunH(){
-  const r = $("sunpanel").getBoundingClientRect();
-  root.style.setProperty("--sunH", Math.round(r.height) + "px");
+  const sun = $("sunpanel").getBoundingClientRect();
+  if(arcSvg.clientWidth && Math.abs(arcSvg.clientWidth - arcW) > 2){ arcW = arcSvg.clientWidth; buildArc(); }
+  if(window.innerWidth > 1020) root.style.setProperty("--tlH", Math.round(sun.height) + "px");
   root.style.setProperty("--barH", $("dockbar").offsetHeight + "px");
-  const dock = $("dock");
-  $("dockgrip").setAttribute("aria-valuenow", dock.offsetHeight);
-  $("dockwidthgrip").setAttribute("aria-valuenow", dock.offsetWidth);
   markDirty();
 }
-function setDockSide(on){
-  const dock = $("dock");
-  dock.classList.add("nt");
-  dock.classList.toggle("side", on);
-  document.body.classList.toggle("sidedock", on);
-  $("dockSide").setAttribute("aria-pressed", on);
-  $("dockSide").title = on ? "Put the panel back along the bottom"
-                           : "Dock this panel to the left, under the sun panel";
-  $("dockSide").innerHTML = `<svg class="ic"><use href="#i-dock${on?"bottom":"side"}"/></svg>`;
-  if(on){
-    $("sunpanel").classList.remove("min");
-    $("sunToggle").title = "Hide the sun panel";
-    if(dock.offsetWidth > window.innerWidth - 28)
-      root.style.setProperty("--sideW", Math.max(240, window.innerWidth - 28) + "px");
-  }
+function setNavCollapsed(min){
+  $("dock").classList.toggle("min", min);
+  document.body.classList.toggle("navmin", min);
+  $("dockToggle").title = min ? "Expand the sidebar" : "Collapse the sidebar";
+  try{ localStorage.setItem("yard-shade-studio:navmin", min ? "1" : ""); }catch{ /* private mode */ }
   syncSunH();
-  setTimeout(()=>dock.classList.remove("nt"), 30);
-  markDirty();
 }
-$("dockSide").addEventListener("click", ()=>setDockSide(!$("dock").classList.contains("side")));
+$("dockToggle").addEventListener("click", ()=>setNavCollapsed(!$("dock").classList.contains("min")));
 if(window.ResizeObserver){
   const ro = new ResizeObserver(syncSunH);
-  ro.observe($("sunpanel")); ro.observe($("dockbar")); ro.observe($("dock"));
-  ro.observe($("inspector")); ro.observe($("top"));
+  for(const id of ["sunpanel","dockbar","dock","inspector","top"]) ro.observe($(id));
 }
 document.querySelectorAll("#sunpanel,#dock,#inspector,#top").forEach(panel=>
-  panel.addEventListener("transitionend",markDirty));
+  panel.addEventListener("transitionend", syncSunH));
 window.addEventListener("resize", syncSunH);
-(function(){
-  const dock = $("dock");
-  const bounds = width=>{
-    const side = dock.classList.contains("side"), gut = parseFloat(getComputedStyle(root).getPropertyValue("--gut"));
-    const max = width ? Math.min(620, window.innerWidth - gut*2)
-      : window.innerHeight - (side ? $("sunpanel").getBoundingClientRect().bottom + gut : 110);
-    return {min:Math.min(max, width ? 240 : $("dockbar").offsetHeight + 72), max};
-  };
-  const size = (value, width, expand = true)=>{
-    const b = bounds(width), side = dock.classList.contains("side");
-    if(expand){
-      dock.classList.remove("min");
-      $("dockToggle").title = "Collapse";
-      $("dockToggle").innerHTML = "&#9660;";
-    }
-    const property = width ? "--sideW" : side ? "--sideDockH" : "--dockH";
-    root.style.setProperty(property, Math.round(clamp(value, b.min, b.max)) + "px");
-    const grip = $(width ? "dockwidthgrip" : "dockgrip");
-    grip.setAttribute("aria-valuemin", Math.round(b.min));
-    grip.setAttribute("aria-valuemax", Math.round(b.max));
-    syncSunH();
-  };
-  for(const [id,width] of [["dockgrip",false],["dockwidthgrip",true]]){
-    const grip = $(id);
-    let drag = null;
-    const move = e=>{
-      if(!drag || drag.id !== e.pointerId) return;
-      const delta = width ? e.clientX-drag.x : (e.clientY-drag.y)*(drag.side ? 1 : -1);
-      size(drag.start + delta, width);
-    };
-    const stop = e=>{
-      if(!drag || drag.id !== e.pointerId) return;
-      if(e.type === "pointerup") move(e);
-      drag = null;
-      dock.classList.remove("nt");
-      markDirty();
-    };
-    grip.addEventListener("pointerdown", e=>{
-      if(e.button !== 0) return;
-      e.preventDefault(); e.stopPropagation();
-      grip.setPointerCapture(e.pointerId);
-      dock.classList.add("nt");
-      drag = {id:e.pointerId, x:e.clientX, y:e.clientY, side:dock.classList.contains("side"),
-              start:width ? dock.offsetWidth : dock.offsetHeight};
-    });
-    grip.addEventListener("pointermove", move);
-    for(const event of ["pointerup","pointercancel","lostpointercapture"]) grip.addEventListener(event, stop);
-    grip.addEventListener("keydown", e=>{
-      const keys = width ? {ArrowLeft:-20,ArrowRight:20}
-        : dock.classList.contains("side") ? {ArrowUp:-20,ArrowDown:20} : {ArrowUp:20,ArrowDown:-20};
-      if(!(e.key in keys)) return;
-      e.preventDefault(); e.stopPropagation();
-      size((width ? dock.offsetWidth : dock.offsetHeight) + keys[e.key], width);
-    });
-    grip.addEventListener("dblclick", ()=>{
-      root.style.removeProperty(width ? "--sideW" : dock.classList.contains("side") ? "--sideDockH" : "--dockH");
-      syncSunH();
-    });
-  }
-  window.addEventListener("resize", ()=>{
-    if(!dock.classList.contains("min")) size(dock.offsetHeight, false, false);
-    if(dock.classList.contains("side")) size(dock.offsetWidth, true, false);
-  });
-})();
 $("sunToggle").addEventListener("click", e=>{ e.stopPropagation(); toggleSun(); });
 $("sunhead").addEventListener("click", toggleSun);
 function toggleSun(){
   const min = $("sunpanel").classList.toggle("min");
-  $("sunToggle").title = min ? "Show the sun panel" : "Hide the sun panel";
+  $("sunToggle").title = min ? "Show the sun details" : "Hide the sun details";
+  syncSunH();
 }
 /* the compass is a steering wheel */
 (function(){
@@ -2657,16 +2732,12 @@ function toggleSun(){
   c.addEventListener("pointercancel", stop);
   c.addEventListener("dblclick", ()=>{ flyTo({az:0}, 420); });
 })();
-document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click", ()=>{
-  document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-pressed", x===b));
-  document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("on", p.dataset.pane === b.dataset.tab));
-  $("dock").classList.remove("min");
-  $("dockToggle").innerHTML = "&#9660;";
-}));
-$("dockToggle").addEventListener("click", ()=>{
-  const min = $("dock").classList.toggle("min");
-  $("dockToggle").innerHTML = min ? "&#9650;" : "&#9660;";
-});
+function showTab(tab){
+  document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-pressed", x.dataset.tab === tab));
+  document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("on", p.dataset.pane === tab));
+  if($("dock").classList.contains("min")) setNavCollapsed(false);
+}
+document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click", ()=>showTab(b.dataset.tab)));
 $("date").addEventListener("input", e=>{ S.date = e.target.value || S.date; afterDateChange(); });
 document.querySelectorAll("[data-jump]").forEach(b=>b.addEventListener("click", ()=>{
   S.date = S.date.slice(0,4)+"-"+b.dataset.jump;
@@ -2685,7 +2756,8 @@ function afterDateChange(){
   syncLocationUI();
   markDirty();
 }
-$("playbtn").addEventListener("click", ()=>{
+$("playbtn").addEventListener("click", e=>{
+  e.stopPropagation();
   playing = !playing;
   $("playbtn").innerHTML = `<svg class="ic fill"><use href="#i-${playing?"pause":"play"}"/></svg>`;
   if(playing){
@@ -3113,13 +3185,18 @@ function initLocationUI(){
 }
 
 /* ============================================================ rendering ---- */
+const QUALITY_HINT = {
+  performance:"1× resolution, no ambient occlusion, 2048 shadows. Best for laptops and phones.",
+  balanced:"Up to 1.5× resolution, half-resolution ambient occlusion, 4096 shadows.",
+  quality:"Full display resolution, full ambient occlusion. Needs a strong GPU."
+};
 function syncPrefs(label){
-  $("rsky").value = prefs.sky; $("rgrass").value = String(prefs.grass);
-  $("rshadow").value = String(prefs.shadow); $("rao").checked = prefs.ao;
-  $("rwind").checked = prefs.wind;
+  $("rsky").value = prefs.sky;
+  document.querySelectorAll("#rquality button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.quality === prefs.quality));
+  $("rqualityhint").textContent = QUALITY_HINT[prefs.quality] || "";
   $("rexp").value = prefs.exposure; $("rexp2").value = prefs.exposure;
   if(label !== undefined) $("rsource").textContent = label
-    ? "HDRI: "+label+". Settings are saved in this browser, not in the plan file."
+    ? "Sky photo: "+label+". Display settings are saved in this browser, not in the plan file."
     : "No HDRI could be loaded, so the physical sky is used.";
   syncRanges(document);
 }
@@ -3130,15 +3207,10 @@ function initPrefsUI(){
     if(prefs.sky === "hdri" && !sky.hdri){ prefs.sky = "sky"; e.target.value = "sky"; toast("No HDRI is available, so the physical sky stays on."); }
     sky.setMode(prefs.sky); changed();
   });
-  $("rgrass").addEventListener("change", e=>{ prefs.grass = +e.target.value; scheduleGrass(); changed(); });
-  $("rshadow").addEventListener("change", e=>{
-    prefs.shadow = +e.target.value;
-    sunLight.shadow.mapSize.set(prefs.shadow, prefs.shadow);
-    sunLight.shadow.map?.dispose(); sunLight.shadow.map = null;
-    changed();
-  });
-  $("rao").addEventListener("change", e=>{ prefs.ao = e.target.checked; post.setAO(prefs.ao); changed(); });
-  $("rwind").addEventListener("change", e=>{ prefs.wind = e.target.checked; changed(); });
+  document.querySelectorAll("#rquality button").forEach(b=>b.addEventListener("click", ()=>{
+    prefs.quality = b.dataset.quality;
+    applyQuality(false); syncPrefs(); changed();
+  }));
   const exp = v=>{ prefs.exposure = clamp(v, .3, 2.5); $("rexp").value = prefs.exposure; $("rexp2").value = prefs.exposure;
     changed(); clearTimeout(exp.t); exp.t = setTimeout(()=>{ updateSun(); refreshHeat(); markDirty(); }, 200); };
   bindNum("rexp", exp); bindNum("rexp2", exp);
@@ -3147,7 +3219,6 @@ function initPrefsUI(){
 /* ============================================================ init --------- */
 function init(){
   renderer = new THREE.WebGLRenderer({canvas, antialias:false, stencil:false, powerPreference:"high-performance"});
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio||1));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false;
@@ -3163,8 +3234,7 @@ function init(){
   sky.setMode(prefs.sky);
   sunLight = new THREE.DirectionalLight(0xfff0d0, 3);
   sunLight.castShadow = true;
-  const sm = prefs.shadow;
-  sunLight.shadow.mapSize.set(sm, sm);
+  sunLight.shadow.mapSize.set(qualityPreset().shadow, qualityPreset().shadow);
   sunLight.shadow.bias = -0.0003;
   sunLight.shadow.normalBias = 0.06;
   sunLight.shadow.radius = 3;
@@ -3173,10 +3243,9 @@ function init(){
   fillLight = new THREE.DirectionalLight(0xbcd2ea, .2);
   scene.add(hemi, fillLight);
   scene.add(objGroup, helperGroup);
-  grass = new Grass(scene, {height:.3});
   trees = new TreeLibrary();
   post = createPost(renderer, scene, camera);
-  post.setAO(prefs.ao);
+  applyQuality(false);
   ensureFenceSides();
   buildGround();
   rebuildAll();
@@ -3204,6 +3273,7 @@ async function boot(){
   lastLeaf = leafOn();
   applySimpleChrome();
   syncInputs(); buildArc(); drawList(); drawPanel(); setTool("select"); scheduleCompute();
+  try{ if(localStorage.getItem("yard-shade-studio:navmin")) setNavCollapsed(true); }catch{ /* private mode */ }
   syncSunH(); histBtns();
   savedMark = JSON.stringify(S);
   pushHist();

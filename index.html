@@ -35,6 +35,12 @@
   <symbol id="i-redo" viewBox="0 0 16 16"><path d="M13.4 4.2v3.6H9.8"/><path d="M12.9 7.5A5.3 5.3 0 1 0 11.6 12"/></symbol>
   <symbol id="i-dockside" viewBox="0 0 16 16"><rect x="2" y="2.6" width="12" height="10.8" rx="1.4"/><path d="M6.6 2.6v10.8"/></symbol>
   <symbol id="i-dockbottom" viewBox="0 0 16 16"><rect x="2" y="2.6" width="12" height="10.8" rx="1.4"/><path d="M2 9.6h12"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3"/><path d="M8 1.2v1.9M8 12.9v1.9M1.2 8h1.9M12.9 8h1.9M3.2 3.2l1.3 1.3M11.5 11.5l1.3 1.3M3.2 12.8l1.3-1.3M11.5 4.5l1.3-1.3"/></symbol>
+  <symbol id="i-lot" viewBox="0 0 16 16"><path d="M2.4 3.2l8.8-1 2.4 9.4-9.6 2.2z"/><circle cx="2.4" cy="3.2" r="1.1"/><circle cx="11.2" cy="2.2" r="1.1"/><circle cx="13.6" cy="11.6" r="1.1"/><circle cx="4" cy="13.8" r="1.1"/></symbol>
+  <symbol id="i-list" viewBox="0 0 16 16"><path d="M5.6 4h8M5.6 8h8M5.6 12h8"/><circle cx="2.6" cy="4" r=".9"/><circle cx="2.6" cy="8" r=".9"/><circle cx="2.6" cy="12" r=".9"/></symbol>
+  <symbol id="i-display" viewBox="0 0 16 16"><rect x="1.8" y="2.6" width="12.4" height="8.6" rx="1.3"/><path d="M5.6 13.8h4.8M8 11.2v2.6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.8h5.4l3 3v9.4H4z"/><path d="M9.2 1.8v3.2h3.2"/></symbol>
+  <symbol id="i-collapse" viewBox="0 0 16 16"><path d="M10 3.6L5.6 8l4.4 4.4"/></symbol>
 </defs></svg>
 
 <div id="view"><canvas id="gl"></canvas></div>
@@ -54,22 +60,22 @@
 
 <div id="sunpanel" class="panel">
   <div id="sunhead">
+    <button class="ibtn primary" id="playbtn" title="Play the day"><svg class="ic fill"><use href="#i-play"/></svg></button>
     <div class="who">
       <div class="clock num" id="clockbig">1:00 PM</div>
       <div class="date" id="datelbl">—</div>
-      <div class="date" id="loclbl"></div>
+      <div class="date loc" id="loclbl"></div>
     </div>
-    <button class="ibtn" id="sunToggle" title="Hide the sun panel"><svg class="ic"><use href="#i-chev"/></svg></button>
+    <button class="ibtn" id="sunToggle" title="Hide the sun details"><svg class="ic"><use href="#i-chev"/></svg></button>
   </div>
   <div id="sunbody">
-    <svg id="arc" viewBox="0 0 320 78" preserveAspectRatio="none"></svg>
+    <svg id="arc" viewBox="0 0 320 78" preserveAspectRatio="none" aria-label="Sun path: drag to set the time"></svg>
     <div id="sunctl">
-      <button class="ibtn primary" id="playbtn" title="Play the day"><svg class="ic fill"><use href="#i-play"/></svg></button>
-      <input type="date" id="date">
-    </div>
-    <div class="seg tiny" id="seasons" style="justify-content:space-between">
-      <button data-jump="03-21">Mar 21</button><button data-jump="06-21">Jun 21</button>
-      <button data-jump="09-21">Sep 21</button><button data-jump="12-21">Dec 21</button>
+      <input type="date" id="date" aria-label="Date">
+      <div class="seg tiny" id="seasons">
+        <button data-jump="03-21">Mar 21</button><button data-jump="06-21">Jun 21</button>
+        <button data-jump="09-21">Sep 21</button><button data-jump="12-21">Dec 21</button>
+      </div>
     </div>
     <div class="readout num">
       <div class="k">Sun height</div><div class="v hot" id="rEl">—</div>
@@ -87,23 +93,29 @@
   <div class="seg" role="group" aria-label="Tools">
     <button data-tool="select" aria-pressed="true" title="Select and move"><svg class="ic fill"><use href="#i-cursor"/></svg><span class="lbl-t">Select</span></button>
     <button data-tool="pan" title="Pan the view"><svg class="ic"><use href="#i-pan"/></svg><span class="lbl-t">Pan</span></button>
-    <button data-tool="tree" title="Place a tree"><svg class="ic"><use href="#i-tree"/></svg><span class="lbl-t">Tree</span></button>
-    <button data-tool="bed" title="Place a bed"><svg class="ic"><use href="#i-bed"/></svg><span class="lbl-t">Bed</span></button>
-    <button data-tool="structure" title="Place a building"><svg class="ic"><use href="#i-house"/></svg><span class="lbl-t">Building</span></button>
-    <button data-tool="deck" title="Place a deck"><svg class="ic"><use href="#i-deck"/></svg><span class="lbl-t">Deck</span></button>
-    <button data-tool="driveway" title="Place an editable driveway"><svg class="ic"><use href="#i-driveway"/></svg><span class="lbl-t">Driveway</span></button>
-    <button data-tool="sidewalk" title="Place an editable sidewalk"><svg class="ic"><use href="#i-sidewalk"/></svg><span class="lbl-t">Sidewalk</span></button>
     <button data-tool="measure" title="Measure"><svg class="ic"><use href="#i-ruler"/></svg><span class="lbl-t">Measure</span></button>
   </div>
   <div class="div"></div>
+  <div class="seg" role="group" aria-label="Add to the yard">
+    <button data-tool="tree" title="Place a tree"><svg class="ic"><use href="#i-tree"/></svg><span class="lbl-t">Tree</span></button>
+    <button data-tool="bed" title="Place a bed"><svg class="ic"><use href="#i-bed"/></svg><span class="lbl-t">Bed</span></button>
+    <button data-tool="structure" title="Place a building"><svg class="ic"><use href="#i-house"/></svg><span class="lbl-t">Building</span></button>
+    <button data-tool="deck" title="Place a deck or patio"><svg class="ic"><use href="#i-deck"/></svg><span class="lbl-t">Deck</span></button>
+    <button data-tool="driveway" title="Place an editable driveway"><svg class="ic"><use href="#i-driveway"/></svg><span class="lbl-t">Driveway</span></button>
+    <button data-tool="sidewalk" title="Place an editable sidewalk"><svg class="ic"><use href="#i-sidewalk"/></svg><span class="lbl-t">Sidewalk</span></button>
+  </div>
+  <div class="div"></div>
   <div class="seg icons" role="group" aria-label="View">
-    <button id="vplan" title="Straight down (1)"><svg class="ic"><use href="#i-plan"/></svg></button>
+    <button id="vplan" title="Plan: straight down (1)"><svg class="ic"><use href="#i-plan"/></svg></button>
     <button id="v3d" aria-pressed="true" title="Tilted (2)"><svg class="ic"><use href="#i-cube"/></svg></button>
     <button id="veye" title="Eye level (3)"><svg class="ic"><use href="#i-eye"/></svg></button>
     <button id="vfit" title="Frame the whole lot (0)"><svg class="ic"><use href="#i-fit"/></svg></button>
     <button id="vfocus" title="Centre on the selection (F)"><svg class="ic"><use href="#i-focus"/></svg></button>
     <button id="vsimple" title="Simple schematic view (G)"><svg class="ic"><use href="#i-grid"/></svg></button>
   </div>
+  <div class="div"></div>
+  <button class="ibtn" id="undoBtn" title="Undo (Ctrl+Z)" disabled><svg class="ic"><use href="#i-undo"/></svg></button>
+  <button class="ibtn" id="redoBtn" title="Redo (Ctrl+Shift+Z)" disabled><svg class="ic"><use href="#i-redo"/></svg></button>
   <button class="btn" id="sheetbtn" style="display:none">Edit</button>
 </div>
 
@@ -113,7 +125,7 @@
   <div class="mark"><i></i><span id="legline">6 h line</span></div>
 </div>
 
-<div id="inspector" class="panel">
+<div id="inspector" class="panel empty">
   <div id="insphead">
     <h2 id="seltitle">Nothing selected</h2>
     <span class="tag" id="seltag"></span>
@@ -122,27 +134,25 @@
   <div id="inspbody"><div id="props"></div></div>
 </div>
 
-<div id="dock" class="panel">
-  <div id="dockgrip" role="separator" tabindex="0" aria-label="Resize menu height"
-    aria-orientation="horizontal" aria-controls="dockbody"
-    title="Drag up or down to resize; arrow keys also resize; double-click to reset">Drag to resize height</div>
-  <div id="dockwidthgrip" role="separator" tabindex="0" aria-label="Resize sidebar width"
-    aria-orientation="vertical" aria-controls="dockbody" title="Drag left or right to resize sidebar width"></div>
+<nav id="dock" class="panel" aria-label="Planner">
   <div id="dockbar">
-    <div id="tabs"><div class="seg tiny">
-      <button data-tab="prop" aria-pressed="true">Property &amp; fence</button>
-      <button data-tab="site">Site &amp; sky</button>
-      <button data-tab="objs">Everything in the yard</button>
-      <button data-tab="file">Plan file</button>
-    </div></div>
-    <button class="ibtn" id="undoBtn" title="Undo (Ctrl+Z)" disabled><svg class="ic"><use href="#i-undo"/></svg></button>
-    <button class="ibtn" id="redoBtn" title="Redo (Ctrl+Shift+Z)" disabled><svg class="ic"><use href="#i-redo"/></svg></button>
-    <button class="ibtn" id="dockSide" aria-pressed="false" title="Dock this panel to the left, under the sun panel"><svg class="ic"><use href="#i-dockside"/></svg></button>
-    <button class="ibtn" id="dockToggle" title="Collapse"><svg class="ic"><use href="#i-chev"/></svg></button>
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="15.5" cy="8.5" r="4.2" fill="#f5a524"/><path d="M3 20.5c2.5-5.5 6.8-8 12-8.2" fill="none" stroke="#5fc6d9" stroke-width="2" stroke-linecap="round"/></svg>
+      <div class="name"><b>Yard Shade Studio</b><span id="brandsub">Sun and shade planner</span></div>
+    </div>
+    <button class="ibtn" id="dockToggle" title="Collapse the sidebar"><svg class="ic"><use href="#i-collapse"/></svg></button>
+    <div id="tabs" role="tablist">
+      <button data-tab="prop" aria-pressed="true" title="Lot &amp; fence"><svg class="ic"><use href="#i-lot"/></svg><span>Lot &amp; fence</span></button>
+      <button data-tab="site" title="Location &amp; sun"><svg class="ic"><use href="#i-sun"/></svg><span>Location &amp; sun</span></button>
+      <button data-tab="objs" title="Yard items"><svg class="ic"><use href="#i-list"/></svg><span>Yard items</span><b class="count num" id="objcount"></b></button>
+      <button data-tab="view" title="Display"><svg class="ic"><use href="#i-display"/></svg><span>Display</span></button>
+      <button data-tab="file" title="Plan file"><svg class="ic"><use href="#i-file"/></svg><span>Plan file</span></button>
+    </div>
   </div>
   <div id="dockbody">
 
     <section class="pane on" data-pane="prop">
+      <h3 class="panetitle">Lot &amp; fence</h3>
       <div class="cols">
         <div>
           <h4>Lot outline</h4>
@@ -176,20 +186,11 @@
           <h4>Fence by side</h4>
           <div class="edgelist" id="fenceedges"></div>
         </div>
-        <div>
-          <h4>Grid</h4>
-          <div class="field"><label for="showgrid">Show grid</label><input type="checkbox" class="sw" id="showgrid" checked></div>
-          <div class="field"><label for="grid">Grid size</label>
-            <span class="inp"><input type="number" id="grid" min="1" max="50" value="5"><span class="u">ft</span></span></div>
-          <div class="field"><label for="snap">Snap to grid</label><input type="checkbox" class="sw" id="snap" checked></div>
-          <div class="field"><label for="simpleview">Simple schematic view</label><input type="checkbox" class="sw" id="simpleview"></div>
-          <div class="btnrow"><button class="btn" id="gridReferenceButton">Square grid to a side</button></div>
-          <p class="hint">Simple view drops the textures and foliage so the grid, trunks and outlines read clearly. Every fifth grid line is called out.</p>
-        </div>
       </div>
     </section>
 
     <section class="pane" data-pane="site">
+      <h3 class="panetitle">Location &amp; sun</h3>
       <div class="cols">
         <div>
           <h4>Orientation</h4>
@@ -229,27 +230,48 @@
           <div class="sliderow"><input type="range" id="mins2" min="1" max="14" step="0.5" value="6"></div>
           <div class="field"><label for="leaf">Bare branches off-season</label><input type="checkbox" class="sw" id="leaf" checked></div>
         </div>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="objs">
+      <h3 class="panetitle">Yard items</h3>
+      <p class="hint" style="margin:-4px 0 10px">Everything on the plan. Pick one to edit it.</p>
+      <div class="objlist" id="objlist"></div>
+    </section>
+
+    <section class="pane" data-pane="view">
+      <h3 class="panetitle">Display</h3>
+      <div class="cols">
         <div>
-          <h4>Rendering</h4>
-          <div class="field"><label for="rsky">Sky</label><span style="flex:1.3"><select id="rsky">
+          <h4>Render quality</h4>
+          <div class="seg tiny qseg" id="rquality" role="group" aria-label="Render quality">
+            <button data-quality="performance">Performance</button>
+            <button data-quality="balanced">Balanced</button>
+            <button data-quality="quality">Quality</button>
+          </div>
+          <p class="hint" id="rqualityhint"></p>
+          <div class="field" style="margin-top:10px"><label for="rsky">Sky</label><span style="flex:1.3"><select id="rsky">
             <option value="hdri">HDRI photo</option><option value="sky">Physical sky</option></select></span></div>
-          <div class="field"><label for="rgrass">Grass blades</label><span style="flex:1.3"><select id="rgrass">
-            <option value="0">Off</option><option value="4">Low</option><option value="8">Medium</option><option value="16">High</option></select></span></div>
-          <div class="field"><label for="rshadow">Shadow detail</label><span style="flex:1.3"><select id="rshadow">
-            <option value="2048">2048</option><option value="4096">4096</option><option value="8192">8192</option></select></span></div>
-          <div class="field"><label for="rao">Ambient occlusion</label><input type="checkbox" class="sw" id="rao" checked></div>
-          <div class="field"><label for="rwind">Wind</label><input type="checkbox" class="sw" id="rwind" checked></div>
           <div class="field"><label for="rexp">Exposure</label>
             <span class="inp"><input type="number" id="rexp" min="0.3" max="2.5" step="0.05" value="1"><span class="u">×</span></span></div>
           <div class="sliderow"><input type="range" id="rexp2" min="0.3" max="2.5" step="0.05" value="1"></div>
           <p class="hint" id="rsource">Saved in this browser, not in the plan file.</p>
         </div>
+        <div>
+          <h4>Grid &amp; schematic</h4>
+          <div class="field"><label for="showgrid">Show grid</label><input type="checkbox" class="sw" id="showgrid" checked></div>
+          <div class="field"><label for="grid">Grid size</label>
+            <span class="inp"><input type="number" id="grid" min="1" max="50" value="5"><span class="u">ft</span></span></div>
+          <div class="field"><label for="snap">Snap to grid</label><input type="checkbox" class="sw" id="snap" checked></div>
+          <div class="field"><label for="simpleview">Simple schematic view</label><input type="checkbox" class="sw" id="simpleview"></div>
+          <div class="btnrow"><button class="btn" id="gridReferenceButton">Square grid to a side</button></div>
+          <p class="hint">Simple view drops the textures and foliage so the grid, trunks and outlines read clearly. Every fifth grid line is called out.</p>
+        </div>
       </div>
     </section>
 
-    <section class="pane" data-pane="objs"><div class="objlist" id="objlist"></div></section>
-
     <section class="pane" data-pane="file">
+      <h3 class="panetitle">Plan file</h3>
       <div class="cols">
         <div>
           <h4>Plan file</h4>
@@ -275,7 +297,7 @@
     </section>
 
   </div>
-</div>
+</nav>
 
 <div id="toast" class="panel"></div>
 <div id="modal"><div id="modalbox" class="panel">

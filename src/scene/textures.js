@@ -82,27 +82,119 @@ function normalFromHeight(height, size, strength) {
   };
 }
 
-/** Lawn soil/thatch seen between blades: mottled olive-brown with green. */
+/**
+ * Mown lawn seen from standing height: thousands of short blade strokes over
+ * mottled turf, with a matching normal map. Tileable; one tile ≈ 6.5 ft.
+ */
 export function lawnTextures(repeat) {
+  const N = 1024;
+  const rand = rng(11);
+  const n = fbm(N, 11, 5, 6);
+  const color = document.createElement('canvas');
+  const bump = document.createElement('canvas');
+  color.width = color.height = bump.width = bump.height = N;
+  const g = color.getContext('2d');
+  const h = bump.getContext('2d');
+
+  // Mottled base: living turf with a little thatch showing through.
+  const img = g.createImageData(N, N);
+  for (let i = 0; i < N * N; i++) {
+    const t = THREE.MathUtils.smoothstep(n[i], 0.3, 0.7);
+    img.data[i * 4] = 44 + 12 * (1 - t);
+    img.data[i * 4 + 1] = 64 + 12 * t;
+    img.data[i * 4 + 2] = 30 + 4 * t;
+    img.data[i * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  h.fillStyle = '#5a5a5a';
+  h.fillRect(0, 0, N, N);
+
+  // Blades, drawn three times near the edges so the tile wraps seamlessly.
+  const blade = (x, y) => {
+    const len = 9 + rand() * 16;
+    const ang = -Math.PI / 2 + (rand() - 0.5) * 1.4;
+    const x2 = x + Math.cos(ang) * len;
+    const y2 = y + Math.sin(ang) * len;
+    const v = rand();
+    const light = 22 + v * 20;
+    const col = `hsl(${92 + rand() * 18}, ${34 + rand() * 16}%, ${light}%)`;
+    const w = 1.2 + rand() * 1.3;
+    for (const [dx, dy] of [[0, 0], [N, 0], [-N, 0], [0, N], [0, -N]]) {
+      if (dx && Math.min(x, N - x) > 30) continue;
+      if (dy && Math.min(y, N - y) > 30) continue;
+      g.strokeStyle = col;
+      g.lineWidth = w;
+      g.beginPath();
+      g.moveTo(x + dx, y + dy);
+      g.lineTo(x2 + dx, y2 + dy);
+      g.stroke();
+      h.strokeStyle = `rgba(255,255,255,${0.25 + v * 0.35})`;
+      h.lineWidth = w;
+      h.beginPath();
+      h.moveTo(x + dx, y + dy);
+      h.lineTo(x2 + dx, y2 + dy);
+      h.stroke();
+    }
+  };
+  g.lineCap = h.lineCap = 'round';
+  for (let i = 0; i < 60000; i++) blade(rand() * N, rand() * N);
+
+  const hd = h.getImageData(0, 0, N, N).data;
+  const height = new Float32Array(N * N);
+  for (let i = 0; i < N * N; i++) height[i] = hd[i * 4] / 255;
+
+  const map = new THREE.CanvasTexture(color);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const normalMap = canvasTexture(N, normalFromHeight(height, N, 3), { srgb: false });
+  for (const t of [map, normalMap]) {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+    t.repeat.set(repeat, repeat);
+  }
+  return { map, normalMap };
+}
+
+/** Tileable broom-finished concrete with a saw-cut joint on one tile edge. */
+export function concreteTile() {
+  const t = concreteTextures(1, 1, 1);
+  for (const x of [t.map, t.roughnessMap, t.normalMap]) x.wrapS = x.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+/** Concrete pavers, running bond. One tile = 4 × 4 courses. */
+export function paverTextures() {
   const size = 512;
-  const n = fbm(size, 11, 6, 8);
-  const fine = fbm(size, 12, 3, 64);
-  const map = canvasTexture(
-    size,
-    (d) => {
-      for (let i = 0; i < size * size; i++) {
-        const t = n[i] * 0.7 + fine[i] * 0.3;
-        const green = 0.6 + 0.4 * THREE.MathUtils.smoothstep(t, 0.3, 0.6);
-        // thatch/soil (#5b5230) → living turf (#4d6b24)
-        d[i * 4] = 70 + (58 - 70) * green + fine[i] * 20;
-        d[i * 4 + 1] = 62 + (92 - 62) * green + fine[i] * 18;
-        d[i * 4 + 2] = 34 + (26 - 34) * green + fine[i] * 8;
-        d[i * 4 + 3] = 255;
-      }
-    },
-    { repeat },
-  );
-  const normalMap = canvasTexture(size, normalFromHeight(fine, size, 6), { srgb: false, repeat });
+  const grain = fbm(size, 61, 3, 64);
+  const rand = rng(62);
+  const tones = Array.from({ length: 64 }, () => rand());
+  const height = new Float32Array(size * size);
+  const tone = new Float32Array(size * size);
+  const rows = 8;
+  const cols = 4;
+  for (let y = 0; y < size; y++) {
+    const row = Math.floor((y * rows) / size);
+    const fy = ((y * rows) % size) / size;
+    for (let x = 0; x < size; x++) {
+      const tx = (x / size) * cols + (row % 2 ? 0.5 : 0);
+      const col = Math.floor(tx);
+      const fx = tx - col;
+      const gap = fy < 0.04 || fx < 0.02;
+      const i = y * size + x;
+      height[i] = gap ? 0 : 0.8 + grain[i] * 0.2;
+      tone[i] = tones[(row * cols + (col % cols)) % 64];
+    }
+  }
+  const map = canvasTexture(size, (d) => {
+    for (let i = 0; i < size * size; i++) {
+      const gap = height[i] === 0;
+      const v = gap ? 70 : 150 + tone[i] * 40 + (grain[i] - 0.5) * 40;
+      d[i * 4] = v;
+      d[i * 4 + 1] = v * 0.96;
+      d[i * 4 + 2] = v * 0.9;
+      d[i * 4 + 3] = 255;
+    }
+  });
+  const normalMap = canvasTexture(size, normalFromHeight(height, size, 3), { srgb: false });
   return { map, normalMap };
 }
 
