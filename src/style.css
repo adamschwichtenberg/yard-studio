@@ -540,3 +540,20 @@ body.navmin #tabs button{justify-content:center;padding:9px}
   #seasons button{padding:5px 6px}
   #sunpanel .readout{min-width:180px;gap:3px 10px}
 }
+
+/* ---------- sun card: a compact square in the bottom-right corner ---------- */
+@media (min-width:1021px){
+  #sunpanel{left:auto;right:var(--gut);bottom:var(--gut);width:var(--inspW);flex-direction:column}
+  #sunhead{min-width:0;border-right:0;border-bottom:1px solid var(--line-2);padding:10px 12px;gap:10px}
+  #sunhead .clock{font-size:22px}
+  #sunbody{flex-direction:column;align-items:stretch;gap:8px;padding:8px 12px 12px}
+  #arc{flex:none;width:100%;min-width:0;height:74px}
+  #sunctl{width:auto}
+  #seasons button{padding:5px 8px}
+  #sunpanel .readout{min-width:0;border-left:0;padding:8px 0 0;border-top:1px solid var(--line-2);
+    grid-template-columns:auto 1fr;gap:3px 12px}
+  #sunpanel.min #sunctl,#sunpanel.min .readout{display:none}
+  #legend{bottom:var(--gut)}
+  #toast{bottom:calc(var(--gut) + 16px);left:calc(50% + var(--sideW)/2 - var(--inspW)/2)}
+  #top{max-width:calc(100vw - var(--sideW) - var(--gut)*4 - 80px)}
+}

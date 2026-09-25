@@ -178,7 +178,7 @@ const QUALITY = {
   balanced:   {dpr:1.5, ao:true,  shadow:4096, half:true},
   quality:    {dpr:2,   ao:true,  shadow:4096, half:false}
 };
-const prefs = Object.assign({sky:"hdri", quality:"balanced", exposure:1}, (()=>{
+const prefs = Object.assign({sky:"hdri", quality:"balanced", treeDetail:"standard", exposure:1}, (()=>{
   try{ return JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"); }catch{ return {}; }
 })());
 function savePrefs(){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }catch{ /* private mode */ } }
@@ -759,7 +759,7 @@ function buildTree(t){
   if(S.simple){ buildTreeSimple(grp, t, {cb, top, R, fn}); return grp; }
 
   const sh = SHAPES[t.shape] || SHAPES.round;
-  grp.add(trees.build(t, {bare, fall:fallAmount(), crownBase:sh.base}));
+  grp.add(trees.build(t, {bare, fall:fallAmount(), crownBase:sh.base, profile:sh.r}));
 
   const r0 = Math.max(.5, trunkR*2.1);
   const ring = new THREE.Mesh(new THREE.RingGeometry(r0, r0+.3, 28),
@@ -3193,6 +3193,7 @@ const QUALITY_HINT = {
 function syncPrefs(label){
   $("rsky").value = prefs.sky;
   document.querySelectorAll("#rquality button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.quality === prefs.quality));
+  document.querySelectorAll("#rtrees button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.trees === prefs.treeDetail));
   $("rqualityhint").textContent = QUALITY_HINT[prefs.quality] || "";
   $("rexp").value = prefs.exposure; $("rexp2").value = prefs.exposure;
   if(label !== undefined) $("rsource").textContent = label
@@ -3210,6 +3211,12 @@ function initPrefsUI(){
   document.querySelectorAll("#rquality button").forEach(b=>b.addEventListener("click", ()=>{
     prefs.quality = b.dataset.quality;
     applyQuality(false); syncPrefs(); changed();
+  }));
+  document.querySelectorAll("#rtrees button").forEach(b=>b.addEventListener("click", ()=>{
+    if(prefs.treeDetail === b.dataset.trees) return;
+    prefs.treeDetail = b.dataset.trees;
+    toast(prefs.treeDetail === "high" ? "Growing high-detail trees…" : "Standard trees");
+    setTimeout(()=>{ trees.setHighDetail(prefs.treeDetail === "high"); rebuildAll(); syncPrefs(); changed(); }, 30);
   }));
   const exp = v=>{ prefs.exposure = clamp(v, .3, 2.5); $("rexp").value = prefs.exposure; $("rexp2").value = prefs.exposure;
     changed(); clearTimeout(exp.t); exp.t = setTimeout(()=>{ updateSun(); refreshHeat(); markDirty(); }, 200); };
@@ -3244,6 +3251,7 @@ function init(){
   scene.add(hemi, fillLight);
   scene.add(objGroup, helperGroup);
   trees = new TreeLibrary();
+  trees.setHighDetail(prefs.treeDetail === "high");
   post = createPost(renderer, scene, camera);
   applyQuality(false);
   ensureFenceSides();
@@ -3290,6 +3298,8 @@ async function boot(){
   setTimeout(()=>bd.remove(), 650);
 }
 window.applyImportedBoundary = applyImportedBoundary;   // hook for the property-image importer
+/* development-only hook for automated screenshots */
+if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, rebuildAll, fromPreset, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute };
 initLocationUI();
 initPrefsUI();
 if(document.readyState === "complete") boot();
