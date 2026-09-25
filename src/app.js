@@ -17,9 +17,10 @@ const SHAPES = {
   round:     {label:"Round crown (maple, ash)",      base:.32, r:u=>Math.sqrt(Math.max(0,1-Math.pow(2*u-1,2)))},
   oval:      {label:"Upright oval (linden, alder)",  base:.22, r:u=>Math.pow(Math.max(0,1-Math.pow(2*u-1,2)),.36)},
   pyramidal: {label:"Pyramidal (spruce, fir)",       base:.05, r:u=>Math.pow(1-u,.8)},
-  columnar:  {label:"Columnar (juniper, mugo)",      base:.06, r:u=>u<.82?.92+.08*Math.sin(u*4):Math.sqrt(Math.max(0,1-Math.pow((u-.82)/.18,2)))},
+  columnar:  {label:"Columnar (narrow pyramid)",     base:.05, r:u=>Math.max(.04, Math.pow(1-u,.62))},
   spreading: {label:"Wide spreading (oak, locust)",  base:.40, r:u=>Math.pow(Math.sin(Math.PI*(.22+.72*u)),.45)},
-  vase:      {label:"Vase (elm, serviceberry)",      base:.42, r:u=>.32+.68*Math.pow(u,.75)},
+  vase:      {label:"Vase (elm, serviceberry)",      base:.36,
+              r:u=>u<.72 ? .16+.84*Math.pow(Math.sin(Math.PI/2*u/.72),1.25) : Math.sqrt(Math.max(0,1-Math.pow((u-.72)/.28,2)))},
   weeping:   {label:"Weeping (willow, river birch)", base:.16, r:u=>Math.pow(Math.sin(Math.PI*(.18+.78*u)),.42)}
 };
 const PRESETS = [
@@ -47,9 +48,9 @@ const PRESETS = [
   note:"Picea abies 'Cupressina'. Very narrow column that keeps its lower branches. Hardy to zone 3."},
  {g:"Shortlist", n:"Columnar Norway Pine", s:"columnar", h:25, w:8, ev:true, d:.85, leaf:0x2a4a26,
   note:"Narrow upright conifer. Mature size varies a lot between growers — confirm the tag."},
- {g:"Already here", n:"Royal Red maple", s:"round", h:35, w:25, ev:false, d:.95, leaf:0x4a2530, fall:0x5a1f1f,
+ {g:"Already here", n:"Royal Red maple", s:"round", h:35, w:25, ev:false, d:.95, leaf:0x8a2230, fall:0x9a2a1c,
   note:"Norway maple. Round, very dense crown — the deepest shade of the maples here."},
- {g:"Already here", n:"Crimson Sunset maple", s:"oval", h:35, w:22, ev:false, d:.90, leaf:0x5a2a36, fall:0x6a2424,
+ {g:"Already here", n:"Crimson Sunset maple", s:"oval", h:35, w:22, ev:false, d:.90, leaf:0x92222e, fall:0xa0301e,
   note:"Upright oval, purple foliage, denser and narrower than a Freeman maple."},
  {g:"Already here", n:"Swamp white oak", s:"spreading", h:55, w:50, ev:false, d:.70, leaf:0x3f5f2a, fall:0x8a5a2a,
   note:"Wide spreading crown with a fairly open interior. Leafs out late."},
@@ -57,6 +58,10 @@ const PRESETS = [
   note:"Vase shape with a high crown, so shade lands well out from the trunk."},
  {g:"Already here", n:"Flowering crabapple", s:"round", h:18, w:18, ev:false, d:.70, leaf:0x4a7030, fall:0xa0702a,
   note:"Small round crown, light shade. Safe near a bed."},
+ {g:"Shortlist", n:"Crimson King maple", s:"round", h:40, w:35, ev:false, d:.95, leaf:0x7e1a26, fall:0x8e2a1c,
+  note:"Norway maple with deep red-maroon leaves all season. Dense, round crown and heavy shade."},
+ {g:"Shortlist", n:"Colorado Blue Spruce", s:"pyramidal", h:50, w:20, ev:true, d:.93, leaf:0x7092a8,
+  note:"Picea pungens. Silver-blue needles on a stiff, broad pyramid. Very hardy (zone 2); shades year round."},
  {g:"Already here", n:"Black Hills spruce", s:"pyramidal", h:35, w:18, ev:true, d:.95, leaf:0x3a5a4a,
   note:"Dense conifer that shades year round, including the low winter sun."},
  {g:"Already here", n:"Pinky Winky hydrangea", s:"round", h:8, w:6, ev:false, d:.75, leaf:0x4a7a30, fall:0x8a6a30,
@@ -392,9 +397,16 @@ function bearingVec(az){
 }
 
 /* ============================================================ shade geometry */
+/* Height (ft) where the lowest leaves start: the tree's own setting, or the
+   crown shape's default. The shade engine and the 3D tree both use this. */
+function crownBaseFt(t){
+  const sh = SHAPES[t.shape] || SHAPES.round;
+  const top = Math.max(1, t.height - 1);
+  return clamp(Number.isFinite(t.crownBase) ? t.crownBase : Math.round(t.height*sh.base*2)/2, 0, top);
+}
 function treeCrown(t){
   const sh = SHAPES[t.shape] || SHAPES.round;
-  return {cb: t.height*sh.base, top: t.height, R: t.spread/2, fn: sh.r};
+  return {cb: crownBaseFt(t), top: t.height, R: t.spread/2, fn: sh.r};
 }
 function treeDiscs(t, u, cot){
   const {cb, top, R, fn} = treeCrown(t);
@@ -759,7 +771,7 @@ function buildTree(t){
   if(S.simple){ buildTreeSimple(grp, t, {cb, top, R, fn}); return grp; }
 
   const sh = SHAPES[t.shape] || SHAPES.round;
-  grp.add(trees.build(t, {bare, fall:fallAmount(), crownBase:sh.base, profile:sh.r}));
+  grp.add(trees.build(t, {bare, fall:fallAmount(), crownBase:crownBaseFt(t)/Math.max(1, t.height), profile:sh.r}));
 
   const r0 = Math.max(.5, trunkR*2.1);
   const ring = new THREE.Mesh(new THREE.RingGeometry(r0, r0+.3, 28),
@@ -2390,7 +2402,7 @@ function drawPanel(){
   }
   title.textContent = o.name;
   tag.textContent = o.type === "structure" ? "building" : o.type;
-  const key = [o.id, nodeEdit, activeNode, o.poly?o.poly.length:0].join("|");
+  const key = [o.id, nodeEdit, activeNode, o.poly?o.poly.length:0, o.type === "tree" ? o.height+"|"+o.shape : ""].join("|");
   if(panelFor === key){
     if(o.type === "boundary" && !props.contains(document.activeElement)){
       panelFor = "init";
@@ -2400,7 +2412,7 @@ function drawPanel(){
     props.querySelectorAll("input[data-key]").forEach(i=>{
       if(document.activeElement === i) return;
       if(i.type === "checkbox") i.checked = !!o[i.dataset.key];
-      else i.value = o[i.dataset.key];
+      else i.value = i.dataset.key === "crownBase" ? crownBaseFt(o) : o[i.dataset.key];
     });
     const box = props.querySelector(".stat");
     if(box){
@@ -2425,6 +2437,7 @@ function drawPanel(){
       + `<select data-key="shape">${Object.entries(SHAPES).map(([k,v])=>`<option value="${k}" ${k===o.shape?"selected":""}>${v.label}</option>`).join("")}</select>`
       + slider("Height","height",2,90,1,o.height)
       + slider("Crown width","spread",1,80,1,o.spread)
+      + slider("Canopy starts at","crownBase",0,Math.max(1, o.height-1),.5,crownBaseFt(o))
       + slider("Canopy density","density",.1,1,.05,o.density ?? .85,"×")
       + `<div class="field"><span class="lab">Evergreen</span><input type="checkbox" class="sw" data-key="evergreen" ${o.evergreen?"checked":""}></div>`
       + `<h4>Position</h4>`
@@ -2471,15 +2484,15 @@ function drawPanel(){
   props.innerHTML = html;
   syncRanges(props);
 }
-const GEOKEYS = new Set(["height","spread","density","shape","evergreen","w","h","surface"]);
+const GEOKEYS = new Set(["height","spread","density","shape","evergreen","w","h","surface","crownBase"]);
 props.addEventListener("input", e=>{
   const o = selected();
   if(!o) return;
   if(e.target.hasAttribute("data-preset")){
     const p = PRESETS[+e.target.value];
     if(!p) return;
-    o.name = p.n; o.shape = p.s; o.height = p.h; o.spread = p.w;
-    o.evergreen = p.ev; o.density = p.d; o.note = p.note;
+    o.name = p.n; o.shape = p.s; o.height = p.h; o.spread = p.w; delete o.crownBase;
+    o.evergreen = p.ev; o.density = p.d; o.note = p.note; o.leaf = p.leaf; o.fall = p.fall;
     panelFor = null;
     rebuildObject(o); drawPanel(); drawList(); updateSelection(); scheduleCompute();
     return;

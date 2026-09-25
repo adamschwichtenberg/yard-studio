@@ -29,7 +29,7 @@ All of the original planner's features and navigation are unchanged:
 - **Everything in the yard:** every object with its size, distance to the property line and sun hours.
 - **Plan file:** save and open JSON plans, start over, undo and redo (60 steps), and import a property image to trace and scale the lot.
 - **Inspector:**
-  - Tree presets and crown shapes, with property-line clearance.
+  - Tree presets and crown shapes, with property-line clearance. **Canopy starts at** sets the height of the lowest leaves (ft, 0.5 ft steps); the shade engine uses it too.
   - Bed sun hours with a planting verdict.
   - Reshaping and height for buildings, decks and paving.
   - Duplicate and delete.
@@ -57,7 +57,7 @@ The sun position comes from the original's NOAA-based solar maths. It matches su
 | --- | --- |
 | HDRI or physical sky. The HDRI's sun is detected, clamped out of the lighting, and rotated to the solar-maths sun, with house angle vs. north applied. | `src/scene/environment.js` |
 | RenderPass → N8AO → ACES → SMAA, half-float buffers, with no tone mapping on the renderer. It switches cleanly between the perspective and plan (orthographic) cameras. | `src/post.js` |
-| Procedural trees built in feet from each tree's crown shape (the same profile the shade engine uses), height, spread and density. Broadleaves fill the crown with leaf clumps on a golden-angle spiral, then grow a symmetric skeleton (trunk, scaffold limbs or central leader, branches, winter twigs) to reach them. Conifers grow in whorls with their own habits: spruce (drooping layered sprays), juniper (dense upright scale foliage with berries), pine and mugo (needle tufts, mugo multi-stemmed). Interior leaves are shaded darker; fall colour starts on the sun-facing outer leaves. EZ-Tree supplies only the bark textures. | `src/trees/trees.js` |
+| Procedural trees built in feet from each tree's crown shape (the same profile the shade engine uses), height, spread and density. Broadleaves fill the crown with leaf clumps on a golden-angle spiral, then grow a symmetric skeleton (trunk, scaffold limbs or central leader, branches, winter twigs) to reach them. Conifers grow in whorls with their own habits: spruce (drooping layered sprays), juniper (dense upright scale foliage with berries), pine and mugo (needle tufts, mugo multi-stemmed). Each variety grows consistently, with small per-tree variation in limbs, clump placement and crown outline so plantings don't look cloned. Foliage is a mix of small and medium leaf sprays. Interior leaves are shaded darker; fall colour starts on the sun-facing outer leaves. EZ-Tree supplies only the bark textures. | `src/trees/trees.js` |
 | Buildings: foundation, corner boards, fascia and soffit, windows and a door on the wall facing the patio, generated for any outline and merged into a few draw calls | `src/app.js` (`buildingDetails`) |
 | Procedural foliage per species: maple, linden, alder, elm, oak and general broadleaf clusters; spruce, juniper and mugo pine sprays. Standard 1024 px, or 2048 px with High tree detail. | `src/trees/leafTextures.js` |
 | Procedural lawn (blade strokes plus normal map, mowing stripes along the grid), concrete, pavers, siding and shingles | `src/scene/textures.js` |

@@ -172,8 +172,8 @@ function card(B, base, tip, face, size, rnd, normalFn, aoFn) {
 /* ------------------------------------------------------------ builders */
 
 function crownGeometry(p) {
-  const { H, R, cb, fn, dens, kind, shape, hi } = p;
-  const r = rng(hash(`${shape}|${kind}|${H.toFixed(0)}|${R.toFixed(0)}`));
+  const { H, R, cb, fn, dens, kind, shape, hi, variant } = p;
+  const r = rng(hash(`${shape}|${kind}|${H.toFixed(0)}|${R.toFixed(0)}|${variant}`));
   const bark = new Buf();
   const leaves = new Buf();
   const mass = [];
@@ -241,7 +241,7 @@ function massGeometry(mass, p) {
 }
 
 function broadleaf(p, r, bark, leaves, mass, ctx) {
-  const { H, R, cb, dens, shape } = p;
+  const { H, R, cb, dens, shape, variant } = p;
   const { envelope, normalFn, aoFn, detail, trunkR, tipR, crownH } = ctx;
 
   // 1. Foliage clumps just inside the crown envelope, laid on one golden-angle
@@ -261,12 +261,19 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
     const u = (k - 1 + (target - cdf[k - 1]) / Math.max(1e-6, cdf[k] - cdf[k - 1])) / samples;
     const y = cb + u * crownH;
     const pr = envelope(y);
-    const a = i * GOLDEN;
-    const rad = Math.max(0, pr - clumpR * (0.62 + 0.18 * r()));
-    clumps.push({ c: V(Math.cos(a) * rad, y + (r() - 0.5) * clumpR * 0.3, Math.sin(a) * rad), a, outer: true });
+    const a = i * GOLDEN + (r() - 0.5) * 0.55;
+    // Lumpy, not lathe-turned: each clump sits a little in or out of the envelope.
+    const bump = 1 + (r() - 0.5) * 0.24;
+    const rad = Math.max(0, pr * bump - clumpR * (0.6 + 0.2 * r()));
+    if (i > 3 && r() < 0.06) continue;   // the odd gap in the canopy
+    let cy = y + (r() - 0.5) * clumpR * 0.5;
+    // Elms: the outer canopy arches over and droops at the rim.
+    if (shape === 'vase' && u > 0.45) cy -= clumpR * 0.35 * (u - 0.45) / 0.55;
+    clumps.push({ c: V(Math.cos(a) * rad, cy, Math.sin(a) * rad), a, outer: true, k: 0.8 + 0.4 * r() });
   }
   // A sparse inner layer so you don't see daylight through the middle.
-  const innerCount = Math.round(count * 0.18);
+  // Elms stay open underneath so the arching limbs show.
+  const innerCount = shape === 'vase' ? 0 : Math.round(count * 0.18);
   for (let i = 0; i < innerCount; i++) {
     const u = 0.15 + 0.7 * ((i + 0.5) / innerCount);
     const y = cb + u * crownH;
@@ -279,14 +286,15 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
   // 2. Skeleton. Leader shapes keep a central stem; the rest fork into scaffold limbs.
   const leader = shape === 'oval' || shape === 'pyramidal' || shape === 'columnar';
   const trunkTop = leader ? cb + crownH * 0.82 : cb;
-  const K = { spreading: 5, vase: 6, weeping: 5 }[shape] || 5;
+  const K = ({ spreading: 5, vase: 5, weeping: 5 }[shape] || 5) + (variant % 2 ? 1 : 0) - (variant === 2 ? 1 : 0);
   const scaffold = [];
   if (!leader) {
-    const reach = { spreading: 0.55, vase: 0.5, weeping: 0.35 }[shape] || 0.38;
-    const rise = { spreading: 0.22, vase: 0.5, weeping: 0.45 }[shape] || 0.35;
+    const reach = { spreading: 0.55, vase: 0.62, weeping: 0.35 }[shape] || 0.38;
+    const rise = { spreading: 0.22, vase: 0.6, weeping: 0.45 }[shape] || 0.35;
     for (let k = 0; k < K; k++) {
-      const a = (k / K) * Math.PI * 2;
-      const end = V(Math.cos(a) * R * reach, cb + crownH * rise, Math.sin(a) * R * reach);
+      const a = (k / K) * Math.PI * 2 + (r() - 0.5) * 0.5;
+      const rr = reach * (0.85 + 0.3 * r());
+      const end = V(Math.cos(a) * R * rr, cb + crownH * rise * (0.88 + 0.24 * r()), Math.sin(a) * R * rr);
       scaffold.push({ a, end, tips: 0 });
     }
   }
@@ -303,13 +311,19 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
     }
   }
   const segs = hi(detail, 10, 14);
-  tube(bark, curve(V(0, 0, 0), V(0, trunkTop * 0.5, 0), V(0, trunkTop, 0), 6), trunkR, leader ? tipR * 2 : trunkR * 0.72, segs);
+  const lean = V((r() - 0.5) * R * 0.05, 0, (r() - 0.5) * R * 0.05);
+  const top = leader ? V(lean.x, trunkTop, lean.z) : V(0, shape === 'vase' ? cb * 0.82 : trunkTop, 0);
+  tube(bark, curve(V(0, 0, 0), V(lean.x * 0.3, top.y * 0.5, lean.z * 0.3), top, 6), trunkR, leader ? tipR * 2 : trunkR * 0.72, segs);
   // A root flare where the trunk meets the ground.
   tube(bark, [V(0, -0.2, 0), V(0, 0.6, 0), V(0, 1.4, 0)], trunkR * 1.45, trunkR * 1.02, segs);
+  const fork = shape === 'vase' ? cb * 0.82 : cb * 0.97;
   for (const s of scaffold) {
-    const ctrl = V(s.end.x * 0.3, cb + (s.end.y - cb) * 0.75, s.end.z * 0.3);
+    // Elm limbs climb almost vertically before arching out; others spread sooner.
+    const ctrl = shape === 'vase'
+      ? V(s.end.x * 0.12, fork + (s.end.y - fork) * 0.92, s.end.z * 0.12)
+      : V(s.end.x * 0.3, cb + (s.end.y - cb) * 0.75, s.end.z * 0.3);
     const rs = Math.min(trunkR * 0.68, tipR * 1.4 * Math.sqrt(Math.max(1, s.tips)));
-    tube(bark, curve(V(0, cb * 0.97, 0), ctrl, s.end, 6), rs, rs * 0.6, hi(detail, 7, 9));
+    tube(bark, curve(V(0, fork, 0), ctrl, s.end, 7), rs, rs * 0.6, hi(detail, 7, 9));
   }
   for (const cl of clumps) {
     const A = cl.from;
@@ -339,8 +353,9 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
   }
 
   // 3. Leaves: leaf-cluster cards filling each clump, facing mostly outward.
-  const size = THREE.MathUtils.clamp(clumpR * 0.95, 1.4, 4.2) / (detail > 1 ? 1.3 : 1);
-  const perClump = Math.round((6 + 9 * dens) * (clumpR / size) ** 2 * (detail > 1 ? 1.4 : 1));
+  const size = THREE.MathUtils.clamp(clumpR * 0.72, 1.0, 3.0) / (detail > 1 ? 1.25 : 1);
+  // Mean card is ~0.75 × size, so scale the count to keep coverage.
+  const perClump = Math.round((6 + 9 * dens) * (clumpR / (size * 0.75)) ** 2 * (detail > 1 ? 1.3 : 1));
   for (const cl of clumps) {
     const P = cl.c;
     const nf = normalFn(P);
@@ -356,7 +371,8 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
       const face = d.clone().multiplyScalar(0.55).addScaledVector(out, 0.35).addScaledVector(UP, 0.25)
         .addScaledVector(randUnit(r), 0.45).normalize();
       const tip = V().crossVectors(face, randUnit(r)).normalize();
-      const s = size * (0.8 + 0.4 * r());
+      // Mostly small and medium sprays, a few large ones.
+      const s = size * (0.45 + 0.75 * r() ** 1.6) * (cl.k || 1);
       card(leaves, centre.addScaledVector(tip, -s * 0.5), tip, face, s, r(), nf, af);
     }
   }
@@ -395,13 +411,14 @@ function conifer(p, r, bark, leaves, mass, ctx) {
     const u = (j + 0.5) / whorls;
     const y = cb + u * crownH;
     const L = Math.max(0.3, envelope(y));
-    const n = THREE.MathUtils.clamp(Math.round(5 + L * 0.7), 5, 11);
+    const n = THREE.MathUtils.clamp(Math.round(5 + L * 0.7 + (r() - 0.5) * 2), 4, 12);
     for (let k = 0; k < n; k++) {
-      const a = (k / n) * Math.PI * 2 + j * GOLDEN;
+      if (r() < 0.08) continue;
+      const a = (k / n) * Math.PI * 2 + j * GOLDEN + (r() - 0.5) * 0.45;
       const dir = V(Math.cos(a), 0, Math.sin(a));
       // Habit: spruce droops then lifts at the tip; juniper and pine ascend.
       const lift = kind === 'spruce' ? -0.18 : kind === 'juniper' ? 0.7 : 0.4;
-      const len = kind === 'juniper' ? L * 0.95 : L;
+      const len = (kind === 'juniper' ? L * 0.95 : L) * (0.85 + 0.25 * r());
       const start = V(0, y - (kind === 'juniper' ? len * 0.35 : 0), 0);
       const end = start.clone().addScaledVector(dir, len).addScaledVector(UP, len * lift);
       const ctrl = start.clone().addScaledVector(dir, len * 0.55).addScaledVector(UP, len * (kind === 'spruce' ? -0.28 : lift * 0.4));
@@ -444,22 +461,22 @@ function conifer(p, r, bark, leaves, mass, ctx) {
     return { tip, face };
   };
   const clumpR = THREE.MathUtils.clamp(R * (kind === 'juniper' ? 0.42 : 0.38), 0.7, 4);
-  const cardS = THREE.MathUtils.clamp(clumpR * (kind === 'spruce' ? 1.5 : 1.25), 0.9, 5) / (detail > 1 ? 1.25 : 1);
+  const cardS = THREE.MathUtils.clamp(clumpR * (kind === 'spruce' ? 1.2 : 1.0), 0.7, 4) / (detail > 1 ? 1.25 : 1);
   const samples = 64;
   const cdf = [0];
   for (let i = 1; i <= samples; i++) cdf.push(cdf[i - 1] + Math.max(0.05, envelope(cb + ((i - 0.5) / samples) * crownH)));
   const shellArea = cdf[samples] * (crownH / samples) * Math.PI * 2;
   const count = THREE.MathUtils.clamp(Math.round((shellArea / (Math.PI * clumpR * clumpR)) * 1.4), 10, 220);
-  const per = Math.round((5 + 7 * dens) * (clumpR / cardS) ** 2 * 2.2 * (detail > 1 ? 1.4 : 1)) + 2;
+  const per = Math.round((5 + 7 * dens) * (clumpR / (cardS * 0.8)) ** 2 * 2.2 * (detail > 1 ? 1.3 : 1)) + 2;
   for (let i = 0; i < count; i++) {
     const target = ((i + 0.5) / count) * cdf[samples];
     let k = 1;
     while (k < samples && cdf[k] < target) k++;
     const u = (k - 1 + (target - cdf[k - 1]) / Math.max(1e-6, cdf[k] - cdf[k - 1])) / samples;
     const y = cb + u * crownH;
-    const a = i * GOLDEN;
+    const a = i * GOLDEN + (r() - 0.5) * 0.5;
     const out = V(Math.cos(a), 0, Math.sin(a));
-    const rad = Math.max(0, envelope(y) - clumpR * 0.55);
+    const rad = Math.max(0, envelope(y) * (1 + (r() - 0.5) * 0.16) - clumpR * 0.55);
     const P = V(out.x * rad, y, out.z * rad);
     const nf = normalFn(P);
     const af = aoFn(P, clumpR);
@@ -467,7 +484,7 @@ function conifer(p, r, bark, leaves, mass, ctx) {
       const d = randUnit(r);
       const centre = P.clone().addScaledVector(d, clumpR * 0.6 * Math.sqrt(r()));
       const { tip, face } = orient(d, out);
-      const s = cardS * (0.8 + 0.4 * r());
+      const s = cardS * (0.5 + 0.7 * r() ** 1.5);
       card(leaves, centre.addScaledVector(tip, -s * 0.35), tip, face, s, r(), nf, af);
     }
   }
@@ -549,10 +566,11 @@ export class TreeLibrary {
     const H = Math.max(2, t.height);
     const R = Math.max(0.5, t.spread / 2);
     const dens = Math.round(THREE.MathUtils.clamp(t.density ?? 0.85, 0.1, 1) * 20) / 20;
-    const key = [t.shape, kind, H.toFixed(1), R.toFixed(1), dens, crownBase.toFixed(2), this.high].join('|');
+    const variant = (t.id ?? 0) % 4;
+    const key = [t.shape, kind, H.toFixed(1), R.toFixed(1), dens, crownBase.toFixed(3), this.high, variant].join('|');
     let g = this.cache.get(key);
     if (!g) {
-      g = crownGeometry({ H, R, cb: H * crownBase, fn: profile, dens, kind, shape: t.shape, hi: this.high });
+      g = crownGeometry({ H, R, cb: H * crownBase, fn: profile, dens, kind, shape: t.shape, hi: this.high, variant });
       for (const x of Object.values(g)) if (x) x.userData.shared = true;
       this.cache.set(key, g);
       if (this.cache.size > 80) {

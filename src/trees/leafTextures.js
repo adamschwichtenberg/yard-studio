@@ -204,7 +204,7 @@ function paintBroadleafSprig(g, N, spec, rand) {
 function paintBroadleafCluster(g, N, spec, rand) {
   const cx = N / 2;
   const cy = N / 2;
-  const M = spec.veins === 'palmate' ? 22 : 30;
+  const M = spec.veins === 'palmate' ? 34 : 46;
   const leaves = [];
   for (let i = 0; i < M; i++) {
     // Irregular scatter (not a rosette): random positions in a lumpy disc.
@@ -227,7 +227,8 @@ function paintBroadleafCluster(g, N, spec, rand) {
   // Inner leaves first (shaded), outer ones last so the rim stays crisp.
   leaves.sort((p, q) => p.f - q.f);
   for (const l of leaves) {
-    const size = N * Math.min(spec.size, 0.15) * 1.25 * (0.85 + rand() * 0.3);
+    // Smaller leaves, more of them: medium and small, a few large.
+    const size = N * Math.min(spec.size, 0.15) * (0.7 + rand() ** 1.5 * 0.55);
     // Mostly hanging with the light, pointing any which way.
     const rot = (rand() < 0.6 ? l.a + Math.PI / 2 : rand() * Math.PI * 2) + (rand() - 0.5) * 1.6;
     // Shade toward the centre: this is what makes the card read as a volume.
