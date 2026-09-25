@@ -49,19 +49,47 @@ const randUnit = (r) => {
 export function leafKindFor(t) {
   const n = (t.name || '').toLowerCase();
   if (t.evergreen) {
-    if (/juniper|cedar|arborvitae|yew/.test(n)) return 'juniper';
+    if (/arborvitae|thuja/.test(n)) return 'arborvitae';
+    if (/juniper|cedar|yew/.test(n)) return 'juniper';
     if (/pine|mugo/.test(n)) return 'pine';
+    if (/norway spruce/.test(n) && t.shape !== 'columnar') return 'norway';
     return 'spruce';
   }
+  if (/hydrangea/.test(n)) return 'hydrangea';
+  if (/crab|malus|prairifire/.test(n)) return 'crabapple';
+  if (/willow/.test(n)) return 'willow';
   if (/maple/.test(n)) return 'maple';
   if (/linden|basswood/.test(n)) return 'linden';
-  if (/alder|birch/.test(n)) return 'alder';
+  if (/birch/.test(n)) return 'birch';
+  if (/aspen/.test(n)) return 'aspen';
+  if (/poplar|cottonwood/.test(n)) return 'poplar';
+  if (/hackberry/.test(n)) return 'hackberry';
+  if (/locust/.test(n)) return 'locust';
+  if (/alder/.test(n)) return 'alder';
   if (/elm/.test(n)) return 'elm';
+  if (/bur oak|burr oak|macrocarpa/.test(n)) return 'buroak';
+  if (/spire|english oak|white oak|robur/.test(n) && /oak/.test(n) && !/swamp/.test(n)) return 'whiteoak';
   if (/oak/.test(n)) return 'oak';
   return { round: 'maple', spreading: 'oak', vase: 'elm', linden: 'linden' }[t.shape] || 'broadleaf';
 }
-const BARK = { maple: 'oak', linden: 'oak', elm: 'oak', oak: 'oak', broadleaf: 'oak', alder: 'birch', spruce: 'pine', juniper: 'willow', pine: 'pine' };
-const BARK_TINT = { maple: 0xb4ada2, linden: 0xa39d92, elm: 0x9a9388, oak: 0x9e958a, broadleaf: 0xa8a196, alder: 0x8f877c, spruce: 0x8c7f70, juniper: 0x8a6e5a, pine: 0x9a7a5e };
+/* Bark per species: [EZ-Tree scanned bark type, tint]. */
+const BARK = {
+  maple: ['oak', 0xb4ada2], linden: ['oak', 0xa39d92], elm: ['oak', 0x9a9388], oak: ['oak', 0x9e958a],
+  buroak: ['oak', 0x8e867a], whiteoak: ['oak', 0x9e968a], broadleaf: ['oak', 0xa8a196], alder: ['birch', 0x8f877c],
+  birch: ['birch', 0xf4f1ea], riverbirch: ['birch', 0xc89a7a], aspen: ['birch', 0xdfe2cf], poplar: ['oak', 0xaaa597],
+  hackberry: ['oak', 0xb0aaa0], locust: ['oak', 0x8a7d70], willow: ['willow', 0x9a8a78], crabapple: ['oak', 0x8a7a6c],
+  hydrangea: ['willow', 0xa08a70],
+  spruce: ['pine', 0x8c7f70], norway: ['pine', 0x8a7465], juniper: ['willow', 0x8a6e5a], arborvitae: ['willow', 0x8e6a52],
+  pine: ['pine', 0x9a7a5e],
+};
+/** Bark key: the leaf kind, except where one kind covers species with different bark. */
+function barkFor(t, kind) {
+  if (kind === 'birch' && /river/i.test(t.name || '')) return 'riverbirch';
+  return BARK[kind] ? kind : 'broadleaf';
+}
+const CONIFERS = new Set(['spruce', 'norway', 'juniper', 'arborvitae', 'pine']);
+/** Species that flower: which flower texture their bloom cards use. */
+export const BLOOMS = { crabapple: 'bloom:crabapple', hydrangea: 'bloom:hydrangea' };
 
 /* ------------------------------------------------------------ geometry buffers */
 
@@ -176,6 +204,7 @@ function crownGeometry(p) {
   const r = rng(hash(`${shape}|${kind}|${H.toFixed(0)}|${R.toFixed(0)}|${variant}`));
   const bark = new Buf();
   const leaves = new Buf();
+  const flowers = BLOOMS[kind] ? new Buf() : null;
   const mass = [];
   const crownH = Math.max(0.5, H - cb);
   const envelope = (y) => R * fn(THREE.MathUtils.clamp((y - cb) / crownH, 0, 1));
@@ -198,12 +227,17 @@ function crownGeometry(p) {
   const trunkR = Math.max(0.12, 0.017 * H + 0.012 * R);
   const tipR = Math.max(0.03, 0.0035 * H);
 
-  if (kind === 'spruce' || kind === 'juniper' || kind === 'pine') {
+  if (CONIFERS.has(kind)) {
     conifer(p, r, bark, leaves, mass, { envelope, normalFn, aoFn, detail, trunkR, tipR });
   } else {
-    broadleaf(p, r, bark, leaves, mass, { envelope, normalFn, aoFn, detail, trunkR, tipR, crownH });
+    broadleaf(p, r, bark, leaves, mass, { envelope, normalFn, aoFn, detail, trunkR, tipR, crownH, flowers });
   }
-  return { bark: bark.geometry(), leaves: leaves.geometry(true), mass: massGeometry(mass, p) };
+  return {
+    bark: bark.geometry(),
+    leaves: leaves.geometry(true),
+    flowers: flowers && flowers.count ? flowers.geometry(true) : null,
+    mass: massGeometry(mass, p),
+  };
 }
 
 /* Inner foliage mass: low-poly blobs (broadleaf) or a solid core (conifer) that
@@ -241,8 +275,9 @@ function massGeometry(mass, p) {
 }
 
 function broadleaf(p, r, bark, leaves, mass, ctx) {
-  const { H, R, cb, dens, shape, variant } = p;
-  const { envelope, normalFn, aoFn, detail, trunkR, tipR, crownH } = ctx;
+  const { H, R, cb, dens, shape, variant, kind } = p;
+  const { envelope, normalFn, aoFn, detail, trunkR, tipR, crownH, flowers } = ctx;
+  const willow = kind === 'willow';
 
   // 1. Foliage clumps just inside the crown envelope, laid on one golden-angle
   //    spiral from the crown base to the top (weighted by girth, so wide parts
@@ -284,7 +319,7 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
   clumps.push({ c: V(0, H - clumpR * 0.7, 0), a: 0, outer: true });
 
   // 2. Skeleton. Leader shapes keep a central stem; the rest fork into scaffold limbs.
-  const leader = shape === 'oval' || shape === 'pyramidal' || shape === 'columnar' || shape === 'linden';
+  const leader = shape === 'oval' || shape === 'pyramidal' || shape === 'columnar' || shape === 'linden' || shape === 'fastigiate';
   const trunkTop = leader ? cb + crownH * 0.82 : cb;
   const K = ({ spreading: 5, vase: 5, weeping: 5 }[shape] || 5) + (variant % 2 ? 1 : 0) - (variant === 2 ? 1 : 0);
   const scaffold = [];
@@ -302,7 +337,9 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
   for (const cl of clumps) {
     if (leader) {
       const out = Math.hypot(cl.c.x, cl.c.z);
-      cl.from = V(0, THREE.MathUtils.clamp(cl.c.y - out * 0.45, cb * 0.95, trunkTop), 0);
+      // Columnar broadleaves send their branches steeply up from low on the trunk.
+      const steep = shape === 'fastigiate' ? 2.6 : 0.45;
+      cl.from = V(0, THREE.MathUtils.clamp(cl.c.y - out * steep, cb * 0.95, trunkTop), 0);
     } else {
       let best = scaffold[0];
       for (const s of scaffold) if (angDist(s.a, cl.a) < angDist(best.a, cl.a)) best = s;
@@ -361,7 +398,8 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
     const nf = normalFn(P);
     const af = aoFn(P, clumpR);
     const out = V(P.x, 0, P.z).normalize();
-    const n = cl.outer ? perClump : Math.round(perClump * 0.5);
+    // Honeylocust's fine leaflets let a lot of light through.
+    const n = Math.round((cl.outer ? perClump : perClump * 0.5) * (kind === 'locust' ? 0.6 : 1));
     for (let i = 0; i < n; i++) {
       const d = randUnit(r);
       d.y = d.y * 0.75 + 0.2;
@@ -370,17 +408,58 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
       // Face outward from the crown (and a little upward), with some tumble.
       const face = d.clone().multiplyScalar(0.55).addScaledVector(out, 0.35).addScaledVector(UP, 0.25)
         .addScaledVector(randUnit(r), 0.45).normalize();
-      const tip = V().crossVectors(face, randUnit(r)).normalize();
+      // Willow streamers hang straight down from the branch; other sprays point any which way.
+      const tip = willow
+        ? V((r() - 0.5) * 0.25, -1, (r() - 0.5) * 0.25).addScaledVector(out, 0.15).normalize()
+        : V().crossVectors(face, randUnit(r)).normalize();
       // Mostly small and medium sprays, a few large ones.
-      const s = size * (0.45 + 0.75 * r() ** 1.6) * (cl.k || 1);
-      card(leaves, centre.addScaledVector(tip, -s * 0.5), tip, face, s, r(), nf, af);
+      const s = size * (0.45 + 0.75 * r() ** 1.6) * (cl.k || 1) * (willow ? 1.3 : 1);
+      card(leaves, centre.addScaledVector(tip, willow ? -s * 0.1 : -s * 0.5), tip, face, s, r(), nf, af);
+    }
+  }
+
+  // 4. Flowers: blossom clusters (crabapple) or cone-shaped panicles
+  //    (hydrangea) on the outside of the crown. Shown only in bloom season.
+  if (flowers) {
+    const panicle = kind === 'hydrangea';
+    const fs = panicle ? THREE.MathUtils.clamp(R * 0.28, 0.55, 1.1) : size * 0.8;
+    const per = panicle ? Math.round(5 + 6 * dens) : Math.round(perClump * 0.55);
+    for (const cl of clumps) {
+      if (!cl.outer) continue;
+      const P = cl.c;
+      const nf = normalFn(P);
+      const af = aoFn(P, clumpR);
+      const out = V(P.x, 0, P.z).normalize();
+      for (let i = 0; i < per; i++) {
+        const d = randUnit(r);
+        d.addScaledVector(out, 0.8).addScaledVector(UP, 0.5).normalize();
+        const centre = P.clone().addScaledVector(d, clumpR * (0.75 + 0.3 * r()));
+        const s = fs * (0.7 + 0.5 * r());
+        if (panicle) {
+          // Panicles stand up and lean out a little, arching under their weight.
+          const tip = UP.clone().addScaledVector(d, 0.45).addScaledVector(randUnit(r), 0.2).normalize();
+          const face = V().crossVectors(tip, V().crossVectors(d, tip)).normalize();
+          const base = centre.clone().addScaledVector(tip, -s * 0.35);
+          card(flowers, base, tip, face, s, r(), nf, af);
+          // A second card crossed at 90° so the cone reads from every side.
+          card(flowers, base, tip, V().crossVectors(tip, face).normalize(), s, r(), nf, af);
+        } else {
+          const face = d.clone().addScaledVector(randUnit(r), 0.4).normalize();
+          const tip = V().crossVectors(face, randUnit(r)).normalize();
+          card(flowers, centre.addScaledVector(tip, -s * 0.5), tip, face, s, r(), nf, af);
+        }
+      }
     }
   }
 }
 
 function conifer(p, r, bark, leaves, mass, ctx) {
-  const { H, R, cb, dens, kind, shape } = p;
+  const { H, R, cb, dens, shape } = p;
   const { envelope, normalFn, aoFn, detail, trunkR, tipR } = ctx;
+  // Branch habit: arborvitae grows like a juniper, Norway spruce like a spruce
+  // whose branchlets hang in curtains.
+  const pendulous = p.kind === 'norway';
+  const kind = { arborvitae: 'juniper', norway: 'spruce' }[p.kind] || p.kind;
   const crownH = Math.max(0.5, H - cb);
   const segs = hi(detail, 8, 12);
   const mugo = kind === 'pine' && H < 20 && shape !== 'columnar';
@@ -417,7 +496,7 @@ function conifer(p, r, bark, leaves, mass, ctx) {
       const a = (k / n) * Math.PI * 2 + j * GOLDEN + (r() - 0.5) * 0.45;
       const dir = V(Math.cos(a), 0, Math.sin(a));
       // Habit: spruce droops then lifts at the tip; juniper and pine ascend.
-      const lift = kind === 'spruce' ? -0.18 : kind === 'juniper' ? 0.7 : 0.4;
+      const lift = kind === 'spruce' ? (pendulous ? -0.08 : -0.18) : kind === 'juniper' ? 0.7 : 0.4;
       const len = (kind === 'juniper' ? L * 0.95 : L) * (0.85 + 0.25 * r());
       const start = V(0, y - (kind === 'juniper' ? len * 0.35 : 0), 0);
       const end = start.clone().addScaledVector(dir, len).addScaledVector(UP, len * lift);
@@ -447,7 +526,7 @@ function conifer(p, r, bark, leaves, mass, ctx) {
   const orient = (d, out) => {
     if (kind === 'spruce') {
       // Flat sprays spreading outward and drooping slightly: layered tiers.
-      const tip = out.clone().addScaledVector(UP, -0.25).addScaledVector(randUnit(r), 0.35).normalize();
+      const tip = out.clone().addScaledVector(UP, pendulous && r() < 0.55 ? -1.6 : -0.25).addScaledVector(randUnit(r), 0.35).normalize();
       const face = V(r() * 0.5 - 0.25, 1, r() * 0.5 - 0.25).addScaledVector(out, 0.35).normalize();
       return { tip, face };
     }
@@ -520,7 +599,12 @@ const hi = (detail, a, b) => (detail > 1 ? b : a);
 
 const DEFAULT_LEAF = 0x46702c;
 const DEFAULT_FALL = 0xb5782a;
-const DEFAULT_NEEDLE = { spruce: 0x2c4a2e, juniper: 0x5f7a6c, pine: 0x2e4d22 };
+const DEFAULT_NEEDLE = { spruce: 0x2c4a2e, norway: 0x284a26, juniper: 0x5f7a6c, arborvitae: 0x3f6a2e, pine: 0x2e4d22 };
+/* Bloom colours over the flowering window: opening, full, fading. */
+const DEFAULT_BLOOM = {
+  crabapple: [0xb0305a, 0xe89ab4, 0xf2d6de],
+  hydrangea: [0xc8dc8a, 0xf1f1e2, 0xd8a4a4],
+};
 
 export class TreeLibrary {
   constructor() {
@@ -539,7 +623,7 @@ export class TreeLibrary {
   }
 
   #barkMaterial(kind) {
-    const type = BARK[kind] || 'oak';
+    const [type, tint] = BARK[kind] || BARK.broadleaf;
     if (!this.bark[kind]) {
       // Borrow EZ-Tree's scanned bark maps by growing a bare trunk once.
       const ez = new EzTree();
@@ -557,7 +641,7 @@ export class TreeLibrary {
         t.needsUpdate = true;
         maps[k] = t;
       }
-      this.bark[kind] = new THREE.MeshStandardMaterial({ ...maps, color: new THREE.Color(BARK_TINT[kind] ?? 0xa8a196), roughness: 1 });
+      this.bark[kind] = new THREE.MeshStandardMaterial({ ...maps, color: new THREE.Color(tint), roughness: 1 });
     }
     return this.bark[kind];
   }
@@ -632,12 +716,62 @@ export class TreeLibrary {
     return mat;
   }
 
+  #flowerMaterial(kind, colors) {
+    const tex = leafTexture(BLOOMS[kind], this.high);
+    const uniforms = {
+      uC0: { value: new THREE.Color(colors[0]) },
+      uC1: { value: new THREE.Color(colors[1]) },
+      uC2: { value: new THREE.Color(colors[2] ?? colors[1]) },
+      uPhase: { value: 0 },
+      uBloom: { value: 0 },
+      uLumaNorm: { value: 1 / tex.luma },
+    };
+    const mat = new THREE.MeshStandardMaterial({ map: tex.map, alphaTest: 0.42, side: THREE.DoubleSide, roughness: 0.8 });
+    mat.userData.uniforms = uniforms;
+    mat.customProgramCacheKey = () => 'yard-bloom';
+    mat.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', `#include <common>
+          attribute float aRand;
+          attribute float aAO;
+          varying float vRand;
+          varying float vAO;`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          vRand = aRand;
+          vAO = aAO;`);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>
+          uniform vec3 uC0;
+          uniform vec3 uC1;
+          uniform vec3 uC2;
+          uniform float uPhase;
+          uniform float uBloom;
+          uniform float uLumaNorm;
+          varying float vRand;
+          varying float vAO;`)
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          // Flowers open (and later drop) a few at a time.
+          if (vRand > uBloom) discard;
+          float l = min(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)) * uLumaNorm, 1.5);
+          // Each flower is a little ahead of or behind the others.
+          float ph = clamp(uPhase + (vRand - 0.5) * 0.25, 0.0, 1.0);
+          vec3 hue = ph < 0.5 ? mix(uC0, uC1, ph * 2.0) : mix(uC1, uC2, ph * 2.0 - 1.0);
+          diffuseColor.rgb = hue * l;`)
+        .replace('#include <aomap_fragment>', `#include <aomap_fragment>
+          reflectedLight.indirectDiffuse *= mix(0.45, 1.0, vAO);`)
+        .replace('#include <normal_fragment_begin>',
+          THREE.ShaderChunk.normal_fragment_begin.replace('gl_FrontFacing ? 1.0 : - 1.0', '1.0'));
+    };
+    return mat;
+  }
+
   /**
    * A tree group for plan tree `t`. `profile(u)` is the crown radius fraction
    * at height fraction u (the shade engine's SHAPES[shape].r); `crownBase` is
    * the fraction of height where the crown starts.
    */
-  build(t, { bare = false, fall = 0, crownBase = 0.25, profile = (u) => Math.sin(Math.PI * u) } = {}) {
+  build(t, { bare = false, fall = 0, bloom = null, crownBase = 0.25, profile = (u) => Math.sin(Math.PI * u) } = {}) {
     const kind = leafKindFor(t);
     const geo = this.#geometry(t, kind, profile, crownBase);
     const grp = new THREE.Group();
@@ -645,7 +779,7 @@ export class TreeLibrary {
     inner.rotation.y = (t.id * GOLDEN) % (Math.PI * 2);
     grp.add(inner);
 
-    const bark = new THREE.Mesh(geo.bark, this.#barkMaterial(kind));
+    const bark = new THREE.Mesh(geo.bark, this.#barkMaterial(barkFor(t, kind)));
     bark.castShadow = bark.receiveShadow = true;
     bark.raycast = () => {};
     inner.add(bark);
@@ -661,6 +795,17 @@ export class TreeLibrary {
       leaves.userData.leafUniforms = mat.userData.uniforms;
       leaves.userData.evergreen = !!t.evergreen;
       inner.add(leaves);
+      if (geo.flowers) {
+        const fm = this.#flowerMaterial(kind, t.bloom || DEFAULT_BLOOM[kind]);
+        const flowers = new THREE.Mesh(geo.flowers, fm);
+        flowers.castShadow = false;
+        flowers.receiveShadow = true;
+        flowers.raycast = () => {};
+        flowers.userData.bloomUniforms = fm.userData.uniforms;
+        flowers.userData.bloomKind = kind;
+        inner.add(flowers);
+        TreeLibrary.applyBloom(flowers, bloom?.(kind));
+      }
       if (geo.mass) {
         const massMat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0 });
         massMat.userData.uniforms = mat.userData.uniforms;
@@ -684,9 +829,17 @@ export class TreeLibrary {
     return grp;
   }
 
-  /** Updates fall colour on every built tree under `root`. */
-  setFall(root, fall) {
+  static applyBloom(mesh, st) {
+    const u = mesh.userData.bloomUniforms;
+    u.uBloom.value = st ? st.amount : 0;
+    u.uPhase.value = st ? st.phase : 0;
+    mesh.visible = u.uBloom.value > 0.001;
+  }
+
+  /** Updates fall colour, and flowering via `bloom(kind)` → {amount, phase}, on every built tree under `root`. */
+  setFall(root, fall, bloom = null) {
     root.traverse((o) => {
+      if (o.userData.bloomUniforms) TreeLibrary.applyBloom(o, bloom?.(o.userData.bloomKind));
       if (o.userData.leafUniforms && !o.userData.evergreen) o.userData.leafUniforms.uFall.value = fall;
       if (o.userData.massOf && !o.userData.massOf.userData.evergreen) {
         const [a, b] = o.material.userData.base;

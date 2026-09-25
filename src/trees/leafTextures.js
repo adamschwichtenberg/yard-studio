@@ -89,6 +89,56 @@ const BROADLEAVES = {
     outline: (s, jag) => profileOutline(s, (u) => 0.34 * u ** 0.55 * (1 - u) ** 0.28 * (1 + 0.22 * Math.sin(u * Math.PI * 6 + 0.6)), { teeth: 0.006, toothCount: 8, jag }),
     veins: 'pinnate', petiole: '#5a4a2a', arrangement: 'alternate', pairs: 5, size: 0.21, hue: 96,
   },
+  birch: {
+    // Small, triangular-ovate, long drawn-out tip, doubly serrate.
+    outline: (s, jag) => profileOutline(s, (u) => 0.4 * (1 - u) ** 0.9 * Math.sin(Math.PI * Math.min(1, u * 1.6)) ** 0.5, { teeth: 0.022, toothCount: 24, jag }),
+    veins: 'parallel', petiole: '#5a3a2a', arrangement: 'alternate', pairs: 5, size: 0.12, hue: 100,
+  },
+  aspen: {
+    // Near-round with a short point and fine rounded teeth; flutters pale-side up.
+    outline: (s, jag) => profileOutline(s, (u) => 0.46 * Math.sin(Math.PI * u ** 0.8) ** 0.5 * (1 - 0.25 * u ** 3), { teeth: 0.012, toothCount: 18, jag }),
+    veins: 'pinnate', petiole: '#6a6a3a', arrangement: 'alternate', pairs: 5, size: 0.12, hue: 92, pale: 0.35,
+  },
+  poplar: {
+    // Deltoid (cottonwood): broad flat base, straight sides to a point, coarse teeth.
+    outline: (s, jag) => profileOutline(s, (u) => 0.5 * (1 - u) ** 1.05 * Math.min(1, u * 7) ** 0.5, { teeth: 0.018, toothCount: 16, jag }),
+    veins: 'pinnate', petiole: '#6a6a3a', arrangement: 'alternate', pairs: 5, size: 0.15, hue: 98, pale: 0.25,
+  },
+  hackberry: {
+    // Ovate, lopsided base, long tapering tip, toothed above the base.
+    outline: (s, jag) => profileOutline(s, (u) => 0.36 * Math.sin(Math.PI * u ** 0.75) ** 0.7 * (1 - 0.35 * u), { teeth: 0.014, toothCount: 20, skew: 0.22, jag }),
+    veins: 'parallel', petiole: '#4f4a2a', arrangement: 'alternate', pairs: 5, size: 0.14, hue: 96,
+  },
+  buroak: {
+    // Fiddle-shaped: small lobes low down, a deep sinus near the middle, a broad wavy crown.
+    outline: (s, jag) => profileOutline(s, (u) => {
+      const lower = 0.2 * Math.sin(Math.PI * u * 4.5) ** 2 * Math.min(1, u * 4);
+      const sinus = Math.exp(-(((u - 0.5) / 0.07) ** 2)) * 0.24;
+      const upper = u > 0.5 ? 0.42 * Math.sin(Math.PI * (u - 0.5) / 0.5) ** 0.45 * (1 + 0.12 * Math.sin(u * 50 + jag)) : 0;
+      return Math.max(0.03, Math.max(lower + 0.08 * Math.min(1, u * 5), upper) - sinus) * (u > 0.97 ? (1 - u) / 0.03 : 1);
+    }, { teeth: 0, toothCount: 1, jag }),
+    veins: 'pinnate', petiole: '#5a4a2a', arrangement: 'alternate', pairs: 5, size: 0.2, hue: 94,
+  },
+  whiteoak: {
+    // English/white oak: 5-7 pairs of rounded lobes with fairly deep sinuses.
+    outline: (s, jag) => profileOutline(s, (u) => 0.32 * Math.sin(Math.PI * u) ** 0.55 * (0.62 + 0.38 * Math.abs(Math.sin(u * Math.PI * 5.5))) * Math.min(1, u * 5), { teeth: 0, toothCount: 1, jag }),
+    veins: 'pinnate', petiole: '#5a4a2a', arrangement: 'alternate', pairs: 5, size: 0.16, hue: 96,
+  },
+  willow: {
+    // Long, narrow, finely toothed blades.
+    outline: (s, jag) => profileOutline(s, (u) => 0.1 * Math.sin(Math.PI * u) ** 0.7, { teeth: 0.004, toothCount: 40, jag }),
+    veins: 'pinnate', petiole: '#7a7a3a', arrangement: 'alternate', pairs: 8, size: 0.2, hue: 84, pale: 0.2,
+  },
+  crabapple: {
+    // Small, glossy, ovate, finely serrate.
+    outline: (s, jag) => profileOutline(s, (u) => 0.34 * Math.sin(Math.PI * u) ** 0.7 * (1 - 0.2 * u), { teeth: 0.01, toothCount: 26, jag }),
+    veins: 'pinnate', petiole: '#6a3a2a', arrangement: 'alternate', pairs: 5, size: 0.12, hue: 100,
+  },
+  hydrangea: {
+    // Panicle hydrangea: elliptic, pointed, toothed, in opposite pairs or whorls of three.
+    outline: (s, jag) => profileOutline(s, (u) => 0.3 * Math.sin(Math.PI * u) ** 0.8, { teeth: 0.012, toothCount: 26, jag }),
+    veins: 'parallel', petiole: '#6a5a2a', arrangement: 'opposite', pairs: 4, size: 0.16, hue: 104,
+  },
   broadleaf: {
     outline: (s, jag) => profileOutline(s, (u) => 0.36 * Math.sin(Math.PI * u) ** 0.75 * (1 - 0.2 * u), { teeth: 0.012, toothCount: 28, jag }),
     veins: 'pinnate', petiole: '#566030', arrangement: 'alternate', pairs: 5, size: 0.15, hue: 102,
@@ -111,6 +161,11 @@ function drawBroadleaf(g, spec, x, y, size, angle, rand, darken = 0) {
   grd.addColorStop(1, `hsl(${spec.hue + 4 + rand() * 6}, 50%, ${L + 8}%)`);
   g.fillStyle = grd;
   g.fill();
+  if (spec.pale && rand() < spec.pale) {
+    // Some leaves show their pale underside (aspen, poplar, willow).
+    g.fillStyle = 'rgba(200,210,190,.35)';
+    g.fill();
+  }
   if (darken > 0) {
     g.fillStyle = `rgba(8,18,6,${darken})`;
     g.fill();
@@ -120,7 +175,7 @@ function drawBroadleaf(g, spec, x, y, size, angle, rand, darken = 0) {
   g.clip();
   g.fillStyle = 'rgba(0,0,0,.10)';
   g.fillRect(-size, -size * 1.2, size, size * 1.3);
-  g.restore();
+  // Veins stay inside the blade.
 
   g.strokeStyle = `hsla(80, 30%, ${L + 22}%, .6)`;
   g.lineCap = 'round';
@@ -151,6 +206,7 @@ function drawBroadleaf(g, spec, x, y, size, angle, rand, darken = 0) {
       }
     }
   }
+  g.restore();
   g.restore();
 }
 
@@ -372,12 +428,189 @@ function paintMugo(g, N, rand) {
   }
 }
 
+/** Weeping willow: long hanging streamers of narrow leaves. The card's base
+    (bottom edge) sits at the branch; the streamers run toward the top edge,
+    and the tree hangs these cards tip-down. */
+function paintWillow(g, N, rand) {
+  const spec = BROADLEAVES.willow;
+  g.lineCap = 'round';
+  for (let k = 0; k < 9; k++) {
+    const x0 = N * (0.18 + 0.64 * (k + rand() * 0.6) / 9);
+    const len = N * (0.6 + rand() * 0.35);
+    const sway = (rand() - 0.5) * N * 0.08;
+    g.strokeStyle = '#7a6a38';
+    g.lineWidth = N * 0.004;
+    g.beginPath();
+    g.moveTo(x0, N * 0.99);
+    g.quadraticCurveTo(x0 + sway, N * 0.99 - len * 0.5, x0 + sway * 1.6, N * 0.99 - len);
+    g.stroke();
+    const n = 16;
+    for (let i = 1; i <= n; i++) {
+      const t = i / n;
+      const x = x0 + sway * 1.6 * t * t;
+      const y = N * 0.99 - len * t;
+      for (const side of [-1, 1]) {
+        if (rand() < 0.25) continue;
+        const ang = side * (0.25 + rand() * 0.3);
+        drawBroadleaf(g, spec, x, y, N * spec.size * 0.55 * (0.8 + rand() * 0.4) * (1 - 0.3 * t), ang, rand, 0.25 * rand());
+      }
+    }
+  }
+}
+
+/** Honeylocust: overlapping pinnate fronds of tiny leaflets, lots of daylight between. */
+function paintLocust(g, N, rand) {
+  g.lineCap = 'round';
+  for (let k = 0; k < 22; k++) {
+    // Fronds scattered over the card at every angle, gently curved.
+    const cx = N * (0.5 + (rand() - 0.5) * 0.4);
+    const cy = N * (0.5 + (rand() - 0.5) * 0.4);
+    const a = rand() * Math.PI * 2;
+    const len = N * (0.16 + rand() * 0.16);
+    const bend = (rand() - 0.5) * 0.6;
+    g.strokeStyle = '#6a6a36';
+    g.lineWidth = N * 0.0025;
+    g.beginPath();
+    g.moveTo(cx, cy);
+    const pts = [];
+    for (let i = 0; i <= 12; i++) {
+      const t = i / 12;
+      const aa = a + bend * t;
+      const px = cx + Math.cos(aa) * len * t;
+      const py = cy + Math.sin(aa) * len * t;
+      pts.push([px, py, aa]);
+      g.lineTo(px, py);
+    }
+    g.stroke();
+    for (let i = 1; i <= 12; i++) {
+      const [x, y, aa] = pts[i];
+      for (const side of [-1, 1]) {
+        if (rand() < 0.12) continue;
+        const la = aa + side * (1.2 + (rand() - 0.5) * 0.3);
+        const l = N * 0.016 * (0.8 + rand() * 0.4) * (1 - 0.3 * (i / 12));
+        g.fillStyle = `hsl(${86 + rand() * 16}, ${42 + rand() * 14}%, ${28 + rand() * 16}%)`;
+        g.beginPath();
+        g.ellipse(x + Math.cos(la) * l, y + Math.sin(la) * l, l, l * 0.42, la, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+  }
+}
+
+/** Arborvitae: flat, vertical fans of overlapping scale-leaf sprays, branching
+    in one plane, a lighter tip on each fan. */
+function paintArborvitae(g, N, rand) {
+  const frond = (x0, y0, ang, len, w, depth) => {
+    const steps = Math.max(3, Math.round(len / (w * 1.3)));
+    let x = x0;
+    let y = y0;
+    let a = ang;
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      a += (rand() - 0.5) * 0.08;
+      const nx = x + Math.sin(a) * (len / steps);
+      const ny = y - Math.cos(a) * (len / steps);
+      const tw = w * (1 - t * 0.5);
+      // Each segment is a flattened, overlapping scale spray.
+      const L = 24 + t * 12 + rand() * 10;
+      g.fillStyle = `hsl(${92 + rand() * 16}, ${38 + rand() * 12}%, ${L}%)`;
+      g.beginPath();
+      g.ellipse((x + nx) / 2, (y + ny) / 2, tw * 0.5, (len / steps) * 0.75, a, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = `hsla(90, 30%, ${L - 10}%, .8)`;
+      g.lineWidth = Math.max(1, tw * 0.08);
+      g.stroke();
+      if (depth > 0 && t < 0.8) {
+        const side = i % 2 ? 1 : -1;
+        frond(nx, ny, a + side * (0.6 + rand() * 0.25), len * (depth > 1 ? 0.5 : 0.4) * (1 - t * 0.5), tw * 0.75, depth - 1);
+      }
+      x = nx;
+      y = ny;
+    }
+  };
+  for (const [ang, len] of [[0, 0.82], [-0.45, 0.55], [0.45, 0.55]]) frond(N * 0.5, N * 0.97, ang, N * len, N * 0.065, 2);
+}
+
+/* ------------------------------------------------------------ flowers */
+
+/** Crabapple blossom clusters: five-petal flowers and fat buds, drawn pale so
+    the shader can tint them to the variety's colour. */
+function paintBlossoms(g, N, rand) {
+  const cx = N / 2;
+  const cy = N / 2;
+  const M = 40;
+  for (let i = 0; i < M; i++) {
+    const f = Math.sqrt(rand());
+    const a = rand() * Math.PI * 2;
+    const x = cx + Math.cos(a) * f * N * 0.34;
+    const y = cy + Math.sin(a) * f * N * 0.3;
+    const r = N * (0.028 + rand() * 0.02);
+    const L = 62 + rand() * 22;
+    if (rand() < 0.25) {
+      // bud
+      g.fillStyle = `hsl(0, 0%, ${L - 22}%)`;
+      g.beginPath();
+      g.ellipse(x, y, r * 0.45, r * 0.6, rand() * 3, 0, Math.PI * 2);
+      g.fill();
+      continue;
+    }
+    const rot = rand() * Math.PI;
+    for (let k = 0; k < 5; k++) {
+      const pa = rot + (k / 5) * Math.PI * 2;
+      g.fillStyle = `hsl(0, 0%, ${L - rand() * 8}%)`;
+      g.beginPath();
+      g.ellipse(x + Math.cos(pa) * r * 0.55, y + Math.sin(pa) * r * 0.55, r * 0.52, r * 0.4, pa, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.fillStyle = 'hsl(50, 60%, 70%)';
+    g.beginPath();
+    g.arc(x, y, r * 0.18, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+/** Panicle hydrangea: a cone of tiny four-petal florets, point up (toward the card tip). */
+function paintPanicle(g, N, rand) {
+  const base = N * 0.95;
+  const top = N * 0.1;
+  g.strokeStyle = '#6a6a3a';
+  g.lineWidth = N * 0.008;
+  g.beginPath();
+  g.moveTo(N / 2, N);
+  g.lineTo(N / 2, top + N * 0.1);
+  g.stroke();
+  const M = 520;
+  for (let i = 0; i < M; i++) {
+    const t = rand();
+    const y = base - (base - top) * t;
+    // Broad rounded base, tapering to a blunt tip.
+    const half = N * 0.36 * Math.pow(1 - t, 0.7) * Math.min(1, (1 - t) * 6) * Math.min(1, 0.55 + t * 3);
+    const x = N / 2 + (rand() * 2 - 1) * half * Math.sqrt(rand());
+    const r = N * (0.012 + rand() * 0.012);
+    const L = 58 + rand() * 30 - (1 - Math.abs(x - N / 2) / (half + 1)) * 6;
+    const rot = rand() * Math.PI;
+    for (let k = 0; k < 4; k++) {
+      const pa = rot + (k / 4) * Math.PI * 2;
+      g.fillStyle = `hsl(0, 0%, ${L}%)`;
+      g.beginPath();
+      g.ellipse(x + Math.cos(pa) * r * 0.5, y + Math.sin(pa) * r * 0.5, r * 0.55, r * 0.42, pa, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+}
+
 /* ------------------------------------------------------------ api */
 
 const PAINTERS = {
   spruce: paintSpruce,
+  norway: paintSpruce,
   juniper: paintJuniper,
+  arborvitae: paintArborvitae,
   pine: paintMugo,
+  willow: paintWillow,
+  locust: paintLocust,
+  'bloom:crabapple': paintBlossoms,
+  'bloom:hydrangea': paintPanicle,
 };
 
 export const LEAF_KINDS = [...Object.keys(BROADLEAVES), ...Object.keys(PAINTERS)];
@@ -392,8 +625,10 @@ export function leafTexture(kind, high = false) {
   const c = document.createElement('canvas');
   c.width = c.height = N;
   const g = c.getContext('2d');
-  const rand = rng(8127 + kind.length * 97);
-  if (BROADLEAVES[kind]) paintBroadleafCluster(g, N, BROADLEAVES[kind], rand);
+  let seed = 8127;
+  for (let i = 0; i < kind.length; i++) seed = Math.imul(seed ^ kind.charCodeAt(i), 16777619);
+  const rand = rng(seed);
+  if (BROADLEAVES[kind] && !PAINTERS[kind]) paintBroadleafCluster(g, N, BROADLEAVES[kind], rand);
   else (PAINTERS[kind] || paintSpruce)(g, N, rand);
 
   const px = g.getImageData(0, 0, N, N).data;

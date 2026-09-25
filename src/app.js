@@ -26,52 +26,110 @@ const SHAPES = {
   spreading: {label:"Wide spreading (oak, locust)",  base:.40, r:u=>Math.pow(Math.sin(Math.PI*(.22+.72*u)),.45)},
   vase:      {label:"Vase (elm, serviceberry)",      base:.36,
               r:u=>u<.72 ? .16+.84*Math.pow(Math.sin(Math.PI/2*u/.72),1.25) : Math.sqrt(Math.max(0,1-Math.pow((u-.72)/.28,2)))},
-  weeping:   {label:"Weeping (willow, river birch)", base:.16, r:u=>Math.pow(Math.sin(Math.PI*(.18+.78*u)),.42)}
+  weeping:   {label:"Weeping (willow)",             base:.16, r:u=>Math.pow(Math.sin(Math.PI*(.18+.78*u)),.42)},
+  /* Fastigiate: an upright column with a rounded top, for columnar
+     broadleaves (birch, oak, aspen, poplar). Widest a little below the middle. */
+  fastigiate:{label:"Columnar broadleaf (birch, oak)", base:.08,
+              r:u=>Math.pow(Math.max(0,1-Math.pow((u-.42)/.58,2)),.32)}
 };
+/* Trees you can place, grouped Deciduous / Evergreen and then by genus (`gn`).
+   `bloom` colours (opening, full, fading) are for species that flower. */
 const PRESETS = [
- {g:"Shortlist", n:"Autumn Blaze Maple", s:"oval", h:50, w:40, ev:false, d:.85, leaf:0x46702c, fall:0xb8321c,
-  note:"Freeman maple (Jeffersred). Upright oval, fast, brilliant orange-red in fall. Hardy to zone 3."},
- {g:"Shortlist", n:"Sienna Glen Maple", s:"oval", h:55, w:38, ev:false, d:.82, leaf:0x46702c, fall:0xb5512a,
-  note:"Freeman maple. Upright oval that broadens with age, fast growth, hardy to zone 3."},
- {g:"Shortlist", n:"Matador Maple", s:"oval", h:45, w:35, ev:false, d:.90, leaf:0x42692a, fall:0xb3261e,
-  note:"Freeman maple, tighter and more uniform than Sienna Glen. Heavy shade underneath."},
- {g:"Shortlist", n:"Redmond Linden", s:"linden", h:55, w:35, ev:false, d:.90, leaf:0x3f6a2a, fall:0xb89a3a,
-  note:"American linden. Broad pyramidal, very dense. Handles wind and alkaline soil."},
- {g:"Shortlist", n:"Greenspire Linden", s:"linden", h:45, w:30, ev:false, d:.88, leaf:0x3f6a2a, fall:0xb8a040,
-  note:"Littleleaf linden. Tight pyramidal form, dense shade, narrower than Redmond."},
- {g:"Shortlist", n:"Prairie Horizon Alder", s:"oval", h:35, w:28, ev:false, d:.55, leaf:0x2f5424, fall:0x6e6a2c,
-  note:"Manchurian alder. Open canopy, so the shade underneath stays dappled. Very hardy and fast."},
- {g:"Shortlist", n:"Spartan Juniper", s:"columnar", h:18, w:5, ev:true, d:.95, leaf:0x2f4a2a,
-  note:"Narrow columnar evergreen. Thin but solid shadow, year round. Rated zone 4, marginal in 4a."},
- {g:"Shortlist", n:"Moonglow Juniper", s:"pyramidal", h:20, w:10, ev:true, d:.92, leaf:0x66796b,
-  note:"Broad pyramidal blue-green evergreen. Dense year-round shade in a compact footprint."},
- {g:"Shortlist", n:"Tannenbaum Mugo Pine", s:"pyramidal", h:11, w:7, ev:true, d:.90, leaf:0x2e4d22,
-  note:"Compact pyramidal mugo. Slow, stays small, casts dense shade low to the ground."},
- {g:"Shortlist", n:"Columnar Mugo Pine", s:"columnar", h:12, w:5, ev:true, d:.90, leaf:0x2e4d22,
-  note:"Narrow upright mugo. Slow-growing evergreen screen without a wide shadow."},
- {g:"Shortlist", n:"Columnar Norway Spruce", s:"columnar", h:30, w:6, ev:true, d:.92, leaf:0x264221,
-  note:"Picea abies 'Cupressina'. Very narrow column that keeps its lower branches. Hardy to zone 3."},
- {g:"Shortlist", n:"Columnar Norway Pine", s:"columnar", h:25, w:8, ev:true, d:.85, leaf:0x2a4a26,
-  note:"Narrow upright conifer. Mature size varies a lot between growers — confirm the tag."},
- {g:"Already here", n:"Royal Red maple", s:"round", h:35, w:25, ev:false, d:.95, leaf:0x8a2230, fall:0x9a2a1c,
-  note:"Norway maple. Round, very dense crown — the deepest shade of the maples here."},
- {g:"Already here", n:"Crimson Sunset maple", s:"oval", h:35, w:22, ev:false, d:.90, leaf:0x92222e, fall:0xa0301e,
-  note:"Upright oval, purple foliage, denser and narrower than a Freeman maple."},
- {g:"Already here", n:"Swamp white oak", s:"spreading", h:55, w:50, ev:false, d:.70, leaf:0x3f5f2a, fall:0x8a5a2a,
-  note:"Wide spreading crown with a fairly open interior. Leafs out late."},
- {g:"Already here", n:"Prairie Expedition elm", s:"vase", h:50, w:40, ev:false, d:.70, leaf:0x3f6a2a, fall:0xb09a3a,
-  note:"Vase shape with a high crown, so shade lands well out from the trunk."},
- {g:"Already here", n:"Flowering crabapple", s:"round", h:18, w:18, ev:false, d:.70, leaf:0x4a7030, fall:0xa0702a,
-  note:"Small round crown, light shade. Safe near a bed."},
- {g:"Shortlist", n:"Crimson King maple", s:"round", h:40, w:35, ev:false, d:.95, leaf:0x7e1a26, fall:0x8e2a1c,
-  note:"Norway maple with deep red-maroon leaves all season. Dense, round crown and heavy shade."},
- {g:"Shortlist", n:"Colorado Blue Spruce", s:"pyramidal", h:50, w:20, ev:true, d:.93, leaf:0x7092a8,
-  note:"Picea pungens. Silver-blue needles on a stiff, broad pyramid. Very hardy (zone 2); shades year round."},
- {g:"Already here", n:"Black Hills spruce", s:"pyramidal", h:35, w:18, ev:true, d:.95, leaf:0x3a5a4a,
-  note:"Dense conifer that shades year round, including the low winter sun."},
- {g:"Already here", n:"Pinky Winky hydrangea", s:"round", h:8, w:6, ev:false, d:.75, leaf:0x4a7a30, fall:0x8a6a30,
-  note:"Tree-form shrub. Its shadow only matters to a bed right beside it."}
+ // ---- Deciduous
+ {gn:"Maples", n:"Autumn Blaze Maple", s:"oval", h:50, w:40, ev:false, d:.85, leaf:0x46702c, fall:0xb8321c,
+  sci:"Acer × freemanii 'Jeffersred'", note:"Freeman maple (Jeffersred). Upright oval, fast, brilliant orange-red in fall. Hardy to zone 3."},
+ {gn:"Maples", n:"Sienna Glen Maple", s:"oval", h:55, w:38, ev:false, d:.82, leaf:0x46702c, fall:0xb5512a,
+  sci:"Acer × freemanii 'Sienna'", note:"Freeman maple. Upright oval that broadens with age, fast growth, hardy to zone 3."},
+ {gn:"Maples", n:"Matador Maple", s:"oval", h:45, w:35, ev:false, d:.90, leaf:0x42692a, fall:0xb3261e,
+  sci:"Acer × freemanii 'Bailston'", note:"Freeman maple, tighter and more uniform than Sienna Glen. Heavy shade underneath."},
+ {gn:"Maples", n:"Crimson King maple", s:"round", h:40, w:35, ev:false, d:.95, leaf:0x7e1a26, fall:0x8e2a1c,
+  sci:"Acer platanoides 'Crimson King'", note:"Norway maple with deep red-maroon leaves all season. Dense, round crown and heavy shade."},
+ {gn:"Maples", n:"Crimson Sunset maple", s:"oval", h:35, w:22, ev:false, d:.90, leaf:0x92222e, fall:0xa0301e,
+  sci:"Acer truncatum × platanoides 'JFS-KW202'", note:"Upright oval, purple foliage, denser and narrower than a Freeman maple."},
+ {gn:"Maples", n:"Royal Red maple", s:"round", h:35, w:25, ev:false, d:.95, leaf:0x8a2230, fall:0x9a2a1c,
+  sci:"Acer platanoides 'Royal Red'", note:"Norway maple. Round, very dense crown — the deepest shade of the maples here."},
+ {gn:"Lindens", n:"Redmond Linden", s:"linden", h:55, w:35, ev:false, d:.90, leaf:0x3f6a2a, fall:0xb89a3a,
+  sci:"Tilia americana 'Redmond'", note:"American linden. Broad pyramidal, very dense. Handles wind and alkaline soil."},
+ {gn:"Lindens", n:"Greenspire Linden", s:"linden", h:45, w:30, ev:false, d:.88, leaf:0x3f6a2a, fall:0xb8a040,
+  sci:"Tilia cordata 'Greenspire'", note:"Littleleaf linden. Tight pyramidal form, dense shade, narrower than Redmond."},
+ {gn:"Birches", n:"Parkland Pillar Birch", s:"fastigiate", h:40, w:8, ev:false, d:.72, leaf:0x4e7a2e, fall:0xd0a630,
+  sci:"Betula platyphylla 'Jefpark'", note:"Columnar white-barked birch. A narrow, airy column: light shade in a tiny footprint. Bronze birch borer resistant."},
+ {gn:"Birches", n:"River Birch", s:"oval", h:40, w:30, ev:false, d:.62, leaf:0x46702c, fall:0xc8a040,
+  sci:"Betula nigra", note:"Often multi-stemmed, with peeling cinnamon bark. Open oval crown, light dappled shade. Likes moist soil."},
+ {gn:"Oaks", n:"Bur Oak", s:"spreading", h:60, w:55, ev:false, d:.78, leaf:0x3e5c28, fall:0x8a6a30,
+  sci:"Quercus macrocarpa", note:"The prairie oak. Massive, wide crown on stout limbs; deep shade once mature. Slow, very long-lived, zone 3."},
+ {gn:"Oaks", n:"Crimson Spire Oak", s:"fastigiate", h:45, w:15, ev:false, d:.85, leaf:0x3f6030, fall:0x9a3a24,
+  sci:"Quercus robur × alba 'Crimschmidt'", note:"Columnar oak. Dense upright column with rusty-red fall colour; holds some leaves into winter."},
+ {gn:"Oaks", n:"Swamp white oak", s:"spreading", h:55, w:50, ev:false, d:.70, leaf:0x3f5f2a, fall:0x8a5a2a,
+  sci:"Quercus bicolor", note:"Wide spreading crown with a fairly open interior. Leafs out late."},
+ {gn:"Elms", n:"Prairie Expedition elm", s:"vase", h:50, w:40, ev:false, d:.70, leaf:0x3f6a2a, fall:0xb09a3a,
+  sci:"Ulmus americana 'Lewis & Clark'", note:"Vase shape with a high crown, so shade lands well out from the trunk."},
+ {gn:"Hackberries", n:"Common Hackberry", s:"spreading", h:50, w:45, ev:false, d:.75, leaf:0x4a6a30, fall:0xb0a040,
+  sci:"Celtis occidentalis", note:"Tough native with an elm-like, arching crown and warty grey bark. Medium-dense shade."},
+ {gn:"Honeylocusts", n:"Thornless Honeylocust", s:"spreading", h:45, w:40, ev:false, d:.45, leaf:0x5a8030, fall:0xd0b030,
+  sci:"Gleditsia triacanthos var. inermis", note:"Fine, feathery leaflets make light, dappled shade — lawn and beds still grow underneath."},
+ {gn:"Poplars & aspens", n:"Quaking Aspen", s:"oval", h:40, w:20, ev:false, d:.58, leaf:0x5a7a30, fall:0xd8b030,
+  sci:"Populus tremuloides", note:"Narrow oval, white bark, leaves that flutter in the slightest breeze. Light shade; suckers freely."},
+ {gn:"Poplars & aspens", n:"Swedish Columnar Aspen", s:"fastigiate", h:40, w:8, ev:false, d:.72, leaf:0x4e7030, fall:0xc8a030,
+  sci:"Populus tremula 'Erecta'", note:"Tight column for screening. Very narrow shadow; yellow fall colour."},
+ {gn:"Poplars & aspens", n:"Hybrid Poplar", s:"oval", h:55, w:30, ev:false, d:.78, leaf:0x46702c, fall:0xc8b040,
+  sci:"Populus × canadensis", note:"Very fast screen tree with triangular, cottonwood-like leaves. Short-lived; big shade quickly."},
+ {gn:"Poplars & aspens", n:"Tower Poplar", s:"fastigiate", h:45, w:10, ev:false, d:.75, leaf:0x46702c, fall:0xc8b040,
+  sci:"Populus × canescens 'Tower'", note:"Hardy columnar poplar used for windbreaks and privacy. Fast, narrow shadow."},
+ {gn:"Willows", n:"Weeping Willow", s:"weeping", h:40, w:40, cb:10, ev:false, d:.72, leaf:0x6a8a36, fall:0xc0b040,
+  sci:"Salix alba 'Tristis'", note:"Golden weeping willow. Broad dome of hanging streamers; wants room and moist ground."},
+ {gn:"Crabapples", n:"Prairifire Crabapple", s:"round", h:20, w:20, ev:false, d:.72, leaf:0x40522e, fall:0x8a4a2a,
+  bloom:[0x9c1848, 0xd8306e, 0xe0628e], sci:"Malus 'Prairifire'",
+  note:"Deep pink-red blossoms for about two weeks in spring, then reddish-purple leaves maturing to dark green. Disease resistant."},
+ {gn:"Crabapples", n:"Flowering crabapple", s:"round", h:18, w:18, ev:false, d:.70, leaf:0x4a7030, fall:0xa0702a,
+  bloom:[0xd06a8a, 0xf2c8d4, 0xf6ecee], sci:"Malus", note:"Small round crown, light shade. Pink buds opening pale in spring. Safe near a bed."},
+ {gn:"Hydrangeas", n:"Limelight Hydrangea tree", s:"round", h:8, w:6, ev:false, d:.78, leaf:0x46702c, fall:0x8a6a30,
+  bloom:[0xc2d888, 0xf0f0e0, 0xd89aa0], sci:"Hydrangea paniculata 'Limelight'",
+  note:"Tree-form panicle hydrangea. Lime-green cones from midsummer turn white, then blush pink in fall."},
+ {gn:"Hydrangeas", n:"Pinky Winky hydrangea", s:"round", h:8, w:6, ev:false, d:.75, leaf:0x4a7a30, fall:0x8a6a30,
+  bloom:[0xeeeedc, 0xf2e6e2, 0xd0607e], sci:"Hydrangea paniculata 'DVPpinky'",
+  note:"Tree-form panicle hydrangea. White cones that turn pink from the base up. Its shadow only matters to a bed right beside it."},
+ {gn:"Alders", n:"Prairie Horizon Alder", s:"oval", h:35, w:28, ev:false, d:.55, leaf:0x2f5424, fall:0x6e6a2c,
+  sci:"Alnus hirsuta 'Harbin'", note:"Manchurian alder. Open canopy, so the shade underneath stays dappled. Very hardy and fast."},
+ // ---- Evergreen
+ {gn:"Spruces", n:"Norway Spruce", s:"pyramidal", h:60, w:28, ev:true, d:.92, leaf:0x284a26,
+  sci:"Picea abies", note:"Big, dark pyramid with branchlets that hang in curtains. Fast for a spruce; a year-round windbreak."},
+ {gn:"Spruces", n:"Columnar Norway Spruce", s:"columnar", h:30, w:6, ev:true, d:.92, leaf:0x264221,
+  sci:"Picea abies 'Cupressina'", note:"Very narrow column that keeps its lower branches. Hardy to zone 3."},
+ {gn:"Spruces", n:"Colorado Blue Spruce", s:"pyramidal", h:50, w:20, ev:true, d:.93, leaf:0x7092a8,
+  sci:"Picea pungens 'Glauca'", note:"Silver-blue needles on a stiff, broad pyramid. Very hardy (zone 2); shades year round."},
+ {gn:"Spruces", n:"Black Hills spruce", s:"pyramidal", h:35, w:18, ev:true, d:.95, leaf:0x3a5a4a,
+  sci:"Picea glauca var. densata", note:"Dense conifer that shades year round, including the low winter sun."},
+ {gn:"Pines", n:"Tannenbaum Mugo Pine", s:"pyramidal", h:11, w:7, ev:true, d:.90, leaf:0x2e4d22,
+  sci:"Pinus mugo 'Tannenbaum'", note:"Compact pyramidal mugo. Slow, stays small, casts dense shade low to the ground."},
+ {gn:"Pines", n:"Columnar Mugo Pine", s:"columnar", h:12, w:5, ev:true, d:.90, leaf:0x2e4d22,
+  sci:"Pinus mugo", note:"Narrow upright mugo. Slow-growing evergreen screen without a wide shadow."},
+ {gn:"Pines", n:"Columnar Norway Pine", s:"columnar", h:25, w:8, ev:true, d:.85, leaf:0x2a4a26,
+  sci:"Pinus resinosa", note:"Narrow upright conifer. Mature size varies a lot between growers — confirm the tag."},
+ {gn:"Junipers & arborvitae", n:"Techny Arborvitae", s:"pyramidal", h:18, w:10, ev:true, d:.95, leaf:0x3a6428,
+  sci:"Thuja occidentalis 'Techny'", note:"Broad, dense pyramid of flat, bright-green sprays that stay green in winter. Hardy to zone 3."},
+ {gn:"Junipers & arborvitae", n:"Emerald Green Arborvitae", s:"columnar", h:14, w:4, ev:true, d:.95, leaf:0x3f6e2c,
+  sci:"Thuja occidentalis 'Smaragd'", note:"Narrow, formal column for hedges and screens. Slim year-round shadow."},
+ {gn:"Junipers & arborvitae", n:"Spartan Juniper", s:"columnar", h:18, w:5, ev:true, d:.95, leaf:0x2f4a2a,
+  sci:"Juniperus chinensis 'Spartan'", note:"Narrow columnar evergreen. Thin but solid shadow, year round. Rated zone 4, marginal in 4a."},
+ {gn:"Junipers & arborvitae", n:"Moonglow Juniper", s:"pyramidal", h:20, w:10, ev:true, d:.92, leaf:0x66796b,
+  sci:"Juniperus scopulorum 'Moonglow'", note:"Broad pyramidal blue-green evergreen. Dense year-round shade in a compact footprint."}
 ];
+/* Deciduous first, then evergreen; genera in the order they appear above. */
+function presetGroups(){
+  const out = [];
+  for(const [label, ev] of [["Deciduous", false], ["Evergreen", true]]){
+    const genera = [];
+    for(const p of PRESETS){
+      if(p.ev !== ev) continue;
+      let g = genera.find(x=>x.name===p.gn);
+      if(!g){ g = {name:p.gn, items:[]}; genera.push(g); }
+      g.items.push(p);
+    }
+    out.push({label, genera});
+  }
+  return out;
+}
 
 /* ============================================================ polygon helpers */
 function rectPoly(w,h){ return [{x:-w/2,y:-h/2},{x:w/2,y:-h/2},{x:w/2,y:h/2},{x:-w/2,y:h/2}]; }
@@ -148,8 +206,11 @@ let sceneVer = 0;
 
 function fromPreset(name, x, y){
   const d = PRESETS.find(p=>p.n===name) || PRESETS[0];
-  return {id:nid(), type:"tree", name:d.n, x, y, shape:d.s, height:d.h, spread:d.w,
+  const o = {id:nid(), type:"tree", name:d.n, x, y, shape:d.s, height:d.h, spread:d.w,
           evergreen:d.ev, density:d.d, note:d.note, leaf:d.leaf, fall:d.fall};
+  if(d.bloom) o.bloom = d.bloom;
+  if(d.cb != null) o.crownBase = d.cb;
+  return o;
 }
 function isoToday(){
   const d = new Date();
@@ -395,6 +456,21 @@ function fallAmount(){
   if(!S.leafSeason || !leafOn()) return 0;
   const left = mdDay(S.leafDrop) - mdDay(seasonMD());
   return clamp((24 - left)/21, 0, 1);
+}
+/* Flowering windows, in days after leaf-out (so they follow the leaf season
+   and the hemisphere). Crabapples bloom as the leaves emerge and are over in
+   about two weeks; panicle hydrangeas flower from midsummer into fall. */
+const BLOOM_WINDOWS = {crabapple:{from:0, to:16}, hydrangea:{from:62, to:150}};
+function bloomState(kind){
+  const w = BLOOM_WINDOWS[kind];
+  if(!w || !leafOn()) return null;
+  const day = mdDay(seasonMD()) - mdDay(S.leafOut);
+  const end = Math.min(w.to, mdDay(S.leafDrop) - mdDay(S.leafOut) - 2);
+  if(day < w.from || day > end) return null;
+  const phase = (day - w.from)/Math.max(1, end - w.from);
+  /* opens over the first fifth, drops over the last tenth */
+  const amount = clamp(Math.min(phase/.2, (1-phase)/.1), 0, 1);
+  return {amount: .15 + .85*amount, phase};
 }
 function bearingVec(az){
   const a = (az - S.north)*DEG;
@@ -777,7 +853,7 @@ function buildTree(t){
   if(S.simple){ buildTreeSimple(grp, t, {cb, top, R, fn}); return grp; }
 
   const sh = SHAPES[t.shape] || SHAPES.round;
-  grp.add(trees.build(t, {bare, fall:fallAmount(), crownBase:crownBaseFt(t)/Math.max(1, t.height), profile:sh.r}));
+  grp.add(trees.build(t, {bare, fall:fallAmount(), bloom:bloomState, crownBase:crownBaseFt(t)/Math.max(1, t.height), profile:sh.r}));
 
   const r0 = Math.max(.5, trunkR*2.1);
   const ring = new THREE.Mesh(new THREE.RingGeometry(r0, r0+.3, 28),
@@ -2302,17 +2378,11 @@ function syncRanges(root){
 }
 document.addEventListener("input", e=>{ if(e.target.type === "range") syncRanges(e.target.parentNode); }, true);
 function presetSelect(o){
-  const groups = [];
-  for(const p of PRESETS){
-    let g = groups.find(x=>x.name===p.g);
-    if(!g){ g = {name:p.g, items:[]}; groups.push(g); }
-    g.items.push(p);
-  }
   const idx = PRESETS.findIndex(p=>p.n===o.name);
+  const opt = p=>`<option value="${PRESETS.indexOf(p)}" ${PRESETS.indexOf(p)===idx?"selected":""}>${p.n}</option>`;
   return `<select data-preset><option value="-1">${idx<0?"Custom tree":"Load a different tree…"}</option>`
-    + groups.map(g=>`<optgroup label="${g.name}">`
-      + g.items.map(p=>`<option value="${PRESETS.indexOf(p)}" ${PRESETS.indexOf(p)===idx?"selected":""}>${p.n}</option>`).join("")
-      + `</optgroup>`).join("") + `</select>`;
+    + presetGroups().map(G=>G.genera.map(g=>`<optgroup label="${G.label} · ${g.name}">${g.items.map(opt).join("")}</optgroup>`).join("")).join("")
+    + `</select>`;
 }
 function statHTML(st){
   const v = st.avg >= S.fullSun ? `<span class="verdict v-full">Full sun</span>`
@@ -2499,6 +2569,8 @@ props.addEventListener("input", e=>{
     if(!p) return;
     o.name = p.n; o.shape = p.s; o.height = p.h; o.spread = p.w; delete o.crownBase;
     o.evergreen = p.ev; o.density = p.d; o.note = p.note; o.leaf = p.leaf; o.fall = p.fall;
+    if(p.bloom) o.bloom = p.bloom; else delete o.bloom;
+    if(p.cb != null) o.crownBase = p.cb;
     panelFor = null;
     rebuildObject(o); drawPanel(); drawList(); updateSelection(); scheduleCompute();
     return;
@@ -2770,7 +2842,7 @@ function afterDateChange(){
   buildArc();
   const leaf = leafOn();
   if(leaf !== lastLeaf){ lastLeaf = leaf; rebuildAll(); }
-  else trees.setFall(objGroup, fallAmount());
+  else trees.setFall(objGroup, fallAmount(), bloomState);
   scheduleCompute();
   syncLocationUI();
   markDirty();
