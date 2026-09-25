@@ -15,7 +15,12 @@ const escapeHTML = value => String(value).replace(/[&<>"']/g, c=>({
 /* ============================================================ crown profiles */
 const SHAPES = {
   round:     {label:"Round crown (maple, ash)",      base:.32, r:u=>Math.sqrt(Math.max(0,1-Math.pow(2*u-1,2)))},
-  oval:      {label:"Upright oval (linden, alder)",  base:.22, r:u=>Math.pow(Math.max(0,1-Math.pow(2*u-1,2)),.36)},
+  oval:      {label:"Upright oval (maple, alder)",   base:.22, r:u=>Math.pow(Math.max(0,1-Math.pow(2*u-1,2)),.36)},
+  /* Linden: between an upright oval and a pyramid. Full and rounded near the
+     bottom of the crown, widest about a third of the way up, then tapering to
+     a softly pointed top. Canopy typically starts about 6 ft up. */
+  linden:    {label:"Linden (dense ovate pyramid)",  base:.11, baseFt:6,
+              r:u=>u<.3 ? .8+.2*Math.sin(Math.PI/2*u/.3) : Math.pow(Math.max(0,1-Math.pow((u-.3)/.7,1.7)),.62)},
   pyramidal: {label:"Pyramidal (spruce, fir)",       base:.05, r:u=>Math.pow(1-u,.8)},
   columnar:  {label:"Columnar (narrow pyramid)",     base:.05, r:u=>Math.max(.04, Math.pow(1-u,.62))},
   spreading: {label:"Wide spreading (oak, locust)",  base:.40, r:u=>Math.pow(Math.sin(Math.PI*(.22+.72*u)),.45)},
@@ -30,9 +35,9 @@ const PRESETS = [
   note:"Freeman maple. Upright oval that broadens with age, fast growth, hardy to zone 3."},
  {g:"Shortlist", n:"Matador Maple", s:"oval", h:45, w:35, ev:false, d:.90, leaf:0x42692a, fall:0xb3261e,
   note:"Freeman maple, tighter and more uniform than Sienna Glen. Heavy shade underneath."},
- {g:"Shortlist", n:"Redmond Linden", s:"pyramidal", h:55, w:35, ev:false, d:.90, leaf:0x3f6a2a, fall:0xb89a3a,
+ {g:"Shortlist", n:"Redmond Linden", s:"linden", h:55, w:35, ev:false, d:.90, leaf:0x3f6a2a, fall:0xb89a3a,
   note:"American linden. Broad pyramidal, very dense. Handles wind and alkaline soil."},
- {g:"Shortlist", n:"Greenspire Linden", s:"pyramidal", h:45, w:30, ev:false, d:.88, leaf:0x3f6a2a, fall:0xb8a040,
+ {g:"Shortlist", n:"Greenspire Linden", s:"linden", h:45, w:30, ev:false, d:.88, leaf:0x3f6a2a, fall:0xb8a040,
   note:"Littleleaf linden. Tight pyramidal form, dense shade, narrower than Redmond."},
  {g:"Shortlist", n:"Prairie Horizon Alder", s:"oval", h:35, w:28, ev:false, d:.55, leaf:0x2f5424, fall:0x6e6a2c,
   note:"Manchurian alder. Open canopy, so the shade underneath stays dappled. Very hardy and fast."},
@@ -402,7 +407,8 @@ function bearingVec(az){
 function crownBaseFt(t){
   const sh = SHAPES[t.shape] || SHAPES.round;
   const top = Math.max(1, t.height - 1);
-  return clamp(Number.isFinite(t.crownBase) ? t.crownBase : Math.round(t.height*sh.base*2)/2, 0, top);
+  const def = Number.isFinite(sh.baseFt) ? sh.baseFt : Math.round(t.height*sh.base*2)/2;
+  return clamp(Number.isFinite(t.crownBase) ? t.crownBase : def, 0, top);
 }
 function treeCrown(t){
   const sh = SHAPES[t.shape] || SHAPES.round;

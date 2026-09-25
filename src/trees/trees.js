@@ -58,7 +58,7 @@ export function leafKindFor(t) {
   if (/alder|birch/.test(n)) return 'alder';
   if (/elm/.test(n)) return 'elm';
   if (/oak/.test(n)) return 'oak';
-  return { round: 'maple', spreading: 'oak', vase: 'elm' }[t.shape] || 'broadleaf';
+  return { round: 'maple', spreading: 'oak', vase: 'elm', linden: 'linden' }[t.shape] || 'broadleaf';
 }
 const BARK = { maple: 'oak', linden: 'oak', elm: 'oak', oak: 'oak', broadleaf: 'oak', alder: 'birch', spruce: 'pine', juniper: 'willow', pine: 'pine' };
 const BARK_TINT = { maple: 0xb4ada2, linden: 0xa39d92, elm: 0x9a9388, oak: 0x9e958a, broadleaf: 0xa8a196, alder: 0x8f877c, spruce: 0x8c7f70, juniper: 0x8a6e5a, pine: 0x9a7a5e };
@@ -284,7 +284,7 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
   clumps.push({ c: V(0, H - clumpR * 0.7, 0), a: 0, outer: true });
 
   // 2. Skeleton. Leader shapes keep a central stem; the rest fork into scaffold limbs.
-  const leader = shape === 'oval' || shape === 'pyramidal' || shape === 'columnar';
+  const leader = shape === 'oval' || shape === 'pyramidal' || shape === 'columnar' || shape === 'linden';
   const trunkTop = leader ? cb + crownH * 0.82 : cb;
   const K = ({ spreading: 5, vase: 5, weeping: 5 }[shape] || 5) + (variant % 2 ? 1 : 0) - (variant === 2 ? 1 : 0);
   const scaffold = [];
