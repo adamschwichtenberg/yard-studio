@@ -76,7 +76,7 @@ export function leafKindFor(t) {
 const BARK = {
   maple: ['oak', 0xb4ada2], linden: ['oak', 0xa39d92], elm: ['oak', 0x9a9388], oak: ['oak', 0x9e958a],
   buroak: ['oak', 0x8e867a], whiteoak: ['oak', 0x9e968a], broadleaf: ['oak', 0xa8a196], alder: ['birch', 0x8f877c],
-  birch: ['birch', 0xf4f1ea], riverbirch: ['birch', 0xc89a7a], aspen: ['birch', 0xdfe2cf], poplar: ['oak', 0xaaa597],
+  birch: ['birch', 0xe2ded6], riverbirch: ['birch', 0xc89a7a], aspen: ['birch', 0xdfe2cf], poplar: ['oak', 0xaaa597],
   hackberry: ['oak', 0xb0aaa0], locust: ['oak', 0x8a7d70], willow: ['willow', 0x9a8a78], crabapple: ['oak', 0x8a7a6c],
   hydrangea: ['willow', 0xa08a70],
   spruce: ['pine', 0x8c7f70], norway: ['pine', 0x8a7465], juniper: ['willow', 0x8a6e5a], arborvitae: ['willow', 0x8e6a52],
@@ -398,8 +398,8 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
     const nf = normalFn(P);
     const af = aoFn(P, clumpR);
     const out = V(P.x, 0, P.z).normalize();
-    // Honeylocust's fine leaflets let a lot of light through.
-    const n = Math.round((cl.outer ? perClump : perClump * 0.5) * (kind === 'locust' ? 0.6 : 1));
+    // Honeylocust's fine leaflets let light through; columnar crowns pack their leaves in tight.
+    const n = Math.round((cl.outer ? perClump : perClump * 0.5) * (kind === 'locust' ? 0.85 : shape === 'fastigiate' ? 1.4 : 1));
     for (let i = 0; i < n; i++) {
       const d = randUnit(r);
       d.y = d.y * 0.75 + 0.2;

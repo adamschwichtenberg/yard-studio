@@ -6,7 +6,7 @@
 <title>Yard Shade Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
@@ -41,6 +41,12 @@
   <symbol id="i-display" viewBox="0 0 16 16"><rect x="1.8" y="2.6" width="12.4" height="8.6" rx="1.3"/><path d="M5.6 13.8h4.8M8 11.2v2.6"/></symbol>
   <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.8h5.4l3 3v9.4H4z"/><path d="M9.2 1.8v3.2h3.2"/></symbol>
   <symbol id="i-collapse" viewBox="0 0 16 16"><path d="M10 3.6L5.6 8l4.4 4.4"/></symbol>
+  <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 2.5v11M2.5 8h11"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M3.2 8.3l3 3 6.6-6.6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.8"/><path d="M10.6 10.6L14 14"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="11" rx="1.6"/><path d="M2 6.5h12M5.2 1.6v3M10.8 1.6v3"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 16 16"><path d="M8 14.5v-4"/><path d="M8 1.8c3 0 5 2.3 5 5.2S10.8 12.3 8 12.3 3 9.9 3 7s2-5.2 5-5.2z"/></symbol>
 </defs></svg>
 
 <div id="view"><canvas id="gl"></canvas></div>
@@ -62,53 +68,63 @@
   <div id="sunhead">
     <button class="ibtn primary" id="playbtn" title="Play the day"><svg class="ic fill"><use href="#i-play"/></svg></button>
     <div class="who">
-      <div class="clock num" id="clockbig">1:00 PM</div>
-      <div class="date" id="datelbl">—</div>
-      <div class="date loc" id="loclbl"></div>
+      <div class="clock" id="clockbig">1:00 PM</div>
+      <div class="date"><span id="datelbl">—</span><span class="dot">·</span><span class="loc" id="loclbl"></span></div>
     </div>
+    <label class="datepill" title="Change the date"><svg class="ic"><use href="#i-cal"/></svg><span>Date</span>
+      <input type="date" id="date" aria-label="Date"></label>
     <button class="ibtn" id="sunToggle" title="Hide the sun details"><svg class="ic"><use href="#i-chev"/></svg></button>
   </div>
   <div id="sunbody">
-    <svg id="arc" viewBox="0 0 320 78" preserveAspectRatio="none" aria-label="Sun path: drag to set the time"></svg>
+    <svg id="arc" viewBox="0 0 328 92" preserveAspectRatio="none" aria-label="Sun path: drag to set the time"></svg>
+    <div id="yearwrap">
+      <svg id="ribbon" viewBox="0 0 328 34" preserveAspectRatio="none" aria-label="Day length through the year: click to change the date"></svg>
+      <div class="months num"><span>J</span><span>F</span><span>M</span><span>A</span><span>M</span><span>J</span><span>J</span><span>A</span><span>S</span><span>O</span><span>N</span><span>D</span></div>
+    </div>
     <div id="sunctl">
-      <input type="date" id="date" aria-label="Date">
       <div class="seg tiny" id="seasons">
         <button data-jump="03-21">Mar 21</button><button data-jump="06-21">Jun 21</button>
         <button data-jump="09-21">Sep 21</button><button data-jump="12-21">Dec 21</button>
       </div>
     </div>
-    <div class="readout num">
-      <div class="k">Sun height</div><div class="v hot" id="rEl">—</div>
-      <div class="k">Bearing</div><div class="v" id="rAz">—</div>
-      <div class="k">Shadow of 10 ft</div><div class="v" id="rShad">—</div>
-      <div class="k">Daylight</div><div class="v" id="rDay">—</div>
-      <div class="k">Solar noon</div><div class="v" id="rNoon">—</div>
+    <div class="readout">
+      <div class="r"><span class="v hot num" id="rEl">—</span><span class="k">Sun height</span></div>
+      <div class="r"><span class="v num" id="rAz">—</span><span class="k">Bearing</span></div>
+      <div class="r"><span class="v num" id="rShad">—</span><span class="k">Shadow of 10 ft</span></div>
+      <div class="r wide"><span class="k">Daylight</span><span class="v num" id="rDay">—</span></div>
+      <div class="r wide"><span class="k">Solar noon</span><span class="v num" id="rNoon">—</span></div>
     </div>
   </div>
 </div>
 
+<div id="projhead" class="panel">
+  <div class="t">
+    <input id="projname" type="text" maxlength="40" value="Backyard" aria-label="Plan name" spellcheck="false">
+    <div class="s" id="projsub">—</div>
+  </div>
+  <div class="rule"></div>
+  <button id="projstatus" title="Save the plan to a file"><svg class="ic"><use href="#i-check"/></svg><span>Not saved yet</span></button>
+</div>
+
 <div id="compass" class="panel" title="Drag to spin the view · double-click for north up"><svg viewBox="0 0 100 100" id="compsvg"></svg></div>
 
-<div id="top" class="panel">
-  <div class="seg" role="group" aria-label="Tools">
+<div id="top" class="panel" role="toolbar" aria-label="Tools and views">
+  <div class="seg tools" role="group" aria-label="Tools">
     <button data-tool="select" aria-pressed="true" title="Select and move"><svg class="ic fill"><use href="#i-cursor"/></svg><span class="lbl-t">Select</span></button>
     <button data-tool="pan" title="Pan the view"><svg class="ic"><use href="#i-pan"/></svg><span class="lbl-t">Pan</span></button>
     <button data-tool="measure" title="Measure"><svg class="ic"><use href="#i-ruler"/></svg><span class="lbl-t">Measure</span></button>
   </div>
   <div class="div"></div>
-  <div class="seg" role="group" aria-label="Add to the yard">
-    <button data-tool="tree" title="Place a tree"><svg class="ic"><use href="#i-tree"/></svg><span class="lbl-t">Tree</span></button>
-    <button data-tool="bed" title="Place a bed"><svg class="ic"><use href="#i-bed"/></svg><span class="lbl-t">Bed</span></button>
-    <button data-tool="structure" title="Place a building"><svg class="ic"><use href="#i-house"/></svg><span class="lbl-t">Building</span></button>
-    <button data-tool="deck" title="Place a deck or patio"><svg class="ic"><use href="#i-deck"/></svg><span class="lbl-t">Deck</span></button>
-    <button data-tool="driveway" title="Place an editable driveway"><svg class="ic"><use href="#i-driveway"/></svg><span class="lbl-t">Driveway</span></button>
-    <button data-tool="sidewalk" title="Place an editable sidewalk"><svg class="ic"><use href="#i-sidewalk"/></svg><span class="lbl-t">Sidewalk</span></button>
+  <div class="addwrap">
+    <button class="addbtn" id="addbtn" aria-haspopup="true" aria-expanded="false"><svg class="ic"><use href="#i-plus"/></svg><span>Add to yard</span></button>
   </div>
   <div class="div"></div>
-  <div class="seg icons" role="group" aria-label="View">
-    <button id="vplan" title="Plan: straight down (1)"><svg class="ic"><use href="#i-plan"/></svg></button>
-    <button id="v3d" aria-pressed="true" title="Tilted (2)"><svg class="ic"><use href="#i-cube"/></svg></button>
-    <button id="veye" title="Eye level (3)"><svg class="ic"><use href="#i-eye"/></svg></button>
+  <div class="seg views" role="group" aria-label="View">
+    <button id="vplan" title="Plan: straight down (1)">Plan</button>
+    <button id="v3d" aria-pressed="true" title="Tilted (2)">3D</button>
+    <button id="veye" title="Eye level (3)">Eye level</button>
+  </div>
+  <div class="seg icons ghost" role="group" aria-label="Framing">
     <button id="vfit" title="Frame the whole lot (0)"><svg class="ic"><use href="#i-fit"/></svg></button>
     <button id="vfocus" title="Centre on the selection (F)"><svg class="ic"><use href="#i-focus"/></svg></button>
     <button id="vsimple" title="Simple schematic view (G)"><svg class="ic"><use href="#i-grid"/></svg></button>
@@ -119,6 +135,22 @@
   <button class="btn" id="sheetbtn" style="display:none">Edit</button>
 </div>
 
+<div id="addmenu" class="panel" role="menu" aria-label="Add to the yard" hidden>
+  <button data-lib role="menuitem"><svg class="ic"><use href="#i-tree"/></svg><span><b>Tree</b><i>Browse the species library</i></span></button>
+  <button data-tool="bed" role="menuitem"><svg class="ic"><use href="#i-bed"/></svg><span><b>Garden bed</b><i>See how many hours of sun it gets</i></span></button>
+  <button data-tool="structure" role="menuitem"><svg class="ic"><use href="#i-house"/></svg><span><b>Building</b><i>House, garage or shed</i></span></button>
+  <button data-tool="deck" role="menuitem"><svg class="ic"><use href="#i-deck"/></svg><span><b>Deck or patio</b><i>Raised decks cast shade</i></span></button>
+  <button data-tool="driveway" role="menuitem"><svg class="ic"><use href="#i-driveway"/></svg><span><b>Driveway</b><i>Editable outline</i></span></button>
+  <button data-tool="sidewalk" role="menuitem"><svg class="ic"><use href="#i-sidewalk"/></svg><span><b>Sidewalk</b><i>Editable outline</i></span></button>
+</div>
+
+<div id="layers" class="panel" role="group" aria-label="Map layers">
+  <button id="lyShadow" aria-pressed="true" title="Shadows at the time on the sun card"><i class="sw-shadow"></i>Shadows now</button>
+  <button id="lySun" title="Total hours of direct sun over the day"><i class="sw-heat"></i>Sun hours</button>
+  <button id="lyGrid" title="Show the grid"><i class="sw-grid"></i>Grid</button>
+  <button id="lySimple" title="Simple schematic view (G)"><i class="sw-simple"></i>Schematic</button>
+</div>
+
 <div id="legend" class="panel">
   <div class="t">Daily sun hours</div><div class="ramp"></div>
   <div class="ends"><span>0</span><span id="legmax">14 h</span></div>
@@ -127,42 +159,95 @@
 
 <div id="inspector" class="panel empty">
   <div id="insphead">
+    <div class="eyebrow"><span id="seltag"></span><button class="ibtn" id="inspclose" title="Close (Esc)"><svg class="ic"><use href="#i-close"/></svg></button></div>
     <h2 id="seltitle">Nothing selected</h2>
-    <span class="tag" id="seltag"></span>
+    <div id="selsub"></div>
+    <div id="seltags"></div>
     <button class="btn" id="closesheet" style="display:none;padding:5px 10px">Done</button>
   </div>
   <div id="inspbody"><div id="props"></div></div>
 </div>
 
-<nav id="dock" class="panel" aria-label="Planner">
-  <div id="dockbar">
-    <div class="brand">
-      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="15.5" cy="8.5" r="4.2" fill="#f5a524"/><path d="M3 20.5c2.5-5.5 6.8-8 12-8.2" fill="none" stroke="#5fc6d9" stroke-width="2" stroke-linecap="round"/></svg>
+<div id="library" hidden>
+  <section id="libsheet" role="dialog" aria-modal="true" aria-labelledby="libtitle">
+    <header id="libhead">
+      <div class="t">
+        <span class="eyebrow">Plants</span>
+        <h1 id="libtitle">Choose a tree</h1>
+        <p id="libsubtitle">Hardy trees for cold-winter yards, drawn to the same scale so you can compare their size at maturity.</p>
+      </div>
+      <label class="search"><svg class="ic"><use href="#i-search"/></svg>
+        <input type="search" id="libsearch" placeholder="Search species or cultivar" aria-label="Search species"></label>
+      <button class="ibtn big" id="libclose" title="Close (Esc)"><svg class="ic"><use href="#i-close"/></svg></button>
+    </header>
+    <div id="libmain">
+      <aside id="libfilters" aria-label="Filters">
+        <div class="fgroup">
+          <h2>Type</h2>
+          <div class="seg" id="libtype">
+            <button data-type="all" aria-pressed="true">All</button>
+            <button data-type="deciduous">Deciduous</button>
+            <button data-type="evergreen">Evergreen</button>
+          </div>
+        </div>
+        <div class="fgroup">
+          <div class="fh"><h2>Mature height</h2><span class="num" id="libhval">—</span></div>
+          <div class="dual">
+            <input type="range" id="libhmin" min="5" max="60" step="5" value="5" aria-label="Minimum mature height">
+            <input type="range" id="libhmax" min="5" max="60" step="5" value="60" aria-label="Maximum mature height">
+          </div>
+        </div>
+        <div class="fgroup">
+          <h2>Shade it casts</h2>
+          <div id="libshade">
+            <label><input type="checkbox" value="Dappled" checked><i class="sh1"></i>Dappled, under 65%</label>
+            <label><input type="checkbox" value="Moderate" checked><i class="sh2"></i>Moderate, 65–87%</label>
+            <label><input type="checkbox" value="Dense" checked><i class="sh3"></i>Dense, 88% and up</label>
+          </div>
+        </div>
+        <div class="fgroup">
+          <h2>Flowers</h2>
+          <label class="chk"><input type="checkbox" id="libbloom">Only trees that bloom</label>
+        </div>
+        <div class="grow"></div>
+        <div class="libnote" id="libnote"></div>
+      </aside>
+      <div id="libgrid"></div>
+    </div>
+  </section>
+</div>
+
+<nav id="dock" aria-label="Planner">
+  <div id="dockbar" class="panel">
+    <div class="brand" title="Yard Shade Studio">
+      <svg class="mark" viewBox="0 0 30 30" aria-hidden="true"><circle cx="19" cy="11" r="6" fill="#D4A85A"/><path d="M4 25c3.5-7.5 9-11 16.5-11.3" fill="none" stroke="#8FB8CA" stroke-width="2.2" stroke-linecap="round"/></svg>
       <div class="name"><b>Yard Shade Studio</b><span id="brandsub">Sun and shade planner</span></div>
     </div>
-    <button class="ibtn" id="dockToggle" title="Collapse the sidebar"><svg class="ic"><use href="#i-collapse"/></svg></button>
     <div id="tabs" role="tablist">
-      <button data-tab="prop" aria-pressed="true" title="Lot &amp; fence"><svg class="ic"><use href="#i-lot"/></svg><span>Lot &amp; fence</span></button>
-      <button data-tab="site" title="Location &amp; sun"><svg class="ic"><use href="#i-sun"/></svg><span>Location &amp; sun</span></button>
-      <button data-tab="objs" title="Yard items"><svg class="ic"><use href="#i-list"/></svg><span>Yard items</span><b class="count num" id="objcount"></b></button>
+      <button data-tab="prop" title="Lot &amp; fence"><svg class="ic"><use href="#i-lot"/></svg><span>Lot</span></button>
+      <button id="railPlants" title="Species library"><svg class="ic"><use href="#i-leaf"/></svg><span>Plants</span></button>
+      <button data-tab="site" title="Location &amp; sun"><svg class="ic"><use href="#i-sun"/></svg><span>Sun</span></button>
+      <button data-tab="objs" title="Everything in the yard"><svg class="ic"><use href="#i-list"/></svg><span>Items</span><b class="count num" id="objcount"></b></button>
       <button data-tab="view" title="Display"><svg class="ic"><use href="#i-display"/></svg><span>Display</span></button>
-      <button data-tab="file" title="Plan file"><svg class="ic"><use href="#i-file"/></svg><span>Plan file</span></button>
+      <div class="grow"></div>
+      <button data-tab="file" title="Plan file"><svg class="ic"><use href="#i-file"/></svg><span>File</span></button>
     </div>
   </div>
-  <div id="dockbody">
+  <div id="dockfly" class="panel">
+  <div id="dockflyhead"><span class="eyebrow" id="dockeyebrow">Property</span>
+    <button class="ibtn" id="dockToggle" title="Close the panel"><svg class="ic"><use href="#i-close"/></svg></button></div>
+<div id="dockbody">
 
     <section class="pane on" data-pane="prop">
       <h3 class="panetitle">Lot &amp; fence</h3>
+      <div class="lotstats num"><span id="barea">—</span><span id="bperim">—</span><span><span id="bcount">4</span> corners</span></div>
+      <figure class="lotplan">
+        <svg id="lotsvg" viewBox="0 0 320 210" role="img" aria-label="Plan of the lot"></svg>
+        <figcaption><span>Reshape to drag corners; tap a length to type it.</span><span class="fenced" id="lotfenced"></span></figcaption>
+      </figure>
+      <div class="btnrow"><button class="btn accent" id="editBoundary">Reshape the lot</button><button class="btn" data-import-property>Import image</button></div>
+      <p class="hint" id="boundary-image-state"></p>
       <div class="cols">
-        <div>
-          <h4>Lot outline</h4>
-          <div class="btnrow" style="margin-top:0"><button class="btn accent" id="editBoundary">Reshape the lot</button></div>
-          <div class="btnrow"><button class="btn" data-import-property>Import property image</button></div>
-          <p class="hint" id="boundary-image-state"></p>
-          <div class="field"><span class="lab">Corners</span><span class="val num" id="bcount">4</span></div>
-          <div class="field"><span class="lab">Area</span><span class="val num" id="barea">—</span></div>
-          <div class="field"><span class="lab">Perimeter</span><span class="val num" id="bperim">—</span></div>
-        </div>
         <div>
           <h4>Overall size</h4>
           <div class="field"><label for="yardw">Width across</label>
@@ -173,18 +258,28 @@
           <div class="btnrow"><button class="btn" id="rectBoundary">Make it a rectangle</button></div>
         </div>
         <div>
-          <h4>Fence</h4>
-          <select id="fencestyle"></select>
-          <div class="field" style="margin-top:8px"><label for="fenceh">Height</label>
+          <div class="fh"><h4>Fence style</h4><span>Share of sun it blocks</span></div>
+          <div class="fencetiles" id="fencetiles"></div>
+          <select id="fencestyle" hidden aria-hidden="true" tabindex="-1"></select>
+          <div class="field" style="margin-top:12px"><label for="fenceh">Fence height</label>
             <span class="inp"><input type="number" id="fenceh" min="0" max="12" step="0.5" value="5"><span class="u">ft</span></span></div>
           <div class="field"><label for="fenced">Sun it blocks</label>
             <span class="inp"><input type="number" id="fenced" min="0" max="1" step="0.05" value="0.5"><span class="u">×</span></span></div>
           <div class="sliderow"><input type="range" id="fenced2" min="0" max="1" step="0.05" value="0.5"></div>
-          <div class="btnrow"><button class="btn" id="fenceall">All sides</button><button class="btn" id="fencenone">None</button></div>
+          <div class="btnrow"><button class="btn" id="fenceall">Fence all sides</button><button class="btn" id="fencenone">No fence</button></div>
         </div>
         <div>
           <h4>Fence by side</h4>
           <div class="edgelist" id="fenceedges"></div>
+        </div>
+        <div>
+          <h4>Orientation</h4>
+          <div class="northcard">
+            <svg id="northdial" viewBox="0 0 44 44" aria-hidden="true"></svg>
+            <div class="t"><span>House angle vs. north</span><i>Turn until the compass matches your lot.</i></div>
+            <span class="inp"><input type="number" id="northnum" min="0" max="359" step="1" value="0" aria-label="House angle vs. north"><span class="u">&deg;</span></span>
+          </div>
+          <div class="sliderow" style="margin-top:10px"><input type="range" id="north" min="0" max="359" step="1" value="0" aria-label="House angle vs. north"></div>
         </div>
       </div>
     </section>
@@ -192,13 +287,6 @@
     <section class="pane" data-pane="site">
       <h3 class="panetitle">Location &amp; sun</h3>
       <div class="cols">
-        <div>
-          <h4>Orientation</h4>
-          <div class="field"><label for="northnum">House angle vs. north</label>
-            <span class="inp"><input type="number" id="northnum" min="0" max="359" step="1" value="0"><span class="u">&deg;</span></span></div>
-          <div class="sliderow"><input type="range" id="north" min="0" max="359" step="1" value="0"></div>
-          <p class="hint">Build square to the screen, then turn this until the compass matches reality.</p>
-        </div>
         <div>
           <h4>Location</h4>
           <select id="locpreset" aria-label="Location preset"></select>
@@ -302,6 +390,7 @@
       </div>
     </section>
 
+  </div>
   </div>
 </nav>
 

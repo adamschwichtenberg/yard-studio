@@ -3,7 +3,7 @@ import "./importer.js";
 import { SkyEnvironment } from "./scene/environment.js";
 import { lawnTextures, sidingTextures, shingleTextures, concreteTile, paverTextures } from "./scene/textures.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { TreeLibrary } from "./trees/trees.js";
+import { TreeLibrary, leafKindFor } from "./trees/trees.js";
 import { createPost } from "./post.js";
 
 const DEG = Math.PI/180;
@@ -615,7 +615,7 @@ function scheduleCompute(){
     mask[r*cols+q] = pointInPoly(S.boundary, x0+q*cell, y0+r*cell) ? 1 : 0;
 
   const NB = 11;
-  const bedAcc = S.objects.filter(o=>o.type==="bed").map(bd=>({b:bd, grid:new Float32Array(NB*NB)}));
+  const bedAcc = S.objects.filter(o=>o.type==="bed").map(bd=>({b:bd, grid:new Float32Array(NB*NB), series:new Float32Array(times.length)}));
   computeJob = {
     i:0, times, stepH:stepMin/60, raf:0, NB, bedAcc, wantHeat:S.heat,
     heat:{cols, rows, cell, x0, y0, mask, data:new Float32Array(cols*rows), max:0}
@@ -628,6 +628,7 @@ function computeTick(){
   const deadline = performance.now() + 20;
   while(J.i < J.times.length && performance.now() < deadline){
     const c = casters(J.times[J.i]);
+    const ti = J.i;
     J.i++;
     if(!c) continue;
     if(J.wantHeat){
@@ -648,7 +649,7 @@ function computeTick(){
         for(let ix=0; ix<N; ix++){
           const p = rot2((ix/(N-1) - .5)*b.w, ly, a);
           const f = sunFraction(c, b.x+p.x, b.y+p.y);
-          if(f > 0) acc.grid[iy*N+ix] += J.stepH*f;
+          if(f > 0){ acc.grid[iy*N+ix] += J.stepH*f; acc.series[ti] += f/(N*N); }
         }
       }
     }
@@ -662,8 +663,17 @@ function computeTick(){
   for(const acc of J.bedAcc){
     let sum=0, mn=99, mxb=0, good=0;
     for(const v of acc.grid){ sum+=v; if(v<mn) mn=v; if(v>mxb) mxb=v; if(v>=S.fullSun) good++; }
+    /* hour-by-hour share of the bed in sun, for the insights strip */
+    const hours = [];
+    for(let i=0;i<J.times.length;i++){
+      const m = Math.floor(J.times[i]/60)*60;
+      let h = hours[hours.length-1];
+      if(!h || h.m !== m){ h = {m, f:0, n:0}; hours.push(h); }
+      h.f += acc.series[i]; h.n++;
+    }
+    for(const h of hours) h.f /= h.n;
     bedStats.set(acc.b.id, {avg:sum/acc.grid.length, min:mn, max:mxb,
-                            pct:Math.round(100*good/acc.grid.length), grid:acc.grid, N:J.NB});
+                            pct:Math.round(100*good/acc.grid.length), grid:acc.grid, N:J.NB, hours});
   }
   computeJob = null;
   onComputeDone();
@@ -1822,9 +1832,10 @@ function updateReadout(sp){
   const {rise, set} = dayEdges();
   document.getElementById("clockbig").textContent = fmtTime(S.minutes);
   document.getElementById("datelbl").textContent =
-    new Date(S.date+"T12:00:00").toLocaleDateString(undefined,{weekday:"short",month:"long",day:"numeric"});
+    new Date(S.date+"T12:00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
   document.getElementById("rEl").textContent = sp.el > 0 ? sp.el.toFixed(1)+"°" : "below horizon";
   document.getElementById("rAz").textContent = sp.el > 0 ? Math.round(sp.az)+"° "+compassName(sp.az) : "—";
+  if(sp.el <= 0) document.getElementById("rEl").textContent = "Below";
   document.getElementById("rShad").textContent = sp.el > .5
     ? (10/Math.tan(Math.max(1.2,sp.el)*DEG)).toFixed(1)+" ft" : "—";
   const ed = dayEdges();
@@ -1833,7 +1844,7 @@ function updateReadout(sp){
     : fmtTime(rise).replace(/ /,"")+" – "+fmtTime(set).replace(/ /,"");
   document.getElementById("rNoon").textContent = ed.polar === "night" ? "—"
     : fmtTime(ed.noon).replace(/ /,"")+" · "+ed.peak.toFixed(0)+"°";
-  document.getElementById("loclbl").textContent = placeLabel();
+  document.getElementById("loclbl").textContent = S.place ? S.place.replace(/,\s*(USA|United States)$/,"") : placeLabel();
   moveBead(sp);
 }
 let compassKey = null;
@@ -1842,12 +1853,11 @@ function updateCompass(){
   if(key === compassKey) return;
   compassKey = key;
   document.getElementById("compsvg").innerHTML = `
-    <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1.5"/>
     <g transform="rotate(${rot} 50 50)">
-      <path d="M50 12 L57 46 L50 41 L43 46 Z" fill="#ffb43f"/>
-      <path d="M50 88 L43 54 L50 59 L57 54 Z" fill="rgba(255,255,255,.3)"/>
-      <text x="50" y="9" text-anchor="middle" font-size="11" font-weight="700"
-            fill="#ffb43f" font-family="Archivo,sans-serif">N</text>
+      <path d="M50 14 L60 46 L40 46 Z" fill="#D4A85A"/>
+      <path d="M50 86 L40 54 L60 54 Z" fill="rgba(236,231,218,.3)"/>
+      <text x="50" y="11" text-anchor="middle" font-size="10" font-weight="600"
+            fill="#D4A85A" font-family="Geist,sans-serif">N</text>
     </g>`;
 }
 
@@ -2024,11 +2034,12 @@ function updateShapeEditor(){
 const arcSvg = document.getElementById("arc");
 let arcGeom = null;
 function buildArc(){
-  const {rise, set, peak} = dayEdges();
-  /* draw at the arc's real aspect so labels don't stretch in a wide timeline */
-  const W = Math.max(220, Math.round(arcSvg.clientWidth*78/Math.max(1, arcSvg.clientHeight))) || 320;
-  arcSvg.setAttribute("viewBox", "0 0 "+W+" 78");
-  const x0 = 22, x1 = W-22, base = 58, top = 22, pts = [], N = 70;
+  const {rise, set, peak, polar} = dayEdges();
+  /* draw at the arc's real aspect so labels don't stretch */
+  const H = 92;
+  const W = Math.max(220, Math.round(arcSvg.clientWidth*H/Math.max(1, arcSvg.clientHeight))) || 328;
+  arcSvg.setAttribute("viewBox", "0 0 "+W+" "+H);
+  const x0 = 14, x1 = W-14, base = 72, top = 16, pts = [], N = 70;
   for(let i=0;i<=N;i++){
     const m = rise + (set-rise)*i/N;
     pts.push([x0 + (x1-x0)*i/N, base - (Math.max(0,solarPos(m).el)/Math.max(1,peak))*(base-top)]);
@@ -2038,22 +2049,77 @@ function buildArc(){
   let ni = 0;
   for(let i=1;i<pts.length;i++) if(pts[i][1] < pts[ni][1]) ni = i;
   const noon = pts[ni], noonMin = rise + (set-rise)*ni/N;
-  // keep the peak caption inside the viewBox — it used to slide up under the panel edge
-  const capY = Math.max(10, noon[1] - 8);
-  const capX = clamp(noon[0], x0 + 30, x1 - 30);
+  const capX = clamp(noon[0] + 9, x0 + 20, x1 - 100);
+  const mono = `font-family="Geist Mono,monospace"`;
+  const ends = polar === "night" ? "" : `
+    <text x="${x0}" y="${H-4}" font-size="10.5" fill="#8A8C80" ${mono}>${polar === "day" ? "midnight" : fmtTime(rise)}</text>
+    <text x="${x1}" y="${H-4}" font-size="10.5" fill="#8A8C80" text-anchor="end" ${mono}>${polar === "day" ? "midnight" : fmtTime(set)}</text>`;
   arcSvg.innerHTML = `
     <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffb43f" stop-opacity=".30"/>
-      <stop offset="1" stop-color="#ffb43f" stop-opacity="0"/></linearGradient></defs>
+      <stop offset="0" stop-color="#D4A85A" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#D4A85A" stop-opacity="0"/></linearGradient></defs>
     <path d="${d} L ${x1} ${base} L ${x0} ${base} Z" fill="url(#ag)"/>
-    <line x1="${x0-8}" y1="${base}" x2="${x1+8}" y2="${base}" stroke="rgba(255,255,255,.18)"/>
-    <path d="${d}" fill="none" stroke="#ffb43f" stroke-width="1.8" stroke-opacity=".8"/>
-    <line x1="${noon[0]}" y1="${noon[1]}" x2="${noon[0]}" y2="${base}" stroke="rgba(255,255,255,.16)" stroke-dasharray="2 3"/>
-    <text x="${x0-6}" y="${base+15}" font-size="10" fill="#95a0b0" font-family="Archivo,sans-serif">${fmtTime(rise)}</text>
-    <text x="${x1+6}" y="${base+15}" font-size="10" fill="#95a0b0" text-anchor="end" font-family="Archivo,sans-serif">${fmtTime(set)}</text>
-    <text x="${capX}" y="${capY}" font-size="10" fill="#c3ccd8" text-anchor="middle" font-family="Archivo,sans-serif">${fmtTime(noonMin)} · ${peak.toFixed(0)}&#176; high</text>
-    <circle id="aglow" cx="${x0}" cy="${base}" r="13" fill="#ffb43f" opacity=".18"/>
-    <circle id="abead" cx="${x0}" cy="${base}" r="7" fill="#ffb43f" stroke="rgba(0,0,0,.35)"/>`;
+    <line x1="4" y1="${base}" x2="${W-4}" y2="${base}" stroke="#3A443F"/>
+    <path d="${d}" fill="none" stroke="#D4A85A" stroke-width="1.6"/>
+    <line x1="${noon[0]}" y1="${noon[1]}" x2="${noon[0]}" y2="${base}" stroke="rgba(236,231,218,.2)" stroke-dasharray="2 3"/>
+    ${ends}
+    ${polar === "night" ? `<text x="${W/2}" y="${base-10}" font-size="11" fill="#A6A89A" text-anchor="middle" ${mono}>sun below the horizon all day</text>`
+      : `<text x="${capX}" y="${base-7}" font-size="10" fill="#A6A89A" ${mono}>noon ${fmtTime(noonMin).replace(/ [AP]M/,"")} · ${peak.toFixed(0)}&#176;</text>`}
+    <circle id="aglow" cx="${x0}" cy="${base}" r="13" fill="#D4A85A" opacity=".2"/>
+    <circle id="abead" cx="${x0}" cy="${base}" r="7" fill="#F2D594" stroke="#141A17" stroke-width="1.5"/>`;
+  buildRibbon();
+}
+/* Day length through the year at this latitude (NOAA declination), with
+   today marked. Click or drag it to move the date. */
+const ribbonSvg = document.getElementById("ribbon");
+let ribbonKey = null;
+function dayLengthH(doy){
+  const g = 2*Math.PI/365*(doy - 1);
+  const decl = .006918 - .399912*Math.cos(g) + .070257*Math.sin(g) - .006758*Math.cos(2*g)
+             + .000907*Math.sin(2*g) - .002697*Math.cos(3*g) + .00148*Math.sin(3*g);
+  const lat = S.lat*DEG, c = (Math.sin(-.833*DEG) - Math.sin(lat)*Math.sin(decl))/(Math.cos(lat)*Math.cos(decl));
+  return c <= -1 ? 24 : c >= 1 ? 0 : 2*Math.acos(c)/DEG/15;
+}
+function dayOfYear(iso){
+  const [Y,M,D] = iso.split("-").map(Number);
+  return Math.round((Date.UTC(Y,M-1,D) - Date.UTC(Y,0,1))/86400000) + 1;
+}
+function buildRibbon(){
+  if(!ribbonSvg) return;
+  const W = 328, H = 34, doy = dayOfYear(S.date);
+  const key = S.lat.toFixed(3)+"|"+doy;
+  if(key === ribbonKey) return;
+  ribbonKey = key;
+  let lo = 24, hi = 0;
+  for(let d=1; d<=366; d+=5){ const h = dayLengthH(d); lo = Math.min(lo, h); hi = Math.max(hi, h); }
+  const mid = (lo+hi)/2, span = Math.max(4, hi-lo);
+  const y = h=>30 - (((h - mid)/span) + .5)*24 - 2;
+  const pts = [];
+  for(let d=1; d<=366; d+=5) pts.push([(d-1)/365*W, y(dayLengthH(d))]);
+  const wave = "M0 30 L"+pts.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L")+` L${W} 30 Z`;
+  const tx = ((doy-1)/365*W).toFixed(1), ty = y(dayLengthH(doy)).toFixed(1);
+  ribbonSvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  ribbonSvg.innerHTML = `<path d="${wave}" fill="rgba(143,184,202,.16)" stroke="#8FB8CA" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+    <line x1="0" y1="30" x2="${W}" y2="30" stroke="#2C3631" vector-effect="non-scaling-stroke"/>
+    <line x1="${tx}" y1="2" x2="${tx}" y2="30" stroke="#D4A85A" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+    <circle cx="${tx}" cy="${ty}" r="3.5" fill="#D4A85A"/>`;
+  ribbonSvg.setAttribute("aria-label", `Day length through the year: ${dayLengthH(doy).toFixed(1)} hours today. Click to change the date.`);
+}
+if(ribbonSvg){
+  let rd = false;
+  const setFrom = e=>{
+    const r = ribbonSvg.getBoundingClientRect();
+    const doy = clamp(Math.round((e.clientX - r.left)/r.width*365) + 1, 1, 365);
+    const Y = +S.date.slice(0,4), d = new Date(Date.UTC(Y, 0, doy));
+    const iso = Y+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");
+    if(iso === S.date) return;
+    S.date = iso; $("date").value = iso;
+    afterDateChange();
+  };
+  ribbonSvg.addEventListener("pointerdown", e=>{ rd = true; ribbonSvg.setPointerCapture(e.pointerId); setFrom(e); });
+  ribbonSvg.addEventListener("pointermove", e=>{ if(rd) setFrom(e); });
+  ribbonSvg.addEventListener("pointerup", ()=>{ rd = false; });
+  ribbonSvg.addEventListener("pointercancel", ()=>{ rd = false; });
 }
 function moveBead(sp){
   if(!arcGeom) return;
@@ -2312,7 +2378,7 @@ function drawMeasureLine(){
 function addObject(kind, p){
   let o;
   const rot = gridFrame().angle;
-  if(kind === "tree") o = fromPreset(PRESETS[0].n, p.x, p.y);
+  if(kind === "tree") o = fromPreset(pendingPreset || PRESETS[0].n, p.x, p.y);
   else if(kind === "bed") o = {id:nid(), type:"bed", name:"Garden bed", x:p.x, y:p.y, w:12, h:4, rot};
   else if(kind === "deck") o = {id:nid(), type:"deck", name:"Deck", x:p.x, y:p.y, rot, height:.5, poly:rectPoly(16,12)};
   else if(Object.hasOwn(PAVING,kind)){
@@ -2463,22 +2529,240 @@ function gridReferenceHTML(){
       Grid, snapping, new shapes and the framed view share these axes. Property dimensions, existing objects and true north do not change.
       ${f?.modified ? "The outline was edited; reapply to follow the revised side." : ""}</p></section>`;
 }
+/* ---------- inspector building blocks ---------- */
+function crownPath(fn, cx, top, base, half, n = 28){
+  const pts = [];
+  for(let i=0;i<=n;i++){ const u = i/n; pts.push([cx + half*fn(u), base - (base-top)*u]); }
+  for(let i=n;i>=0;i--){ const u = i/n; pts.push([cx - half*fn(u), base - (base-top)*u]); }
+  return "M"+pts.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L")+" Z";
+}
+const SHAPE_TILES = [["round","Round"],["oval","Upright oval"],["linden","Linden"],
+  ["pyramidal","Pyramid"],["columnar","Narrow pyramid"],["fastigiate","Column"],
+  ["spreading","Spreading"],["vase","Vase"],["weeping","Weeping"]];
+function shapeTiles(o){
+  return `<div class="tiles">`+SHAPE_TILES.map(([k,label])=>{
+    const sh = SHAPES[k], tb = 32 - 28*clamp(sh.base, .03, .5);
+    return `<button type="button" class="tile" data-shape="${k}" aria-pressed="${k===o.shape}" title="${escapeHTML(sh.label)}">`
+      + `<svg viewBox="0 0 40 34" aria-hidden="true"><path d="${crownPath(sh.r, 20, 3, tb, 13, 20)}"/><line x1="20" y1="${tb.toFixed(1)}" x2="20" y2="32"/></svg>`
+      + `<span>${label}</span></button>`;
+  }).join("")+`</div>`;
+}
+/* refined slider: label, an editable value, and a thin brass track */
+function sl(label, key, min, max, step, val, unit, pct){
+  const shown = pct ? Math.round(val*100) : val;
+  const lo = pct ? min*100 : min, hi = pct ? max*100 : max, st = pct ? step*100 : step;
+  const d = pct ? ` data-pct="1"` : "";
+  return `<div class="sl"><div class="slh"><label>${label}</label><span class="slv">`
+    + `<input type="number" data-key="${key}"${d} min="${lo}" max="${hi}" step="${st}" value="${shown}" aria-label="${label}"><i>${unit||"ft"}</i></span></div>`
+    + `<input type="range" data-key="${key}"${d} min="${lo}" max="${hi}" step="${st}" value="${shown}" aria-label="${label}"></div>`;
+}
+const PERSON = `<circle cx="3" cy="2" r="2"/><rect x="1.2" y="4.6" width="3.6" height="8" rx="1.4"/><rect x="1.4" y="12" width="1.4" height="7"/><rect x="3.2" y="12" width="1.4" height="7"/>`;
+/* To-scale elevation of a tree with its canopy line, height and spread. */
+function elevationSVG(o){
+  const sh = SHAPES[o.shape] || SHAPES.round, H = Math.max(2, o.height), W = Math.max(1, o.spread), cb = crownBaseFt(o);
+  const k = Math.min(168/H, 216/W), g = 186, cx = 180;
+  const top = g - H*k, cbY = g - cb*k, half = W/2*k;
+  const pres = presetFor(o), col = new THREE.Color(o.leaf ?? (o.evergreen ? 0x2c4a2e : 0x46702c));
+  const tint = "#"+col.clone().lerp(new THREE.Color(0x93B87A), .55).getHexString();
+  const px = clamp(cx + half + 16, 150, 286), ps = 6*k/19;
+  const lblY = cbY + 16 < g - 4 ? cbY + 16 : cbY - 7;
+  return `<svg viewBox="0 0 360 214" data-k="${k}" role="img" aria-label="Elevation drawn to scale: ${H} ft tall, ${W} ft crown, canopy starts at ${cb} ft">
+    <line x1="0" y1="${g}" x2="360" y2="${g}" stroke="#3A443F"/>
+    <path d="${crownPath(sh.r, cx, top, cbY, half)}" fill="${tint}" fill-opacity=".2" stroke="${tint}" stroke-width="1.3"/>
+    <rect x="${cx-3}" y="${(cbY-4).toFixed(1)}" width="6" height="${(g-cbY+4).toFixed(1)}" rx="2" fill="#8A7560"/>
+    <g transform="translate(${px.toFixed(1)} ${(g-19*ps).toFixed(1)}) scale(${ps.toFixed(3)})" fill="rgba(236,231,218,.55)">${PERSON}</g>
+    <text x="${(px+14).toFixed(1)}" y="${g-3}" fill="#7C8074" font-family="Geist,sans-serif" font-size="9.5">6 ft</text>
+    <line x1="${(cx+half+26 > 330 ? 344 : 318)}" y1="${top.toFixed(1)}" x2="${(cx+half+26 > 330 ? 344 : 318)}" y2="${g}" stroke="rgba(236,231,218,.45)"/>
+    <text x="${(cx+half+26 > 330 ? 340 : 324)}" y="${((top+g)/2+4).toFixed(1)}" fill="#ECE7DA" font-family="Geist Mono,monospace" font-size="12" text-anchor="${cx+half+26 > 330 ? "end" : "start"}">${H} ft</text>
+    <line x1="${(cx-half).toFixed(1)}" y1="202" x2="${(cx+half).toFixed(1)}" y2="202" stroke="rgba(236,231,218,.45)"/>
+    <line x1="${(cx-half).toFixed(1)}" y1="196" x2="${(cx-half).toFixed(1)}" y2="208" stroke="rgba(236,231,218,.45)"/>
+    <line x1="${(cx+half).toFixed(1)}" y1="196" x2="${(cx+half).toFixed(1)}" y2="208" stroke="rgba(236,231,218,.45)"/>
+    <rect x="${cx-20}" y="195" width="40" height="14" fill="#141A17"/>
+    <text x="${cx}" y="206" text-anchor="middle" fill="#ECE7DA" font-family="Geist Mono,monospace" font-size="12">${W} ft</text>
+    <g class="cbh">
+      <line x1="16" y1="${cbY.toFixed(1)}" x2="${cx+half+8 > 300 ? 344 : 300}" y2="${cbY.toFixed(1)}" stroke="transparent" stroke-width="16"/>
+      <line x1="42" y1="${cbY.toFixed(1)}" x2="${cx+half+8 > 300 ? 344 : 300}" y2="${cbY.toFixed(1)}" stroke="#D4A85A" stroke-width="1.2" stroke-dasharray="5 4"/>
+      <circle cx="42" cy="${cbY.toFixed(1)}" r="7" fill="#141A17" stroke="#D4A85A" stroke-width="1.6"/>
+      <path d="M39 ${(cbY-1.5).toFixed(1)}l3-3 3 3M39 ${(cbY+1.5).toFixed(1)}l3 3 3-3" fill="none" stroke="#D4A85A" stroke-width="1.1"/>
+    </g>
+    <text x="56" y="${lblY.toFixed(1)}" fill="#D4A85A" font-family="Geist,sans-serif" font-size="11">Canopy starts ${cb % 1 ? cb.toFixed(1) : cb} ft</text>
+  </svg>`;
+}
+/* Mini plan: the lot, this item's footprint and its distance to the nearest lines. */
+function clearanceHTML(o){
+  const L = lineDistances(o);
+  if(!L.length) return "";
+  const bb = bbox(S.boundary), pad = 4, Wb = 128, Hb = 104;
+  const k = Math.min((Wb-pad*2)/Math.max(1,bb.w), (Hb-pad*2)/Math.max(1,bb.h));
+  const ox = 2 + (Wb - bb.w*k)/2, oy = 2 + (Hb - bb.h*k)/2;
+  const X = x=>ox + (x-bb.x0)*k, Y = y=>oy + (y-bb.y0)*k;
+  const poly = S.boundary.map(q=>X(q.x).toFixed(1)+","+Y(q.y).toFixed(1)).join(" ");
+  const r = objReach(o)*k;
+  const marks = [];
+  for(const e of L.slice(0,2)){
+    const edge = boundaryEdges().find(E=>E.name === e.name && Math.abs(distToSeg(o.x,o.y,E.A.x,E.A.y,E.B.x,E.B.y).d - e.d) < .01);
+    if(!edge) continue;
+    const t = distToSeg(o.x,o.y,edge.A.x,edge.A.y,edge.B.x,edge.B.y).t;
+    const qx = edge.A.x + (edge.B.x-edge.A.x)*t, qy = edge.A.y + (edge.B.y-edge.A.y)*t;
+    const mx = (X(o.x)+X(qx))/2, my = (Y(o.y)+Y(qy))/2;
+    marks.push(`<line x1="${X(o.x).toFixed(1)}" y1="${Y(o.y).toFixed(1)}" x2="${X(qx).toFixed(1)}" y2="${Y(qy).toFixed(1)}" stroke="#D4A85A"/>`
+      + `<text x="${(mx+3).toFixed(1)}" y="${(my-3).toFixed(1)}" fill="#D4A85A" font-family="Geist Mono,monospace" font-size="9">${e.d.toFixed(0)}</text>`);
+  }
+  const spill = L.filter(e=>e.over > .1), inside = insideLot(o);
+  const verdict = !inside
+    ? `<div class="bad"><svg class="ic"><use href="#i-close"/></svg>Sits outside the property line</div>`
+    : spill.length
+      ? `<div class="bad"><svg class="ic"><use href="#i-close"/></svg>${o.type === "tree" ? "Canopy" : "It"} reaches over the ${spill.map(e=>escapeHTML(e.name)).join(" and ")} line by ${spill.map(e=>e.over.toFixed(1)+" ft").join(" and ")}</div>`
+      : `<div class="ok"><svg class="ic"><use href="#i-check"/></svg>Stays inside every line</div>`;
+  return `<div class="clear"><svg viewBox="0 0 132 108" role="img" aria-label="Plan: distance to the nearest property lines">
+      <polygon points="${poly}" fill="rgba(147,184,122,.05)" stroke="rgba(236,231,218,.35)" stroke-dasharray="4 3"/>
+      ${o.type === "tree" ? `<circle cx="${X(o.x).toFixed(1)}" cy="${Y(o.y).toFixed(1)}" r="${Math.max(2,r).toFixed(1)}" fill="rgba(147,184,122,.2)" stroke="#93B87A"/>`
+        : `<polygon points="${(o.poly ? worldPoly(o) : worldPoly({...o, poly:rectPoly(o.w,o.h)})).map(q=>X(q.x).toFixed(1)+","+Y(q.y).toFixed(1)).join(" ")}" fill="rgba(212,168,90,.18)" stroke="#D4A85A"/>`}
+      ${marks.join("")}
+      <circle cx="${X(o.x).toFixed(1)}" cy="${Y(o.y).toFixed(1)}" r="2" fill="#ECE7DA"/>
+    </svg><div class="cl">${verdict}
+      <div class="dl">${L.slice(0,4).map(e=>`<span>${escapeHTML(shortSide(e.name))} ${e.d.toFixed(1)} ft</span>`).join("")}</div></div></div>`;
+}
+function shortSide(n){ n = String(n); return n.length > 7 ? n.slice(0,6)+"…" : n; }
+function presetFor(o){ return o && o.type === "tree" ? PRESETS.find(p=>p.n === o.name) : null; }
+function shadeClass(d){ return d < .65 ? "Dappled" : d < .88 ? "Moderate" : "Dense"; }
+function bloomLabel(o){
+  const k = o.type === "tree" && !o.evergreen ? leafKindFor(o) : null;
+  return k === "crabapple" ? "Blooms in spring" : k === "hydrangea" ? "Blooms midsummer to fall" : "";
+}
+function footHTML(o){
+  return `<div class="ifoot">`
+    + (o.type !== "boundary" ? `<button class="btn" data-act="dup">Duplicate</button><button class="btn danger" data-act="del">Remove</button>` : "")
+    + `<span class="grow"></span><button class="btn solid" data-act="done">Done</button></div>`;
+}
+function inspectorHeader(o){
+  const tag = $("seltag"), sub = $("selsub"), tags = $("seltags");
+  if(!o){ tag.textContent = ""; sub.textContent = ""; tags.innerHTML = ""; return; }
+  const p = presetFor(o);
+  const kind = {tree:"Tree", bed:"Garden bed", structure:"Building", deck:"Deck", driveway:"Driveway", sidewalk:"Sidewalk", boundary:"Property"}[o.type] || o.type;
+  tag.textContent = o.type === "tree" ? [kind, o.evergreen ? "Evergreen" : "Deciduous", p ? p.gn : "Custom"].join(" · ") : kind;
+  sub.textContent = p?.sci || "";
+  let t = "";
+  if(o.type === "tree"){
+    const d = o.density ?? .85;
+    t += `<span class="tagp leaf">${o.evergreen ? "Evergreen" : "Deciduous"}</span>`
+      + `<span class="tagp sky">${shadeClass(d)} shade</span>`;
+    const bl = bloomLabel(o);
+    if(bl) t += `<span class="tagp pink">${bl}</span>`;
+    t += `<span class="tagp">${o.height} × ${o.spread} ft</span>`;
+  } else if(o.type === "bed"){
+    const st = bedStats.get(o.id);
+    if(st) t += st.avg >= S.fullSun ? `<span class="tagp brass">Full sun</span>` : st.avg >= 4 ? `<span class="tagp sky">Part sun</span>` : `<span class="tagp">Shade</span>`;
+    t += `<span class="tagp">${o.w} × ${o.h} ft · ${Math.round(o.w*o.h)} sq ft</span>`;
+  } else if(o.type === "boundary"){
+    t += `<span class="tagp">${Math.round(polyArea(S.boundary)).toLocaleString()} sq ft</span><span class="tagp">${S.boundary.length} corners</span>`;
+  }
+  tags.innerHTML = t;
+}
+/* ---------- bed insights ---------- */
+const FITS = [
+  [8, ["Tomatoes","Peppers","Squash","Melons","Basil"], "Tomatoes and peppers are happy here."],
+  [6, ["Tomatoes","Beans","Cucumbers","Zucchini","Herbs"], "Enough for most fruiting vegetables."],
+  [4, ["Lettuce","Kale","Chard","Peas","Beets","Carrots"], "Good for greens, roots and most herbs."],
+  [0, ["Lettuce","Spinach","Mint","Hostas","Ferns"], "Leafy greens only, or move the bed."]
+];
+function fitsFor(h){ return FITS.find(f=>h >= f[0]) || FITS[FITS.length-1]; }
+function fmtHM(mins){ const h = Math.floor(mins/60), m = Math.round(mins%60); return h+" h "+String(m).padStart(2,"0")+" m"; }
+function bedInsightsHTML(o){
+  const st = bedStats.get(o.id);
+  if(!st) return `<div class="isec"><p class="hint" style="margin:0">Measuring the sun on this bed…</p></div>`;
+  const ed = dayEdges(), dayMin = Math.max(0, ed.set - ed.rise), dayH = dayMin/60;
+  const C = 2*Math.PI*54, frac = dayH > 0 ? clamp(st.avg/dayH, 0, 1) : 0;
+  const fit = fitsFor(st.avg);
+  let html = `<div class="isec ring"><svg viewBox="0 0 132 132" role="img" aria-label="${st.avg.toFixed(1)} of ${dayH.toFixed(1)} hours of daylight reach this bed">
+      <circle cx="66" cy="66" r="54" fill="none" stroke="#243029" stroke-width="10"/>
+      <circle cx="66" cy="66" r="54" fill="none" stroke="#D4A85A" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(C*frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 66 66)"/>
+      <text x="66" y="68" text-anchor="middle" fill="#ECE7DA" font-family="Instrument Serif,Georgia,serif" font-size="36">${st.avg.toFixed(1)}</text>
+      <text x="66" y="88" text-anchor="middle" fill="#A6A89A" font-family="Geist,sans-serif" font-size="11">hours of sun</text></svg>
+    <div class="kv"><div><span>Daylight on ${new Date(S.date+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"})}</span><b>${fmtHM(dayMin)}</b></div>
+      <div><span>Full-sun threshold</span><b>${S.fullSun} h${st.max - st.min >= .2 ? ` · ${st.pct}% of bed` : ""}</b></div>
+      <p>${fit[2]}</p></div></div>`;
+  if(st.hours && st.hours.length){
+    const cells = st.hours.map(h=>{
+      const c = h.f > .66 ? "#D4A85A" : h.f > .33 ? "#8C8A6A" : "#8FB8CA";
+      return `<i style="background:${c}" title="${fmtTime(h.m)} · ${Math.round(h.f*100)}% sun"></i>`;
+    }).join("");
+    const first = st.hours[0].m, last = st.hours[st.hours.length-1].m;
+    html += `<div class="isec"><div class="fh"><h4>Through the day</h4><span>${new Date(S.date+"T12:00:00").toLocaleDateString(undefined,{month:"long",day:"numeric"})}</span></div>
+      <div class="strip">${cells}</div>
+      <div class="stripx"><span>${fmtTime(first)}</span><span>${fmtTime((first+last)/2)}</span><span>${fmtTime(last+60)}</span></div>
+      <div class="keyrow"><span><i style="background:#D4A85A"></i>Direct sun</span><span><i style="background:#8C8A6A"></i>Partly shaded</span><span><i style="background:#8FB8CA"></i>Shaded</span></div></div>`;
+  }
+  const season = bedSeason(o);
+  html += `<div class="isec"><div class="fh"><h4>Across the season</h4><span>${season ? "Average hours of direct sun" : "Measuring…"}</span></div>`;
+  if(season){
+    const mx = Math.max(1, ...season.map(m=>m.v));
+    html += `<div class="bars">${season.map(m=>`<div><b>${m.v.toFixed(1)}</b><i class="${m.cur?"on":""}" style="height:${Math.max(3, Math.round(m.v/mx*70))}px"></i><span>${m.label}</span></div>`).join("")}</div>`;
+  }
+  html += `</div><div class="isec"><h4>Good fits</h4><div class="chips">${fit[1].map(x=>`<span>${x}</span>`).join("")}</div></div>`;
+  return html;
+}
+/* Average sun hours at a few points on a bed on the 15th of each growing
+   month. Computed after the panel draws, then cached until the plan changes. */
+const seasonCache = new Map();
+let seasonTimer = 0;
+function bedSeason(o){
+  const key = [o.id, o.x, o.y, o.w, o.h, o.rot, sceneVer, S.lat, S.lon, S.fullSun].join("|");
+  const hit = seasonCache.get(o.id);
+  if(hit && hit.key === key) return hit.val;
+  clearTimeout(seasonTimer);
+  seasonTimer = setTimeout(()=>{
+    const val = computeBedSeason(o);
+    seasonCache.set(o.id, {key, val});
+    if(selected() === o){ const box = props.querySelector(".bedins"); if(box) box.innerHTML = bedInsightsHTML(o); }
+  }, 60);
+  return null;
+}
+function computeBedSeason(o){
+  const saveDate = S.date, south = S.lat < 0;
+  const months = south ? [9,10,11,0,1,2,3] : [3,4,5,6,7,8,9];
+  const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const cur = +saveDate.slice(5,7) - 1, a = o.rot*DEG, pts = [];
+  for(const [u,v] of [[0,0],[-.3,-.3],[.3,-.3],[-.3,.3],[.3,.3]]){ const q = rot2(u*o.w, v*o.h, a); pts.push({x:o.x+q.x, y:o.y+q.y}); }
+  const out = [];
+  try{
+    for(const m of months){
+      S.date = saveDate.slice(0,4)+"-"+String(m+1).padStart(2,"0")+"-15";
+      edgeCache.key = null;
+      const {rise, set} = dayEdges();
+      let sum = 0;
+      for(let t=rise; t<=set; t+=20){
+        const c = casters(t);
+        if(!c) continue;
+        let f = 0;
+        for(const p of pts) f += sunFraction(c, p.x, p.y);
+        sum += f/pts.length*(20/60);
+      }
+      out.push({label:names[m], v:sum, cur:m === cur});
+    }
+  } finally {
+    S.date = saveDate; edgeCache.key = null;
+  }
+  return out;
+}
+
 function drawPanel(){
   const o = selected();
-  const title = document.getElementById("seltitle"), tag = document.getElementById("seltag");
+  const title = document.getElementById("seltitle");
   document.getElementById("inspector").classList.toggle("empty", !o);
+  document.body.classList.toggle("inspoff", !o);
   if(!o){
     title.textContent = "Nothing selected";
-    tag.textContent = "";
+    inspectorHeader(null);
     if(panelFor !== null){
       props.innerHTML = `<p class="hint">Tap anything in the yard to edit it here. Site-wide settings are in the sidebar.</p>`;
       panelFor = null;
     }
     return;
   }
-  title.textContent = o.name;
-  tag.textContent = o.type === "structure" ? "building" : o.type;
-  const key = [o.id, nodeEdit, activeNode, o.poly?o.poly.length:0, o.type === "tree" ? o.height+"|"+o.shape : ""].join("|");
+  title.textContent = o.type === "boundary" ? "Property line" : o.name;
+  inspectorHeader(o);
+  const key = [o.id, nodeEdit, activeNode, o.poly?o.poly.length:0, o.type === "tree" ? o.name : ""].join("|");
   if(panelFor === key){
     if(o.type === "boundary" && !props.contains(document.activeElement)){
       panelFor = "init";
@@ -2488,77 +2772,128 @@ function drawPanel(){
     props.querySelectorAll("input[data-key]").forEach(i=>{
       if(document.activeElement === i) return;
       if(i.type === "checkbox") i.checked = !!o[i.dataset.key];
-      else i.value = i.dataset.key === "crownBase" ? crownBaseFt(o) : o[i.dataset.key];
+      else{
+        const v = i.dataset.key === "crownBase" ? crownBaseFt(o) : o[i.dataset.key];
+        if(i.dataset.key === "crownBase") i.max = Math.max(1, o.height-1);
+        i.value = i.dataset.pct ? Math.round(v*100) : v;
+      }
     });
+    props.querySelectorAll("[data-shape]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.shape === o.shape));
+    const el = props.querySelector(".elev");
+    if(el && !elevDrag) el.querySelector("svg").outerHTML = elevationSVG(o);
+    const cl = props.querySelector(".clearbox");
+    if(cl) cl.innerHTML = clearanceHTML(o);
+    const bi = props.querySelector(".bedins");
+    if(bi) bi.innerHTML = bedInsightsHTML(o);
     const box = props.querySelector(".stat");
-    if(box){
-      const st = bedStats.get(o.id);
-      box.innerHTML = o.type === "bed" ? (st ? statHTML(st) : "Measuring…") : lineHTML(o);
-    }
-    const lb = props.querySelector(".linebox");
-    if(lb) lb.innerHTML = lineHTML(o);
+    if(box) box.innerHTML = lineHTML(o);
     syncRanges(props);
     return;
   }
+  if(!panelFor || String(panelFor).split("|")[0] !== String(o.id)) $("inspbody").scrollTop = 0;
   panelFor = key;
   let html = "";
-  if(o.type !== "boundary")
-    html += `<div class="field"><span class="lab">Name</span><span class="inp wide">`
-      + `<input type="text" data-key="name" value="${String(o.name).replace(/"/g,"&quot;")}"></span></div>`;
+  const nameRow = `<div class="field"><span class="lab">Name</span><span class="inp wide">`
+      + `<input type="text" data-key="name" value="${escapeHTML(o.name)}"></span></div>`;
 
   if(o.type === "tree"){
-    html += presetSelect(o)
-      + (o.note ? `<p class="profile">${o.note}</p>` : "")
-      + `<h4>Crown shape</h4>`
-      + `<select data-key="shape">${Object.entries(SHAPES).map(([k,v])=>`<option value="${k}" ${k===o.shape?"selected":""}>${v.label}</option>`).join("")}</select>`
-      + slider("Height","height",2,90,1,o.height)
-      + slider("Crown width","spread",1,80,1,o.spread)
-      + slider("Canopy starts at","crownBase",0,Math.max(1, o.height-1),.5,crownBaseFt(o))
-      + slider("Canopy density","density",.1,1,.05,o.density ?? .85,"×")
-      + `<div class="field"><span class="lab">Evergreen</span><input type="checkbox" class="sw" data-key="evergreen" ${o.evergreen?"checked":""}></div>`
-      + `<h4>Position</h4>`
+    html += `<figure class="elev">${elevationSVG(o)}<figcaption>Drawn to scale. Drag the brass line to raise or lower the canopy.</figcaption></figure>`
+      + (o.note ? `<p class="profile">${escapeHTML(o.note)}</p>` : "")
+      + `<div class="btnrow"><button class="btn accent" data-act="species">Change species</button></div>`
+      + `<div class="fh"><h4>Crown shape</h4><span>Also used by the shade maths</span></div>`
+      + shapeTiles(o)
+      + `<div style="margin-top:6px">`
+      + sl("Height","height",2,90,1,o.height)
+      + sl("Crown width","spread",1,80,1,o.spread)
+      + sl("Canopy starts at","crownBase",0,Math.max(1, o.height-1),.5,crownBaseFt(o))
+      + sl("Leaf density","density",.1,1,.05,o.density ?? .85,"%",true)
+      + `</div>`
+      + `<div class="swrow"><span>Evergreen</span><input type="checkbox" class="sw" data-key="evergreen" ${o.evergreen?"checked":""} aria-label="Evergreen"></div>`
+      + `<div class="clearbox">${clearanceHTML(o)}</div>`
+      + `<h4>Details</h4>` + nameRow
+      + `<div class="field"><span class="lab">Species list</span><span style="flex:1.6">${presetSelect(o)}</span></div>`
+      + field("Left–right","x",`step="1" value="${o.x}"`)
+      + field("Up–down","y",`step="1" value="${o.y}"`);
+  } else if(o.type === "bed"){
+    html += `<div class="bedins">${bedInsightsHTML(o)}</div>`
+      + `<h4 style="margin-top:16px">Size &amp; position</h4>`
+      + sl("Width","w",1,120,1,o.w)
+      + sl("Depth","h",1,120,1,o.h)
+      + field("Rotation","rot",`min="-180" max="180" step="1" value="${o.rot}"`,"°")
       + field("Left–right","x",`step="1" value="${o.x}"`)
       + field("Up–down","y",`step="1" value="${o.y}"`)
-      + `<div class="stat">${lineHTML(o)}</div>`;
-  } else if(o.type === "bed"){
-    const st = bedStats.get(o.id);
-    html += slider("Width","w",1,120,1,o.w)
-      + slider("Depth","h",1,120,1,o.h)
-      + field("Rotation","rot",`min="-180" max="180" step="1" value="${o.rot}"`,"°")
-      + `<h4>Position</h4>` + field("Left–right","x",`step="1" value="${o.x}"`)
-      + field("Up–down","y",`step="1" value="${o.y}"`)
-      + `<div class="stat">${st?statHTML(st):"Measuring…"}</div><div class="linebox">${lineHTML(o)}</div>`;
+      + nameRow
+      + `<div class="clearbox">${clearanceHTML(o)}</div>`;
   } else if(o.type === "boundary"){
     const b = yardBounds();
-    html += outlineHTML(o)
-      + (isPaved(o) ? `<p class="hint">Ground-level ${o.type === "driveway" ? "asphalt driveway" : "concrete sidewalk"}.
-          Drag corners and use + to make bends, tapers or irregular shapes. It receives shade but does not act like a building.</p>` : "")
+    html += `<div style="height:10px"></div>` + outlineHTML(o)
       + gridReferenceHTML()
       + boundaryMeasurementsHTML()
       + `<h4>Stretch the whole lot</h4>`
       + numRow("Width across", 'data-fitlot="w"', b.w.toFixed(0))
       + numRow("Depth", 'data-fitlot="h"', b.h.toFixed(0))
-      + `<p class="hint">Fence sides, style and height are under Lot &amp; fence in the sidebar.</p>`;
+      + `<p class="hint">Fence sides, style and height are under Lot in the sidebar.</p>`;
   } else {
     const b = bbox(o.poly);
-    html += outlineHTML(o)
+    html += `<div style="height:10px"></div>` + outlineHTML(o)
+      + (isPaved(o) ? `<p class="hint">Ground-level ${o.type === "driveway" ? "asphalt driveway" : "concrete sidewalk"}.
+          Drag corners and use + to make bends, tapers or irregular shapes. It receives shade but does not act like a building.</p>` : "")
       + `<h4>Overall size</h4>`
       + numRow("Width", 'data-fit="w"', b.w.toFixed(0))
       + numRow("Depth", 'data-fit="h"', b.h.toFixed(0))
-      + (o.type === "structure" ? slider("Height to peak","height",4,80,1,o.height) : "")
-      + (o.type === "deck" ? slider("Deck height","height",0,20,.5,(o.height ?? .5).toFixed(1))
+      + (o.type === "structure" ? sl("Height to peak","height",4,80,1,o.height) : "")
+      + (o.type === "deck" ? sl("Deck height","height",0,20,.5,(o.height ?? .5).toFixed(1))
           + `<div class="field"><span class="lab">Surface</span><span style="flex:1.4"><select data-key="surface">${
             Object.entries(SURFACES).map(([k,v])=>`<option value="${k}" ${k===deckSurface(o)?"selected":""}>${v}</option>`).join("")}</select></span></div>` : "")
       + field("Rotation","rot",`min="-180" max="180" step="1" value="${o.rot}"`,"°")
       + `<h4>Position</h4>` + field("Left–right","x",`step="1" value="${o.x}"`)
       + field("Up–down","y",`step="1" value="${o.y}"`)
-      + `<div class="stat">${lineHTML(o)}</div>`;
+      + nameRow
+      + `<div class="clearbox">${clearanceHTML(o)}</div>`;
   }
-  if(o.type !== "boundary")
-    html += `<div class="btnrow"><button class="btn" data-act="dup">Duplicate</button>`
-      + `<button class="btn danger" data-act="del">Delete</button></div>`;
+  html += footHTML(o);
   props.innerHTML = html;
   syncRanges(props);
+}
+/* drag the brass canopy line on the elevation */
+let elevDrag = null;
+props.addEventListener("pointerdown", e=>{
+  const svg = e.target.closest(".elev svg");
+  const o = selected();
+  if(!svg || !o || o.type !== "tree") return;
+  const r = svg.getBoundingClientRect(), k = +svg.dataset.k;
+  const y = (e.clientY - r.top)/r.height*214;
+  const cbY = 186 - crownBaseFt(o)*k;
+  if(!e.target.closest(".cbh") && Math.abs(y - cbY) > 14) return;
+  elevDrag = {id:e.pointerId, k, fig:svg.parentNode};
+  svg.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+props.addEventListener("pointermove", e=>{
+  if(!elevDrag || e.pointerId !== elevDrag.id) return;
+  const o = selected(), svg = elevDrag.fig.querySelector("svg");
+  if(!o || !svg) return;
+  const r = svg.getBoundingClientRect();
+  const y = (e.clientY - r.top)/r.height*214;
+  const ft = clamp(Math.round((186 - y)/elevDrag.k*2)/2, 0, Math.max(1, o.height-1));
+  if(ft === crownBaseFt(o)) return;
+  o.crownBase = ft;
+  svg.outerHTML = elevationSVG(o);
+  elevDrag.fig.querySelector("svg").setPointerCapture(e.pointerId);
+  props.querySelectorAll('input[data-key="crownBase"]').forEach(i=>{ i.value = ft; });
+  syncRanges(props);
+  queueRebuild(o); scheduleCompute();
+});
+const endElev = ()=>{ if(elevDrag){ elevDrag = null; drawPanel(); } };
+props.addEventListener("pointerup", endElev);
+props.addEventListener("pointercancel", endElev);
+function applyPreset(o, p){
+  o.name = p.n; o.shape = p.s; o.height = p.h; o.spread = p.w; delete o.crownBase;
+  o.evergreen = p.ev; o.density = p.d; o.note = p.note; o.leaf = p.leaf; o.fall = p.fall;
+  if(p.bloom) o.bloom = p.bloom; else delete o.bloom;
+  if(p.cb != null) o.crownBase = p.cb;
+  panelFor = null;
+  rebuildObject(o); drawPanel(); drawList(); updateSelection(); scheduleCompute();
 }
 const GEOKEYS = new Set(["height","spread","density","shape","evergreen","w","h","surface","crownBase"]);
 props.addEventListener("input", e=>{
@@ -2566,13 +2901,7 @@ props.addEventListener("input", e=>{
   if(!o) return;
   if(e.target.hasAttribute("data-preset")){
     const p = PRESETS[+e.target.value];
-    if(!p) return;
-    o.name = p.n; o.shape = p.s; o.height = p.h; o.spread = p.w; delete o.crownBase;
-    o.evergreen = p.ev; o.density = p.d; o.note = p.note; o.leaf = p.leaf; o.fall = p.fall;
-    if(p.bloom) o.bloom = p.bloom; else delete o.bloom;
-    if(p.cb != null) o.crownBase = p.cb;
-    panelFor = null;
-    rebuildObject(o); drawPanel(); drawList(); updateSelection(); scheduleCompute();
+    if(p) applyPreset(o, p);
     return;
   }
   const nd = e.target.dataset.node;
@@ -2604,13 +2933,23 @@ props.addEventListener("input", e=>{
   const k = e.target.dataset.key;
   if(!k) return;
   if(e.target.type === "checkbox") o[k] = e.target.checked;
-  else if(e.target.type === "number" || e.target.type === "range") o[k] = parseFloat(e.target.value)||0;
+  else if(e.target.type === "number" || e.target.type === "range") o[k] = (parseFloat(e.target.value)||0)/(e.target.dataset.pct ? 100 : 1);
   else o[k] = e.target.value;
   if(GEOKEYS.has(k)) queueRebuild(o); else placeObject(o);
   if(k === "name") document.getElementById("seltitle").textContent = o.name;
+  if(k === "height" && o.type === "tree" && Number.isFinite(o.crownBase)) o.crownBase = Math.min(o.crownBase, Math.max(1, o.height-1));
   updateSelection(); drawPanel(); drawList(); scheduleCompute();
 });
 props.addEventListener("click", e=>{
+  const tile = e.target.closest("button[data-shape]");
+  if(tile){
+    const o = selected();
+    if(o && o.type === "tree" && o.shape !== tile.dataset.shape){
+      o.shape = tile.dataset.shape;
+      queueRebuild(o); updateSelection(); drawPanel(); drawList(); scheduleCompute();
+    }
+    return;
+  }
   const btn = e.target.closest("button[data-act]");
   if(!btn) return;
   const act = btn.dataset.act, o = selected();
@@ -2639,6 +2978,8 @@ props.addEventListener("click", e=>{
     drawPanel(); updateSelection(); drawList();
   }
   if(act === "del") removeSelected();
+  if(act === "done"){ nodeEdit = false; activeNode = null; select(null); openSheet(false); markDirty(); }
+  if(act === "species") openLibrary("replace");
   if(act === "dup"){
     const copy = JSON.parse(JSON.stringify(o));
     const offset = rot2(S.grid*2,S.grid*2,gridFrame().angle*DEG);
@@ -2680,16 +3021,17 @@ function drawList(){
         <span class="tx"><span class="nm">${o.name}</span><span class="mt">${mt}</span></span></button>`);
     }
     el.innerHTML = rows.join("");
-    $("objcount").textContent = S.objects.length;
+    $("objcount").textContent = S.objects.length || "";
   }
   syncLotFields();
   drawFenceEdges();
+  syncProject();
 }
 function syncLotFields(){
   const set = (id,v)=>{ const n = document.getElementById(id); if(n) n.textContent = v; };
   set("bcount", S.boundary.length);
-  set("barea", Math.round(polyArea(S.boundary))+" sq ft");
-  set("bperim", Math.round(polyPerimeter(S.boundary))+" ft");
+  set("barea", Math.round(polyArea(S.boundary)).toLocaleString()+" sq ft");
+  set("bperim", Math.round(polyPerimeter(S.boundary)).toLocaleString()+" ft perimeter");
   set("boundary-image-state", S.boundaryImageDraft
     ? "Unscaled image draft: saved with your plan. Import the same picture to resume and set a known length."
     : S.boundaryImage ? "Image-based outline. Names and measurements are saved with the plan; the image itself is not included." : "");
@@ -2708,6 +3050,7 @@ function drawFenceEdges(){
       <span class="w"><b>${escapeHTML(e.name)}</b> side · ${e.len.toFixed(1)} ft</span>
       <input type="checkbox" class="sw" data-edge="${e.i}" ${sides[e.i]?"checked":""}>
     </label>`).join("");
+  drawLotPlan();
 }
 document.getElementById("objlist").addEventListener("click", e=>{
   const b = e.target.closest("button");
@@ -2732,12 +3075,13 @@ function toast(msg){
 }
 function setTool(t){
   tool = t;
-  document.querySelectorAll("#top button[data-tool]").forEach(b=>
+  document.querySelectorAll("button[data-tool]").forEach(b=>
     b.setAttribute("aria-pressed", b.dataset.tool === t));
+  $("addbtn").setAttribute("aria-pressed", !["select","pan","measure"].includes(t));
   if(t !== "measure"){ measure = {a:null,b:null,live:null}; drawMeasureLine(); }
   canvas.style.cursor = t === "pan" ? "grab" : t === "select" ? "default" : "crosshair";
 }
-document.querySelectorAll("#top button[data-tool]").forEach(b=>
+document.querySelectorAll("button[data-tool]").forEach(b=>
   b.addEventListener("click", ()=>setTool(b.dataset.tool)));
 $("vplan").addEventListener("click", ()=>setView("vplan"));
 $("v3d").addEventListener("click", ()=>setView("v3d"));
@@ -2750,6 +3094,7 @@ function applySimpleChrome(){
   document.body.classList.toggle("simple", !!S.simple);
   $("vsimple").setAttribute("aria-pressed", !!S.simple);
   $("vsimple").title = S.simple ? "Back to the realistic view (G)" : "Simple schematic view (G)";
+  if($("lySimple")) syncLayers();
   const cb = $("simpleview");
   if(cb) cb.checked = !!S.simple;
 }
@@ -2771,25 +3116,30 @@ $("simpleview").addEventListener("change", e=>setSimple(e.target.checked));
 const root = document.documentElement;
 let arcW = 0;
 function syncSunH(){
-  const sun = $("sunpanel").getBoundingClientRect();
   if(arcSvg.clientWidth && Math.abs(arcSvg.clientWidth - arcW) > 2){ arcW = arcSvg.clientWidth; buildArc(); }
-  if(window.innerWidth > 1020) root.style.setProperty("--tlH", Math.round(sun.height) + "px");
-  root.style.setProperty("--barH", $("dockbar").offsetHeight + "px");
+  const ph = $("projhead");
+  root.style.setProperty("--projW", (ph && ph.offsetWidth ? ph.offsetWidth : -10) + "px");
+  placeAddMenu();
   markDirty();
 }
+/* The rail's flyout: open on a tab, close with the same tab or the × */
 function setNavCollapsed(min){
   $("dock").classList.toggle("min", min);
   document.body.classList.toggle("navmin", min);
-  $("dockToggle").title = min ? "Expand the sidebar" : "Collapse the sidebar";
-  try{ localStorage.setItem("yard-shade-studio:navmin", min ? "1" : ""); }catch{ /* private mode */ }
+  document.querySelectorAll("#tabs button[data-tab]").forEach(x=>{
+    if(min) x.setAttribute("aria-pressed", "false");
+    else x.setAttribute("aria-pressed", x.dataset.tab === currentTab);
+  });
   syncSunH();
 }
-$("dockToggle").addEventListener("click", ()=>setNavCollapsed(!$("dock").classList.contains("min")));
+let currentTab = "prop";
+const TAB_EYEBROW = {prop:"Property", site:"Site", objs:"Inventory", view:"Settings", file:"Plan"};
+$("dockToggle").addEventListener("click", ()=>setNavCollapsed(true));
 if(window.ResizeObserver){
   const ro = new ResizeObserver(syncSunH);
-  for(const id of ["sunpanel","dockbar","dock","inspector","top"]) ro.observe($(id));
+  for(const id of ["sunpanel","dockbar","dock","inspector","top","projhead"]) ro.observe($(id));
 }
-document.querySelectorAll("#sunpanel,#dock,#inspector,#top").forEach(panel=>
+document.querySelectorAll("#sunpanel,#dock,#inspector,#top,#projhead").forEach(panel=>
   panel.addEventListener("transitionend", syncSunH));
 window.addEventListener("resize", syncSunH);
 $("sunToggle").addEventListener("click", e=>{ e.stopPropagation(); toggleSun(); });
@@ -2824,11 +3174,267 @@ function toggleSun(){
   c.addEventListener("dblclick", ()=>{ flyTo({az:0}, 420); });
 })();
 function showTab(tab){
-  document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-pressed", x.dataset.tab === tab));
+  const open = !$("dock").classList.contains("min");
+  if(open && tab === currentTab){ setNavCollapsed(true); return; }
+  currentTab = tab;
   document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("on", p.dataset.pane === tab));
-  if($("dock").classList.contains("min")) setNavCollapsed(false);
+  $("dockeyebrow").textContent = TAB_EYEBROW[tab] || "";
+  setNavCollapsed(false);
 }
-document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click", ()=>showTab(b.dataset.tab)));
+document.querySelectorAll("#tabs button[data-tab]").forEach(b=>b.addEventListener("click", ()=>showTab(b.dataset.tab)));
+$("railPlants").addEventListener("click", ()=>openLibrary("place"));
+
+/* ---------- Add to yard menu ---------- */
+const addBtn = $("addbtn"), addMenu = $("addmenu");
+function placeAddMenu(){
+  if(addMenu.hidden) return;
+  const r = addBtn.getBoundingClientRect();
+  const w = addMenu.offsetWidth || 300;
+  addMenu.style.left = clamp(r.left, 8, window.innerWidth - w - 8) + "px";
+  if(window.innerWidth <= 1020){ addMenu.style.top = (r.bottom + 8) + "px"; }
+  else addMenu.style.top = (r.bottom + 10) + "px";
+}
+function showAddMenu(on){
+  addMenu.hidden = !on;
+  addBtn.setAttribute("aria-expanded", on);
+  if(on) placeAddMenu();
+}
+addBtn.addEventListener("click", e=>{ e.stopPropagation(); showAddMenu(addMenu.hidden); });
+addMenu.addEventListener("click", e=>{
+  const b = e.target.closest("button");
+  if(!b) return;
+  showAddMenu(false);
+  if(b.hasAttribute("data-lib")) openLibrary("place");
+  else toast("Click the yard to place the " + b.querySelector("b").textContent.toLowerCase());
+});
+document.addEventListener("pointerdown", e=>{
+  if(!addMenu.hidden && !addMenu.contains(e.target) && e.target !== addBtn && !addBtn.contains(e.target)) showAddMenu(false);
+});
+
+/* ---------- map layers ---------- */
+function syncLayers(){
+  $("lyShadow").setAttribute("aria-pressed", !S.heat);
+  $("lySun").setAttribute("aria-pressed", !!S.heat);
+  $("lyGrid").setAttribute("aria-pressed", !!S.showGrid);
+  $("lySimple").setAttribute("aria-pressed", !!S.simple);
+}
+function flipCheck(id, v){
+  const c = $(id);
+  if(c.checked === v) return;
+  c.checked = v;
+  c.dispatchEvent(new Event("change", {bubbles:true}));
+}
+$("lyShadow").addEventListener("click", ()=>{ flipCheck("heat", false); syncLayers(); });
+$("lySun").addEventListener("click", ()=>{ flipCheck("heat", !S.heat); syncLayers(); });
+$("lyGrid").addEventListener("click", ()=>{ flipCheck("showgrid", !S.showGrid); syncLayers(); });
+$("lySimple").addEventListener("click", ()=>{ setSimple(!S.simple); syncLayers(); });
+for(const id of ["heat","showgrid","simpleview"]) $(id).addEventListener("change", ()=>syncLayers());
+
+/* ---------- project card ---------- */
+const saveKey = v=>{ const {sel, minutes, ...plan} = v; return JSON.stringify(plan); };
+let savedKey = null, everSaved = false;
+function markSaved(fromFile){ savedKey = saveKey(S); if(fromFile) everSaved = true; syncProject(); }
+function syncProject(){
+  const b = yardBounds();
+  const where = S.place ? S.place.replace(/,\s*USA$/,"") : fmtCoord(S.lat,"N","S")+" "+fmtCoord(S.lon,"E","W");
+  $("projsub").textContent = `${where} · ${Math.round(b.w)} × ${Math.round(b.h)} ft lot`;
+  const nm = $("projname");
+  if(document.activeElement !== nm) nm.value = S.title || "Backyard";
+  nm.style.setProperty("--nameW", Math.max(5, nm.value.length + 1) + "ch");
+  const clean = savedKey === saveKey(S), st = $("projstatus");
+  st.classList.toggle("saved", clean && everSaved);
+  st.querySelector("span").textContent = clean ? (everSaved ? "Saved to file" : "No changes yet") : "Unsaved changes";
+  st.title = clean && everSaved ? "Saved. Click to save another copy." : "Save the plan to a file";
+}
+$("projname").addEventListener("input", e=>{
+  S.title = e.target.value.trim().slice(0,40) || "Backyard";
+  e.target.style.setProperty("--nameW", Math.max(5, e.target.value.length + 1) + "ch");
+  scheduleHist(); syncSunH();
+});
+$("projname").addEventListener("keydown", e=>{ if(e.key === "Enter") e.target.blur(); e.stopPropagation(); });
+$("projstatus").addEventListener("click", ()=>savePlan());
+
+/* ---------- species library ---------- */
+let libMode = "place", pendingPreset = null;
+const lib = {type:"all", hmin:5, hmax:60, shade:new Set(["Dappled","Moderate","Dense"]), bloom:false, q:""};
+function openLibrary(mode){
+  libMode = mode;
+  showAddMenu(false);
+  const o = selected();
+  $("libtitle").textContent = mode === "replace" ? "Change species" : "Choose a tree";
+  $("libnote").innerHTML = mode === "replace" && o
+    ? `<span>Replacing</span><b>${escapeHTML(o.name)}</b><span>Keeps its place in the yard; size and shape change to the new species.</span>`
+    : `<span>Placing</span><b>Pick a tree, then click the yard where it goes.</b><span>Esc cancels.</span>`;
+  renderLibrary();
+  $("library").hidden = false;
+  setTimeout(()=>$("libsearch").focus({preventScroll:true}), 30);
+}
+function closeLibrary(){ $("library").hidden = true; }
+function libSilhouette(p){
+  const sh = SHAPES[p.s] || SHAPES.round, k = 84/62, g = 94, cx = 140;
+  const top = g - p.h*k, cbFt = p.cb ?? (Number.isFinite(sh.baseFt) ? sh.baseFt : p.h*sh.base), cb = g - cbFt*k, half = p.w/2*k;
+  const col = new THREE.Color(p.leaf ?? 0x46702c);
+  const hex = "#"+col.getHexString(), line = "#"+col.clone().lerp(new THREE.Color(0xC9D8B8), .5).getHexString();
+  const bloom = p.bloom ? "#"+new THREE.Color(p.bloom[1]).getHexString() : null;
+  let dots = "";
+  if(bloom){
+    for(let i=0;i<14;i++){
+      const u = .15 + .7*((i*.618)%1), yy = cb - (cb-top)*u, w = half*sh.r(u)*.8;
+      const xx = cx + (((i*.37)%1)*2-1)*w;
+      dots += `<circle cx="${xx.toFixed(1)}" cy="${yy.toFixed(1)}" r="1.6" fill="${bloom}"/>`;
+    }
+  }
+  return `<svg viewBox="0 0 280 96" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    <line x1="0" y1="94" x2="280" y2="94" stroke="#2C3631"/>
+    <path d="${crownPath(sh.r, cx, top, cb, half, 24)}" fill="${hex}" fill-opacity=".45" stroke="${line}" stroke-width="1.1"/>
+    ${dots}
+    <line x1="${cx}" y1="${cb.toFixed(1)}" x2="${cx}" y2="94" stroke="#8A7560" stroke-width="2.4"/>
+    <g transform="translate(236 82) scale(.62)" fill="rgba(236,231,218,.4)">${PERSON}</g>
+  </svg>`;
+}
+function libMatches(p){
+  if(lib.type === "deciduous" && p.ev) return false;
+  if(lib.type === "evergreen" && !p.ev) return false;
+  if(p.h < lib.hmin || p.h > lib.hmax + (lib.hmax >= 60 ? 99 : 0)) return false;
+  if(!lib.shade.has(shadeClass(p.d))) return false;
+  if(lib.bloom && !p.bloom) return false;
+  if(lib.q){
+    const hay = (p.n+" "+(p.sci||"")+" "+p.gn+" "+(p.note||"")).toLowerCase();
+    if(!lib.q.split(/\s+/).every(w=>hay.includes(w))) return false;
+  }
+  return true;
+}
+function renderLibrary(){
+  const cur = selected(), here = new Map();
+  for(const o of S.objects) if(o.type === "tree") here.set(o.name, (here.get(o.name)||0) + 1);
+  $("libhval").textContent = `${lib.hmin}–${lib.hmax}${lib.hmax >= 60 ? "+" : ""} ft`;
+  const a = (lib.hmin-5)/55*100, b = (lib.hmax-5)/55*100;
+  const dual = document.querySelector(".dual");
+  dual.style.setProperty("--a", a+"%"); dual.style.setProperty("--b", b+"%");
+  let html = "", total = 0;
+  for(const G of presetGroups()){
+    const genera = G.genera.map(g=>({name:g.name, items:g.items.filter(libMatches)})).filter(g=>g.items.length);
+    const n = genera.reduce((t,g)=>t+g.items.length, 0);
+    if(!n) continue;
+    total += n;
+    html += `<section class="libgroup"><h2>${G.label}<span>${n} ${n === 1 ? "tree" : "trees"}</span></h2>`;
+    for(const g of genera){
+      html += `<div class="libgenus"><h3>${escapeHTML(g.name)}</h3></div><div class="libcards">`;
+      for(const p of g.items){
+        const i = PRESETS.indexOf(p), isCur = libMode === "replace" && cur && cur.name === p.n;
+        const count = here.get(p.n) || 0;
+        const btn = libMode === "replace"
+          ? (isCur ? `<button class="btn" disabled>Current</button>` : `<button class="btn" data-pick="${i}">Use this</button>`)
+          : `<button class="btn${count ? "" : ""}" data-pick="${i}">${count ? "Add another" : "Place"}</button>`;
+        html += `<article class="lcard${isCur ? " cur" : ""}">${libSilhouette(p)}
+          <div class="nm"><h4>${escapeHTML(p.n)}</h4><span class="tg${count ? " here" : ""}">${count ? (count > 1 ? count+" in your yard" : "In your yard") : ""}</span></div>
+          <div class="la">${escapeHTML(p.sci || "")}</div>
+          <div class="ft"><div class="mt"><span>${p.h} × ${p.w} ft</span><span class="sh">${shadeClass(p.d)}</span>${p.bloom ? `<span class="bl">Blooms</span>` : ""}</div>${btn}</div>
+        </article>`;
+      }
+      html += `</div>`;
+    }
+    html += `</section>`;
+  }
+  $("libgrid").innerHTML = html || `<p class="libempty">No trees match those filters.</p>`;
+}
+$("libgrid").addEventListener("click", e=>{
+  const b = e.target.closest("[data-pick]");
+  if(!b) return;
+  const p = PRESETS[+b.dataset.pick];
+  const o = selected();
+  closeLibrary();
+  if(libMode === "replace" && o && o.type === "tree"){ applyPreset(o, p); toast("Now a " + p.n); return; }
+  pendingPreset = p.n;
+  setTool("tree");
+  toast("Click the yard to place the " + p.n);
+});
+$("libclose").addEventListener("click", closeLibrary);
+$("library").addEventListener("pointerdown", e=>{ if(e.target === $("library")) closeLibrary(); });
+$("libsearch").addEventListener("input", e=>{ lib.q = e.target.value.trim().toLowerCase(); renderLibrary(); });
+$("libsearch").addEventListener("keydown", e=>{ if(e.key === "Escape") closeLibrary(); e.stopPropagation(); });
+$("libtype").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-type]");
+  if(!b) return;
+  lib.type = b.dataset.type;
+  $("libtype").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x === b));
+  renderLibrary();
+});
+for(const id of ["libhmin","libhmax"]) $(id).addEventListener("input", e=>{
+  let lo = +$("libhmin").value, hi = +$("libhmax").value;
+  if(lo > hi){ if(id === "libhmin") hi = lo; else lo = hi; $("libhmin").value = lo; $("libhmax").value = hi; }
+  lib.hmin = lo; lib.hmax = hi;
+  renderLibrary();
+});
+$("libshade").addEventListener("change", e=>{
+  if(e.target.checked) lib.shade.add(e.target.value); else lib.shade.delete(e.target.value);
+  renderLibrary();
+});
+$("libbloom").addEventListener("change", e=>{ lib.bloom = e.target.checked; renderLibrary(); });
+
+/* ---------- lot plan, fence tiles and the north dial in the Lot pane ---------- */
+const FENCE_ICONS = {
+  picket:"M4 26h64M4 8v18M12 8v18M20 8v18M28 8v18M36 8v18M44 8v18M52 8v18M60 8v18M68 8v18M4 11h64",
+  privacy:"M4 26h64M4 6h64v20M4 6v20M22 6v20M40 6v20M58 6v20",
+  board:"M4 26h64M6 6v20M11 8v18M16 6v20M21 8v18M26 6v20M31 8v18M36 6v20M41 8v18M46 6v20M51 8v18M56 6v20M61 8v18M66 6v20",
+  rail:"M4 26h64M8 8v18M36 8v18M64 8v18M4 13l64-2M4 20l64-1",
+  chain:"M4 26h64M4 8v18M68 8v18M4 8l8 8 8-8 8 8 8-8 8 8 8-8 8 8 8-8M4 16l8 8 8-8 8 8 8-8 8 8 8-8 8 8 8-8",
+  hedge:"M4 26h64M6 26c-2-6 0-16 6-17 3-4 9-3 12 0 4-3 10-3 13 1 4-3 10-2 13 2 5-2 10 1 11 6 2 3 1 6-1 8"
+};
+function drawFenceTiles(){
+  const host = $("fencetiles");
+  if(!host) return;
+  host.innerHTML = Object.entries(FENCE_STYLES).map(([k,v])=>
+    `<button type="button" data-fence="${k}" aria-pressed="${(S.fence.style||"picket") === k}">
+      <svg viewBox="0 0 72 30" aria-hidden="true"><path d="${FENCE_ICONS[k] || FENCE_ICONS.picket}"/></svg>
+      <span>${v.label}</span><b>${Math.round(v.dens*100)}%</b></button>`).join("");
+}
+$("fencetiles").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-fence]");
+  if(!b) return;
+  const sel = $("fencestyle");
+  sel.value = b.dataset.fence;
+  sel.dispatchEvent(new Event("change", {bubbles:true}));
+  drawFenceTiles(); drawLotPlan();
+});
+function drawLotPlan(){
+  const svg = $("lotsvg");
+  if(!svg) return;
+  const bb = bbox(S.boundary), W = 320, H = 210, pad = 44;
+  const k = Math.min((W - pad*2)/Math.max(1,bb.w), (H - 50)/Math.max(1,bb.h));
+  const ox = (W - bb.w*k)/2, oy = 22 + (H - 44 - bb.h*k)/2;
+  const X = x=>ox + (x-bb.x0)*k, Y = y=>oy + (y-bb.y0)*k;
+  const sides = ensureFenceSides();
+  let h = `<polygon points="${S.boundary.map(q=>X(q.x).toFixed(1)+","+Y(q.y).toFixed(1)).join(" ")}" fill="rgba(147,184,122,.08)"/>`;
+  for(const o of S.objects){
+    if(o.type === "structure" && o.poly) h += `<polygon points="${worldPoly(o).map(q=>X(q.x).toFixed(1)+","+Y(q.y).toFixed(1)).join(" ")}" fill="rgba(236,231,218,.1)" stroke="rgba(236,231,218,.35)"/>`;
+    if(o.type === "tree") h += `<circle cx="${X(o.x).toFixed(1)}" cy="${Y(o.y).toFixed(1)}" r="${Math.max(1.5, o.spread/2*k).toFixed(1)}" fill="rgba(147,184,122,.18)" stroke="rgba(147,184,122,.5)"/>`;
+    if(o.type === "bed") h += `<polygon points="${worldPoly({...o, poly:rectPoly(o.w,o.h)}).map(q=>X(q.x).toFixed(1)+","+Y(q.y).toFixed(1)).join(" ")}" fill="rgba(212,168,90,.18)"/>`;
+  }
+  const cx = X(bb.cx), cy = Y(bb.cy);
+  for(const e of boundaryEdges()){
+    const on = S.fence.on !== false && sides[e.i];
+    h += `<line x1="${X(e.A.x).toFixed(1)}" y1="${Y(e.A.y).toFixed(1)}" x2="${X(e.B.x).toFixed(1)}" y2="${Y(e.B.y).toFixed(1)}" stroke="${on ? "#D4A85A" : "rgba(236,231,218,.45)"}" stroke-width="${on ? 3 : 1.2}" ${on ? "" : `stroke-dasharray="4 3"`}/>`;
+    if(e.len < 1) continue;
+    let mx = X((e.A.x+e.B.x)/2), my = Y((e.A.y+e.B.y)/2);
+    const dx = mx - cx, dy = my - cy, dl = Math.hypot(dx,dy) || 1;
+    mx += dx/dl*16; my += dy/dl*13;
+    const t = Math.round(e.len)+" ft", tw = t.length*6.6 + 12;
+    h += `<rect x="${(mx-tw/2).toFixed(1)}" y="${(my-8).toFixed(1)}" width="${tw.toFixed(1)}" height="16" rx="8" fill="#1B2320" stroke="#2C3631"/>`
+      + `<text x="${mx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" fill="#ECE7DA" font-family="Geist Mono,monospace" font-size="11">${t}</text>`;
+  }
+  for(const q of S.boundary) h += `<circle cx="${X(q.x).toFixed(1)}" cy="${Y(q.y).toFixed(1)}" r="4.5" fill="#141A17" stroke="#ECE7DA" stroke-width="1.4"/>`;
+  const na = -S.north;
+  h += `<g transform="translate(${W-16} ${H-18}) rotate(${na})"><path d="M0 -12l4 10h-8z" fill="#D4A85A"/></g><text x="${W-16}" y="${H-2}" text-anchor="middle" fill="#A6A89A" font-family="Geist,sans-serif" font-size="9.5">N</text>`;
+  svg.innerHTML = h;
+  const on = boundaryEdges().filter(e=>S.fence.on !== false && sides[e.i]).length, n = boundaryEdges().length;
+  $("lotfenced").textContent = on === 0 ? "No fence" : on === n ? `Fenced: all ${n} sides` : `Fenced: ${on} of ${n} sides`;
+}
+function drawNorthDial(){
+  const d = $("northdial");
+  if(d) d.innerHTML = `<circle cx="22" cy="22" r="19" fill="none" stroke="#2C3631" stroke-width="1.5"/>
+    <g transform="rotate(${-S.north} 22 22)"><path d="M22 6l4 12h-8z" fill="#D4A85A"/><text x="22" y="37" text-anchor="middle" fill="#7C8074" font-family="Geist,sans-serif" font-size="8">N</text></g>`;
+}
 $("date").addEventListener("input", e=>{ S.date = e.target.value || S.date; afterDateChange(); });
 document.querySelectorAll("[data-jump]").forEach(b=>b.addEventListener("click", ()=>{
   S.date = S.date.slice(0,4)+"-"+b.dataset.jump;
@@ -2873,6 +3479,7 @@ function setNorth(v){
   S.north = ((Math.round(v)%360)+360)%360;
   $("north").value = S.north; $("northnum").value = S.north;
   compassKey = null;
+  drawNorthDial();
   scheduleCompute(); panelFor = null; drawPanel(); drawList(); markDirty();
 }
 bindNum("north", setNorth);
@@ -2911,6 +3518,7 @@ $("fencestyle").addEventListener("change", e=>{
   S.fence.density = st.dens;
   $("fenced").value = st.dens; $("fenced2").value = st.dens;
   buildFence(); scheduleCompute(); markDirty();
+  drawFenceTiles(); syncRanges(document);
   toast(st.label + " — blocks about " + Math.round(st.dens*100) + "% of direct sun");
 });
 $("fenceall").addEventListener("click", ()=>{
@@ -2969,7 +3577,13 @@ document.addEventListener("keydown", e=>{
   if(mod) return;
   if(/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
   if($("modal").classList.contains("on")) return;
-  if(e.key === "Escape" && nodeEdit){ nodeEdit = false; activeNode = null; panelFor = null; drawPanel(); markDirty(); }
+  if(!$("library").hidden){ if(e.key === "Escape") closeLibrary(); return; }
+  if(e.key === "Escape"){
+    if(!addMenu.hidden){ showAddMenu(false); return; }
+    if(nodeEdit){ nodeEdit = false; activeNode = null; panelFor = null; drawPanel(); markDirty(); return; }
+    if(tool !== "select"){ setTool("select"); return; }
+    if(S.sel != null){ select(null); openSheet(false); markDirty(); return; }
+  }
   if((e.key === "Delete" || e.key === "Backspace") && S.sel != null && S.sel !== BOUNDARY){ removeSelected(); e.preventDefault(); }
   if(e.key === "1") setView("vplan");
   if(e.key === "2") setView("v3d");
@@ -2987,6 +3601,7 @@ function openSheet(on){
 }
 $("sheetbtn").addEventListener("click", ()=>openSheet(!$("inspector").classList.contains("open")));
 $("closesheet").addEventListener("click", ()=>openSheet(false));
+$("inspclose").addEventListener("click", ()=>{ nodeEdit = false; activeNode = null; select(null); openSheet(false); markDirty(); });
 
 /* ============================================================ modal -------- */
 function askUser(title, msg, buttons){
@@ -3022,6 +3637,7 @@ function savePlan(){
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
   savedMark = JSON.stringify(S);
+  markSaved(true);
   toast("Plan saved");
 }
 /* Rebuild everything from a plain object. Shared by Open, Start over and Undo. */
@@ -3088,6 +3704,7 @@ function pushHist(){
   if(hist.stack.length > 60) hist.stack.shift();
   hist.i = hist.stack.length - 1;
   histBtns();
+  syncProject();
 }
 function scheduleHist(){
   if(hist.lock) return;
@@ -3137,6 +3754,7 @@ $("fileinput").addEventListener("change", e=>{
       if(!data.objects) throw new Error("not a plan");
       loadState(data, true);
       savedMark = JSON.stringify(S);
+      markSaved(true);
       pushHist();
       toast("Plan opened");
     }catch(err){ toast("That file isn't a yard plan"); }
@@ -3147,6 +3765,7 @@ $("fileinput").addEventListener("change", e=>{
 function doReset(){
   loadState(freshState(), true);
   savedMark = JSON.stringify(S);
+  everSaved = false; markSaved(false);
   pushHist();
   toast("Back to the starting yard");
 }
@@ -3173,6 +3792,7 @@ function syncInputs(){
   $("heat").checked = S.heat; $("leaf").checked = S.leafSeason;
   $("mins").value = S.fullSun; $("mins2").value = S.fullSun;
   syncLotFields();
+  drawFenceTiles(); drawNorthDial(); drawLotPlan(); syncLayers(); syncProject();
   syncRanges(document);
 }
 
@@ -3372,9 +3992,10 @@ async function boot(){
   lastLeaf = leafOn();
   applySimpleChrome();
   syncInputs(); buildArc(); drawList(); drawPanel(); setTool("select"); scheduleCompute();
-  try{ if(localStorage.getItem("yard-shade-studio:navmin")) setNavCollapsed(true); }catch{ /* private mode */ }
+  setNavCollapsed(true);
   syncSunH(); histBtns();
   savedMark = JSON.stringify(S);
+  markSaved(false);
   pushHist();
   if(window.innerWidth <= 1020) $("sunpanel").classList.add("min");
   loop();

@@ -260,7 +260,8 @@ function paintBroadleafSprig(g, N, spec, rand) {
 function paintBroadleafCluster(g, N, spec, rand) {
   const cx = N / 2;
   const cy = N / 2;
-  const M = spec.veins === 'palmate' ? 34 : 46;
+  // Small-leaved species get more leaves so the cluster covers the same area.
+  const M = Math.round((spec.veins === 'palmate' ? 34 : 46) * Math.min(1.8, Math.max(1, (0.14 / spec.size) ** 2)));
   const leaves = [];
   for (let i = 0; i < M; i++) {
     // Irregular scatter (not a rosette): random positions in a lumpy disc.
