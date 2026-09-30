@@ -59,6 +59,8 @@ export class SkyEnvironment {
 
     // Distance haze so the ground plane melts into the horizon.
     scene.fog = new THREE.FogExp2(0xffffff, fogDensity);
+    this.fogDensity = fogDensity;
+    this.stage = null;
   }
 
   async loadHDRI(onStatus = () => {}) {
@@ -95,8 +97,32 @@ export class SkyEnvironment {
     this.scene.environmentRotation.set(0, 0, 0);
   }
 
+  /**
+   * Diorama staging: the sky still lights the model (environment), but the
+   * backdrop is a studio gradient and there's no distance fog.
+   */
+  setStage(texture) {
+    this.stage = texture || null;
+    this.lastBakeDir.set(0, -1, 0);
+  }
+
   /** Call whenever the sun moves. */
   update(sunDir, daylight) {
+    this.#update(sunDir, daylight);
+    if (this.stage) {
+      const scene = this.scene;
+      scene.background = this.stage;
+      scene.backgroundRotation.set(0, 0, 0);
+      scene.backgroundIntensity = 1;
+      if (this.sky.parent) this.sky.visible = false;
+      scene.fog.density = 0;
+    } else {
+      this.sky.visible = true;
+      this.scene.fog.density = this.fogDensity;
+    }
+  }
+
+  #update(sunDir, daylight) {
     const scene = this.scene;
     const dim = Math.max(daylight, 0.015);
 

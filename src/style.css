@@ -219,6 +219,7 @@ body.inspoff #layers{max-width:calc(100vw - var(--leftX) - var(--sunW) - 40px)}
 .sw-heat{width:26px;height:8px;border-radius:4px;background:linear-gradient(90deg,#2C4A5C,#8FB8CA,#D4A85A,#F2E3BE)}
 .sw-grid{width:12px;height:12px;border:1.5px solid var(--dim);border-radius:2px;
   background:linear-gradient(var(--dim),var(--dim)) 50% 0/1px 100% no-repeat,linear-gradient(var(--dim),var(--dim)) 0 50%/100% 1px no-repeat}
+.sw-path{width:16px;height:8px;border:1.5px solid var(--brass);border-bottom:0;border-radius:10px 10px 0 0}
 .sw-simple{width:12px;height:0;border-top:1.5px dashed var(--text)}
 
 /* ---------- sun card ---------- */

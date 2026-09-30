@@ -6,6 +6,8 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { TreeLibrary, SUN } from "./botany/library.js";
 import { speciesFor } from "./botany/species.js";
 import { createPost } from "./post.js";
+import { Diorama, studioBackdrop } from "./scene/diorama.js";
+import { SunPath } from "./scene/sunpath.js";
 
 const DEG = Math.PI/180;
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
@@ -250,7 +252,7 @@ const QUALITY = {
   balanced:   {dpr:1.5, ao:true,  shadow:4096, half:true},
   quality:    {dpr:2,   ao:true,  shadow:4096, half:false}
 };
-const prefs = Object.assign({sky:"hdri", quality:"balanced", treeDetail:"standard", exposure:1}, (()=>{
+const prefs = Object.assign({sky:"hdri", quality:"balanced", treeDetail:"standard", exposure:1, stage:"diorama"}, (()=>{
   try{ return JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"); }catch{ return {}; }
 })());
 function savePrefs(){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }catch{ /* private mode */ } }
@@ -721,7 +723,7 @@ function insideLot(o){ return pointInPoly(S.boundary, o.x, o.y); }
 /* ============================================================ three.js scene */
 const canvas = document.getElementById("gl");
 let renderer, scene, camera, perspectiveCamera, planCamera, sunLight, hemi, fillLight, groundMesh, gridLines, majorLines,
-    post, sky, trees, lawnMat, apronMat,
+    post, sky, trees, lawnMat, apronMat, diorama, sunPath, backdrop,
     fenceGroup, heatMesh, measureLine, edgeLine;
 const objGroup = new THREE.Group();
 const helperGroup = new THREE.Group();
@@ -1298,7 +1300,43 @@ function buildGround(){
   apron.material = S.simple ? new THREE.MeshStandardMaterial({color:0x11171d, roughness:1}) : apronMat;
   buildEdgeLine();
   buildGrid();
+  applyStage();
   markShadows();
+}
+/* Diorama: the lot as a model cut from the earth, on a studio plinth.
+   Landscape: open country under the sky photo. */
+function stageOn(){ return prefs.stage === "diorama" && !S.simple; }
+function applyStage(){
+  if(!diorama) return;
+  const on = stageOn();
+  diorama.setVisible(on);
+  if(on) diorama.build(S.boundary);
+  sky.setStage(on ? backdrop : null);
+  const apron = scene.getObjectByName("apron");
+  if(apron) apron.visible = !on;
+  sunPath.setVisible(!S.simple && prefs.sunPath !== false);
+  post?.setStage(on, activeView === "vplan");
+  skyKey = null;
+  markShadows(); markDirty();
+}
+/* Direction to the sun in world space (x east-ish, z south-ish, y up), with house angle applied. */
+function sunDirOf(sp){
+  const azRel = (sp.az - S.north)*DEG;
+  const ce = Math.cos(sp.el*DEG), se = Math.sin(sp.el*DEG);
+  return new THREE.Vector3(Math.sin(azRel)*ce, se, -Math.cos(azRel)*ce).normalize();
+}
+function buildSunPath(){
+  if(!sunPath) return;
+  const {rise, set, polar} = dayEdges();
+  const samples = [];
+  if(polar !== "night"){
+    for(let m = Math.floor(rise); m <= Math.ceil(set); m += 5){
+      samples.push({dir: sunDirOf(solarPos(m)), hour: Math.floor(m/60) !== Math.floor((m-5)/60)});
+    }
+  }
+  const b = yardBounds();
+  sunPath.build(new THREE.Vector3(b.cx, 0, b.cy), Math.max(b.w, b.h)*.62, samples);
+  sunPath.setSun(sunDirOf(solarPos(S.minutes)));
 }
 function buildEdgeLine(){
   if(edgeLine){ helperGroup.remove(edgeLine); edgeLine.geometry.dispose(); edgeLine = null; }
@@ -1352,16 +1390,21 @@ function buildGrid(){
    Pre-invert the tone curve so the colours land on screen as designed.
    (Mirrors three's ACESFilmicToneMapping.) */
 const HEAT_GAIN = 4;
-function acesJS(c, exposure){
-  const k = exposure/.6, v = [c[0]*k, c[1]*k, c[2]*k];
-  const a = [.59719*v[0] + .35458*v[1] + .04823*v[2],
-             .07600*v[0] + .90834*v[1] + .01566*v[2],
-             .02840*v[0] + .13383*v[1] + .83777*v[2]];
-  const f = x=>(x*(x+.0245786) - .000090537)/(x*(.983729*x + .4329510) + .238081);
-  const r = a.map(f);
-  return [1.60475*r[0] - .53108*r[1] - .07367*r[2],
-          -.10208*r[0] + 1.10813*r[1] - .00605*r[2],
-          -.00327*r[0] - .07276*r[1] + 1.07602*r[2]].map(x=>clamp(x,0,1));
+/* three.js / postprocessing AgX (Filament's, from Blender), for the heat-map LUT */
+const mulCols = (m, v)=>[m[0][0]*v[0]+m[1][0]*v[1]+m[2][0]*v[2], m[0][1]*v[0]+m[1][1]*v[1]+m[2][1]*v[2], m[0][2]*v[0]+m[1][2]*v[1]+m[2][2]*v[2]];
+const SRGB_TO_2020 = [[.6274,.0691,.0164],[.3293,.9195,.0880],[.0433,.0113,.8956]];
+const R2020_TO_SRGB = [[1.6605,-.1246,-.0182],[-.5876,1.1329,-.1006],[-.0728,-.0083,1.1187]];
+const AGX_IN = [[.856627153315983,.137318972929847,.11189821299995],[.0951212405381588,.761241990602591,.0767994186031903],[.0482516061458583,.101439036467562,.811302368396859]];
+const AGX_OUT = [[1.1271005818144368,-.1413297634984383,-.14132976349843826],[-.11060664309660323,1.157823702216272,-.11060664309660294],[-.016493938717834573,-.016493938717834257,1.2519364065950405]];
+function agxJS(c, exposure){
+  let v = mulCols(AGX_IN, mulCols(SRGB_TO_2020, c.map(x=>x*exposure)));
+  v = v.map(x=>{
+    const l = clamp((Math.log2(Math.max(x, 1e-10)) + 12.47393)/(4.026069 + 12.47393), 0, 1);
+    const x2 = l*l, x4 = x2*x2;
+    return 15.5*x4*x2 - 40.14*x4*l + 31.96*x4 - 6.868*x2*l + .4298*x2 + .1191*l - .00232;
+  });
+  v = mulCols(AGX_OUT, v).map(x=>Math.pow(Math.max(0, x), 2.2));
+  return mulCols(R2020_TO_SRGB, v).map(x=>clamp(x, 0, 1));
 }
 const toLin = u=>{ u /= 255; return u <= .04045 ? u/12.92 : Math.pow((u+.055)/1.055, 2.4); };
 const toSRGB = l=>255*(l <= .0031308 ? l*12.92 : 1.055*Math.pow(l, 1/2.4) - .055);
@@ -1370,7 +1413,7 @@ function preToneMap(rgb, exposure){
   const want = rgb.map(toLin).map(x=>Math.min(x, .97));
   let L = want.slice();
   for(let i=0;i<24;i++){
-    const got = acesJS(L, exposure);
+    const got = agxJS(L, exposure);
     L = L.map((x,j)=>clamp(x*(want[j]+1e-4)/(got[j]+1e-4), 0, HEAT_GAIN));
   }
   return L.map(x=>clamp(toSRGB(x/HEAT_GAIN), 0, 255));
@@ -1603,6 +1646,7 @@ function updateSun(){
   sunLight.target.updateMatrixWorld();
   sunLight.visible = sp.el > 0;
   SUN.uSunDir.value.copy(dir);
+  sunPath?.setSun(sunDirOf(sp));
   const R = span*.8, sc = sunLight.shadow.camera;
   sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R;
   sc.near = span*.4; sc.far = span*3.4;
@@ -1658,6 +1702,7 @@ function updateCameraProjection(){
 function applyCamera(){
   camera = activeView === "vplan" ? planCamera : perspectiveCamera;
   post?.setCamera(camera);
+  post?.setStage(stageOn(), activeView === "vplan");
   if(activeView === "vplan"){
     orbit.el = 90; orbit.ty = 0;
     updateCameraProjection();
@@ -2071,6 +2116,7 @@ function buildArc(){
   const ends = polar === "night" ? "" : `
     <text x="${x0}" y="${H-4}" font-size="10.5" fill="#8A8C80" ${mono}>${polar === "day" ? "midnight" : fmtTime(rise)}</text>
     <text x="${x1}" y="${H-4}" font-size="10.5" fill="#8A8C80" text-anchor="end" ${mono}>${polar === "day" ? "midnight" : fmtTime(set)}</text>`;
+  buildSunPath();
   arcSvg.innerHTML = `
     <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#D4A85A" stop-opacity=".26"/>
@@ -3922,6 +3968,9 @@ function syncPrefs(label){
   $("rsky").value = prefs.sky;
   document.querySelectorAll("#rquality button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.quality === prefs.quality));
   document.querySelectorAll("#rtrees button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.trees === prefs.treeDetail));
+  document.querySelectorAll("#rstage button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.stage === prefs.stage));
+  if($("rsunpath")) $("rsunpath").checked = prefs.sunPath !== false;
+  if($("lyPath")) $("lyPath").setAttribute("aria-pressed", prefs.sunPath !== false);
   $("rqualityhint").textContent = QUALITY_HINT[prefs.quality] || "";
   $("rexp").value = prefs.exposure; $("rexp2").value = prefs.exposure;
   if(label !== undefined) $("rsource").textContent = label
@@ -3946,6 +3995,12 @@ function initPrefsUI(){
     toast(prefs.treeDetail === "high" ? "Growing high-detail trees…" : "Standard trees");
     setTimeout(()=>{ trees.setHighDetail(prefs.treeDetail === "high"); rebuildAll(); syncPrefs(); changed(); }, 30);
   }));
+  document.querySelectorAll("#rstage button").forEach(b=>b.addEventListener("click", ()=>{
+    prefs.stage = b.dataset.stage; applyStage(); updateSun(); syncPrefs(); changed();
+  }));
+  const setPath = on=>{ prefs.sunPath = !!on; applyStage(); syncPrefs(); changed(); };
+  $("rsunpath")?.addEventListener("change", e=>setPath(e.target.checked));
+  $("lyPath")?.addEventListener("click", ()=>setPath(prefs.sunPath === false));
   const exp = v=>{ prefs.exposure = clamp(v, .3, 2.5); $("rexp").value = prefs.exposure; $("rexp2").value = prefs.exposure;
     changed(); clearTimeout(exp.t); exp.t = setTimeout(()=>{ updateSun(); refreshHeat(); markDirty(); }, 200); };
   bindNum("rexp", exp); bindNum("rexp2", exp);
@@ -3980,6 +4035,9 @@ function init(){
   scene.add(objGroup, helperGroup);
   trees = new TreeLibrary();
   trees.setHighDetail(prefs.treeDetail === "high");
+  diorama = new Diorama(scene);
+  sunPath = new SunPath(scene);
+  backdrop = studioBackdrop();
   post = createPost(renderer, scene, camera);
   applyQuality(false);
   ensureFenceSides();

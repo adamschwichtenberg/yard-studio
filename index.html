@@ -153,6 +153,7 @@
 <div id="layers" class="panel" role="group" aria-label="Map layers">
   <button id="lyShadow" aria-pressed="true" title="Shadows at the time on the sun card"><i class="sw-shadow"></i>Shadows now</button>
   <button id="lySun" title="Total hours of direct sun over the day"><i class="sw-heat"></i>Sun hours</button>
+  <button id="lyPath" title="The sun's path across the sky today"><i class="sw-path"></i>Sun path</button>
   <button id="lyGrid" title="Show the grid"><i class="sw-grid"></i>Grid</button>
   <button id="lySimple" title="Simple schematic view (G)"><i class="sw-simple"></i>Schematic</button>
 </div>
@@ -337,6 +338,13 @@
       <h3 class="panetitle">Display</h3>
       <div class="cols">
         <div>
+          <h4>Stage</h4>
+          <div class="seg tiny qseg" id="rstage" role="group" aria-label="Stage">
+            <button data-stage="diorama">Diorama</button>
+            <button data-stage="landscape">Landscape</button>
+          </div>
+          <p class="hint">Diorama shows the lot as a model cut from the earth, on a studio plinth. Landscape sets it in open country under the sky photo.</p>
+          <div class="field" style="margin-top:10px"><label for="rsunpath">Sun path over the yard</label><input type="checkbox" class="sw" id="rsunpath" checked></div>
           <h4>Render quality</h4>
           <div class="seg tiny qseg" id="rquality" role="group" aria-label="Render quality">
             <button data-quality="performance">Performance</button>
