@@ -407,8 +407,8 @@ function buildChains(nodes, rad) {
  * (opposite pairs turned 90° each node, or alternate on a 2/5 spiral), on
  * petioles angled out from the twig, blades turned toward the light.
  *
- * Then a coverage pass: the crown is projected straight down and from four
- * 40° sun angles, and wherever the leaves leave a gap, a short twig carries a
+ * Then a coverage pass: the crown is projected straight down, from three
+ * 40° and three 15° sun angles, and wherever the leaves leave a gap, a short twig carries a
  * small leaf cluster into it, until the crown blocks about as much light as
  * the tree's density says (a mature maple or linden casts near-solid shade;
  * a honeylocust stays dappled).
@@ -515,7 +515,9 @@ function placeLeaves(nodes, rad, depth, p) {
   const foot = Math.sqrt(leafArea / Math.PI); // footprint radius per unit leaf length
   const meanLen = len * scale;
   const cell = THREE.MathUtils.clamp(meanLen * foot * 0.5, 0.05, 0.4);
-  const budget = Math.round(S.length * 0.9);
+  // Enough fill to cover the crown's surface about twice over, which small
+  // leaves on a narrow crown (birches) need far more of than their shoots carry.
+  const budget = Math.round(THREE.MathUtils.clamp((2.2 * shell) / (meanLen * meanLen * leafArea), S.length * 1.1, S.length * 3));
   let added = 0;
   const twigGrid = new Grid(D * 4);
   shoots.forEach((i, k) => twigGrid.add(k, nodes.pos[i]));
@@ -525,6 +527,12 @@ function placeLeaves(nodes, rad, depth, p) {
   for (let k = 0; k < 3; k++) {
     const az = (k / 3) * Math.PI * 2 + 0.4;
     dirs.push(V(Math.cos(az) * Math.cos(el), -Math.sin(el), Math.sin(az) * Math.cos(el)).normalize());
+  }
+  // Low sun (and the side view that matters most for a narrow column).
+  const lo = THREE.MathUtils.degToRad(15);
+  for (let k = 0; k < 3; k++) {
+    const az = (k / 3) * Math.PI * 2 + 1.45;
+    dirs.push(V(Math.cos(az) * Math.cos(lo), -Math.sin(lo), Math.sin(az) * Math.cos(lo)).normalize());
   }
   // Fill only near real twigs, so the crown keeps its clumps and scalloped
   // edge instead of rounding out to the smooth envelope. A voxel grid marks
@@ -733,7 +741,7 @@ function placeOrnaments(nodes, depth, p) {
       // sit out at that leaf surface (fruit a little inside it) to be seen.
       // (Flowers that open on bare wood stay on the twigs.)
       const leafy = orn.to == null || orn.to > 8;
-      const reach = leafy ? (p.D * 1.3 + (p.leafLen || p.D) * 0.9) * (hang ? 0.6 : 0.95) : 0;
+      const reach = leafy ? (p.D * 1.3 + (p.leafLen || p.D) * 0.9) * (hang ? 0.6 : 1.15) : 0;
       const out = V(b.x, 0, b.z).normalize().multiplyScalar(0.7).add(dir.clone().multiplyScalar(0.5)).add(V(0, hang ? 0 : 0.3, 0)).normalize();
       const at = b.clone().addScaledVector(out, reach);
       for (let k = 0; k < reps; k++) {
@@ -871,8 +879,9 @@ export function growConifer(p) {
         const pos = V().lerpVectors(at, end, tt).addScaledVector(randUnit(r), 0.05);
         // Shoot axis: along the branchlet, with a little splay.
         const axis = dir2.clone().addScaledVector(randUnit(r), flat ? 0.35 : 0.3).normalize();
-        const face = flat ? V().crossVectors(axis, V().crossVectors(UP, axis).normalize()).normalize()
-          : UP.clone().addScaledVector(randUnit(r), 0.5).addScaledVector(axis, -UP.dot(axis)).normalize();
+        // Arborvitae holds flat, vertical fans; juniper cords point every which way.
+        const face = p.key === 'arborvitae' ? V().crossVectors(axis, V().crossVectors(UP, axis).normalize()).normalize()
+          : UP.clone().addScaledVector(randUnit(r), p.key === 'juniper' ? 1.4 : 0.5).addScaledVector(axis, -UP.dot(axis)).normalize();
         const outer = THREE.MathUtils.clamp(Math.hypot(pos.x, pos.z) / Math.max(0.3, envelope(pos.y)), 0, 1);
         shoots.push({ pos, axis, face, s: shoot.length * (0.75 + 0.5 * r()) * p.shootScale, rand: r(), ao: THREE.MathUtils.clamp(0.25 + 0.6 * outer + 0.15 * b.u, 0, 1) });
         total++;
@@ -885,10 +894,14 @@ export function growConifer(p) {
     }
   }
   // Dense conifer foliage hides a dark core so no daylight shows through the middle.
-  const core = [];
-  for (let i = 0; i <= 12; i++) {
-    const y = cb + (i / 12) * crownH;
-    core.push(new THREE.Vector2(Math.max(0.05, envelope(y) * (flat ? 0.55 : 0.4) * (0.6 + 0.4 * dens)), y));
+  // It starts a little above the lowest branches and swells in, so it never
+  // shows below the foliage as a dark drum.
+  const core = [new THREE.Vector2(0.02, cb + crownH * 0.04)];
+  for (let i = 1; i <= 12; i++) {
+    const t = i / 12;
+    const y = cb + t * crownH;
+    const swell = 0.25 + 0.75 * THREE.MathUtils.smoothstep(t, 0.04, 0.22);
+    core.push(new THREE.Vector2(Math.max(0.05, envelope(y) * (flat ? 0.5 : 0.4) * (0.6 + 0.4 * dens) * swell), y));
   }
   core.push(new THREE.Vector2(0.01, H * 0.97));
   const ornaments = (sp.ornaments || []).map((o) => ({ ...o, list: o.type === 'berry' ? shoots.filter((_, i) => i % 23 === 0).map((s) => ({ pos: s.pos, dir: V(0, -1, 0), rand: s.rand, outer: 1 })) : cones }));

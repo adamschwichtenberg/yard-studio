@@ -87,7 +87,8 @@ const OUTLINES = {
     // Body of the blade, with the rounded basal lobes of a heart blended in.
     const body = 0.5 * Math.pow(Math.max(0, Math.sin(Math.PI * Math.min(1, (u - 0.02) * 1.02))), 0.55) * (1 - 0.38 * u);
     const heart = Math.max(body, 0.36 * Math.exp(-(((u - 0.1) / 0.16) ** 2)));
-    return heart * (side > 0 ? 1.04 : 0.96);
+    // Basal lobes round in to meet the stalk rather than ending square.
+    return heart * Math.sqrt(Math.min(1, (u + 0.004) / 0.07)) * (side > 0 ? 1.04 : 0.96);
   }, 100, teeth(s.margin, 34, 0.014)),
   deltoid: (s) => sides((u) => 0.5 * Math.pow(1 - u, 1.05) * Math.min(1, u * 6 + 0.25) ** 0.5, 90, teeth(s.margin, 22, 0.018)),
   oval: (s) => sides((u) => 0.46 * Math.pow(Math.sin(Math.PI * u), 0.62), 90, teeth(s.margin, 22, 0.02)),
@@ -488,11 +489,47 @@ function paintLarch(g, W, H, rand) {
     }
   }
 }
+function paintJuniper(g, W, H, rand) {
+  // Juniper: no flat fans (that's arborvitae) and no needles on a twig
+  // (spruce) but fine, braided cords of tiny scale leaves that fork again
+  // and again into a soft, feathery spray, tips reaching up.
+  const bead = (x, y, r, L) => {
+    g.fillStyle = `hsl(${140 + rand() * 25}, ${22 + rand() * 18}%, ${L}%)`;
+    g.beginPath();
+    g.ellipse(x, y, r, r * 1.6, 0, 0, Math.PI * 2);
+    g.fill();
+  };
+  const cord = (x, y, ang, len, depth, pass) => {
+    const n = Math.max(3, Math.round(len / (W * 0.02)));
+    const r0 = W * (0.009 + depth * 0.003) * (pass ? 1 : 1.6);
+    let px = x;
+    let py = y;
+    for (let i = 0; i < n; i++) {
+      const a = ang + (rand() - 0.5) * 0.25;
+      px += Math.sin(a) * (len / n);
+      py -= Math.cos(a) * (len / n);
+      bead(px, py, r0 * (1 - (i / n) * 0.45), pass ? 22 + rand() * 22 + (depth === 0 ? 6 : 0) : 10 + rand() * 6);
+      // Side cords fork off every few scales.
+      if (depth > 0 && i > 1 && i < n - 2 && i % 4 === 2) {
+        const side = (i % 8 === 2 ? 1 : -1) * (0.38 + rand() * 0.24);
+        cord(px, py, a + side, len * (0.38 + rand() * 0.14), depth - 1, pass);
+      }
+    }
+  };
+  for (let pass = 0; pass < 2; pass++) {
+    // Same seed both passes, so the light cords sit exactly on their dark underlay.
+    const s0 = rand;
+    let seed = 7;
+    rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let k = 0; k < 2; k++) cord(W / 2 + (k - 0.5) * W * 0.08, H, (k - 0.5) * 0.26, H * (0.86 + 0.08 * k), 2, pass);
+    rand = s0;
+  }
+}
 export function shootCard(kind, high = false) {
   const ck = 'shoot:' + kind + (high ? '@hi' : '');
   if (cache.has(ck)) return cache.get(ck);
   let out;
-  if (kind === 'arborvitae' || kind === 'juniper') out = leafTexture(kind, high);
+  if (kind === 'arborvitae') out = leafTexture(kind, high);
   else {
     const H = high ? 512 : 256;
     const W = H;
@@ -504,6 +541,7 @@ export function shootCard(kind, high = false) {
     if (kind === 'pine' || kind === 'redpine' || kind === 'scotchpine') paintTuft(g, W, H, rand);
     else if (kind === 'whitepine') paintTuft(g, W, H, rand, true);
     else if (kind === 'tamarack') paintLarch(g, W, H, rand);
+    else if (kind === 'juniper') paintJuniper(g, W, H, rand);
     else paintBottlebrush(g, W, H, rand);
     const map = new THREE.CanvasTexture(c);
     map.colorSpace = THREE.SRGBColorSpace;

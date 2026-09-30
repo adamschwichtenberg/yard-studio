@@ -166,13 +166,19 @@ export const SPECIES = {
   swampoak: { leaf: 'swampoak', bark: 'oak', leader: false, angle: 58, tropism: 0.05, arrange: 'alternate', perShoot: 6, twiggy: 0.6, scaffolds: 5, gnarl: 0.2,
     ornaments: [{ type: 'acorn', from: 100, to: 160, color: [0x7a7a3a, 0x7a5430], size: 0.9 }] },
   willow: { leaf: 'willow', bark: 'willow', leader: false, angle: 42, tropism: 0.25, arrange: 'alternate', perShoot: 10, twiggy: 0.4, scaffolds: 5, weeping: true },
+  // Prairifire: leaves open maroon and settle to a dark red-bronzed green by June (`shift`, with the preset's leaf2).
   crabapple: { leaf: 'crabapple', bark: 'crabapple', leader: false, angle: 40, tropism: 0.25, arrange: 'alternate', perShoot: 5, twiggy: 0.8, spurs: true,
-    ornaments: [{ type: 'blossom', from: 0, to: 16, bloom: true },
+    shift: { from: 8, to: 38 },
+    ornaments: [{ type: 'blossom', from: 0, to: 16, bloom: true, size: 1.8 },
                 { type: 'pome', from: 120, to: 300, color: [0x8a2a2a, 0x5a1a2a], winter: true }] },
   hydrangea: { leaf: 'hydrangea', bark: 'hydrangea', leader: false, angle: 45, tropism: 0.2, arrange: 'opposite', perShoot: 6, twiggy: 0.6, standard: true,
     ornaments: [{ type: 'panicle', from: 62, to: 150, bloom: true }] },
   locust: { leaf: 'locust', bark: 'locust', leader: false, angle: 55, tropism: 0.05, arrange: 'alternate', perShoot: 6, twiggy: 0.5, scaffolds: 4,
     ornaments: [{ type: 'pod', from: 110, to: 330, color: [0x7a5a2a, 0x4a2a1a], winter: true }] },
+  // Apple: the crabapple's habit and leaves, with big fruit ripening in September instead of small persistent crabs.
+  apple: { leaf: 'crabapple', bark: 'crabapple', leader: false, angle: 45, tropism: 0.2, arrange: 'alternate', perShoot: 5, twiggy: 0.75, spurs: true,
+    ornaments: [{ type: 'blossom', from: 2, to: 16, bloom: true, size: 1.8 },
+                { type: 'pome', from: 70, to: 140, color: [0xa81c1c, 0xc8582a], size: 2.6 }] },
   broadleaf: { leaf: 'linden', bark: 'maple', leader: false, angle: 45, tropism: 0.2, arrange: 'alternate', perShoot: 5, twiggy: 0.7 },
 
   sugarmaple: { leaf: 'sugar', bark: 'maple', leader: false, angle: 34, tropism: 0.35, arrange: 'opposite', perShoot: 6, twiggy: 0.8, scaffolds: 5 },
@@ -203,7 +209,7 @@ export const SPECIES = {
     ornaments: [{ type: 'blossom', from: -5, to: 8, bloom: true, size: 1.4 }, { type: 'drupe', from: 40, to: 62, color: [0x5a2a4a, 0x2a1a3a] }] },
   // Canada Red: leaves open green and turn purple over early summer (`shift`).
   chokecherry: { leaf: 'chokecherry', bark: 'cherry', leader: false, angle: 35, tropism: 0.3, arrange: 'alternate', perShoot: 5, twiggy: 0.7, stems: 2,
-    shift: { from: 12, to: 45 },
+    shift: { from: 14, to: 40 },
     ornaments: [{ type: 'blossom', from: 4, to: 16, bloom: true, size: 1.3 }, { type: 'drupe', from: 85, to: 120, color: [0x3a0a1a, 0x1a0a14] }] },
   plum: { leaf: 'plum', bark: 'cherry', leader: false, angle: 40, tropism: 0.25, arrange: 'alternate', perShoot: 5, twiggy: 0.8,
     ornaments: [{ type: 'blossom', from: -6, to: 8, bloom: true, size: 1.4 }, { type: 'drupe', from: 90, to: 130, color: [0xa02a2a, 0x6a1a2a], size: 2 }] },
@@ -238,7 +244,7 @@ export const SPECIES = {
   pine: { conifer: true, shoot: 'pine', bark: 'pine', whorl: 0.9, droop: 0.4, candles: true, ornaments: [{ type: 'cone', color: [0x6a5238, 0x7a6048], size: 1.5 }] },
   redpine: { conifer: true, shoot: 'redpine', bark: 'pine', whorl: 1.2, droop: 0.3, ornaments: [{ type: 'cone', color: [0x6a5238, 0x7a6048], size: 2 }] },
   arborvitae: { conifer: true, shoot: 'arborvitae', bark: 'cedar', whorl: 0.55, droop: 0.6 },
-  juniper: { conifer: true, shoot: 'juniper', bark: 'cedar', whorl: 0.5, droop: 0.7, ornaments: [{ type: 'berry', color: [0x6a7a9a, 0x5a6a8a], size: 0.3 }] },
+  juniper: { conifer: true, shoot: 'juniper', bark: 'cedar', whorl: 0.5, droop: 0.7, shootBoost: 1.8, shootMax: 2.2, ornaments: [{ type: 'berry', color: [0x6a7a9a, 0x5a6a8a], size: 0.3 }] },
   // Weeping white spruce: short limbs that turn straight down and hang against the trunk.
   weepingspruce: { conifer: true, shoot: 'spruce', bark: 'spruce', whorl: 0.75, weep: true, pendulous: 1, ornaments: [{ type: 'cone', color: [0x6a4a30, 0x7a5a3a], size: 2 }] },
   fir: { conifer: true, shoot: 'fir', bark: 'fir', whorl: 1.0, ascend: 0.08, ornaments: [{ type: 'cone', color: [0x5a4a6a, 0x6a5a3a], size: 3 }] },
@@ -276,7 +282,8 @@ const CONIFER_BY_NAME = [
 ];
 const BROADLEAF_BY_NAME = [
   [/hydrangea/, 'hydrangea'],
-  [/crab|malus|prairifire/, 'crabapple'],
+  [/crab|prairifire/, 'crabapple'],
+  [/apple|honeycrisp|domestica/, 'apple'],
   [/willow/, 'willow'],
   [/japanese maple|palmatum|bloodgood/, 'jmaple'],
   [/sugar maple|saccharum\b|fall fiesta|unity/, 'sugarmaple'],

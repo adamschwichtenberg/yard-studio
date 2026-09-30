@@ -252,7 +252,11 @@ function flowerMaterial(map, luma, colors) {
         float l = min(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)) * uLumaNorm, 1.5);
         float ph = clamp(uPhase + (vRand - 0.5) * 0.25, 0.0, 1.0);
         vec3 hue = ph < 0.5 ? mix(uC0, uC1, ph * 2.0) : mix(uC1, uC2, ph * 2.0 - 1.0);
-        diffuseColor.rgb = hue * l;`);
+        diffuseColor.rgb = hue * l;`)
+      // Thin petals pass light: a little glow keeps blossoms reading as
+      // white or pink inside a shaded crown instead of going grey.
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        totalEmissiveRadiance += diffuseColor.rgb * 0.22;`);
   };
   return mat;
 }
@@ -321,7 +325,8 @@ export class TreeLibrary {
   }
 
   #target(sp, shell, dens) {
-    if (sp.conifer) return Math.round(THREE.MathUtils.clamp(shell * (this.high ? 5 : 2.6) * (0.55 + 0.5 * dens), 500, this.high ? 26000 : 13000));
+    // Enough shoots that each card stays near life size (a big card reads as a feather up close).
+    if (sp.conifer) return Math.round(THREE.MathUtils.clamp(shell * (this.high ? 8 : 5) * (0.55 + 0.5 * dens), 800, this.high ? 40000 : 24000));
     // Base leaves on the shoots; the coverage pass adds what it takes to close the crown.
     return Math.round(THREE.MathUtils.clamp(shell * (this.high ? 18 : 9) * (0.5 + 0.6 * dens), 1500, this.high ? 70000 : 32000));
   }
@@ -347,7 +352,9 @@ export class TreeLibrary {
       const shoot = SHOOT[sp.shoot];
       const area = shoot.length * shoot.length * 0.55;
       p.shoot = shoot;
-      p.shootScale = THREE.MathUtils.clamp(Math.sqrt((shell * 3.6) / (target * area)), 1.3, 3.4);
+      // Junipers: more, smaller sprays so their fine texture reads.
+      if (sp.shootBoost) p.target = target * sp.shootBoost;
+      p.shootScale = THREE.MathUtils.clamp(Math.sqrt((shell * 3.6) / (p.target * area)), 1.3, sp.shootMax ?? 3.4);
       g = { conifer: true, ...growConifer(p) };
     } else {
       p.leaf = LEAF[sp.leaf];
