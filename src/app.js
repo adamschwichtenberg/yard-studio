@@ -3228,12 +3228,12 @@ $("photodone").addEventListener("click", exitPhoto);
 $("photosave").addEventListener("click", ()=>{
   if(!photo?.active) return;
   photo.render();
+  /* read the frame back in the same task it was drawn, then offer it */
   const url = canvas.toDataURL("image/png");
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = (S.title || "yard").replace(/[^\w-]+/g, "-").toLowerCase() + "-" + S.date + ".png";
-  a.click();
-  toast("Image saved");
+  const bin = atob(url.split(",")[1]), bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  const name = (S.title || "yard").replace(/[^\w-]+/g, "-").toLowerCase() + "-" + S.date + ".png";
+  offerFile(name, new Blob([bytes], {type:"image/png"})).then(r=>{ if(r === "saved") toast("Image saved"); });
 });
 $("simpleview").addEventListener("change", e=>setSimple(e.target.checked));
 
@@ -3756,16 +3756,43 @@ function askUser(title, msg, buttons){
 $("modal").addEventListener("pointerdown", e=>{ if(e.target.id === "modal") $("modal").classList.remove("on"); });
 
 /* ============================================================ plan file ---- */
-function savePlan(){
-  const blob = new Blob([JSON.stringify(S,null,2)], {type:"application/json"});
+/* Hand the viewer a file. Inside the claude.ai viewer, pages can't start
+   downloads themselves: the `downloads` capability asks the viewer to
+   confirm instead. Anywhere else (a local copy, the dev server) a plain
+   download link does the job. Resolves "saved", "declined" or "failed". */
+let downloadsNs = null;
+function downloadsCapability(){
+  downloadsNs ??= (window.claude?.use ? window.claude.use("downloads").catch(()=>null) : Promise.resolve(null));
+  return downloadsNs;
+}
+async function offerFile(filename, data){
+  const dl = await downloadsCapability();
+  if(dl){
+    try{ await dl.save({filename, data}); return "saved"; }
+    catch(err){
+      if(err?.code === "declined") return "declined";
+      if(err?.code === "rate_limited"){ toast("A save is already waiting for your answer"); return "failed"; }
+      if(!["unavailable","not_granted","capability_disabled","capability_removed"].includes(err?.code)){
+        toast("The file couldn't be saved here"); return "failed";
+      }
+    }
+  }
+  const blob = data instanceof Blob ? data : new Blob([data]);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "yard-plan.json";
+  a.download = filename;
   a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+  return "saved";
+}
+downloadsCapability();
+async function savePlan(){
+  const res = await offerFile("yard-plan.json", JSON.stringify(S,null,2));
+  if(res !== "saved") return false;
   savedMark = JSON.stringify(S);
   markSaved(true);
   toast("Plan saved");
+  return true;
 }
 /* Rebuild everything from a plain object. Shared by Open, Start over and Undo. */
 function loadState(data, frame){
@@ -3903,7 +3930,7 @@ $("resetbtn").addEventListener("click", ()=>{
       ? "This wipes the current plan and drops you back on the starting yard. Anything you have not saved to a file will be lost — Undo can bring it back, but only while this tab stays open."
       : "This wipes the current plan and drops you back on the starting yard.",
     [ {label:"Cancel"},
-      {label:"Save a copy first", run:()=>{ savePlan(); setTimeout(doReset, 350); }},
+      {label:"Save a copy first", run:async ()=>{ if(await savePlan()) doReset(); }},
       {label:"Start over", kind:"danger", run:doReset} ]);
 });
 function syncInputs(){
