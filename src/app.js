@@ -3,7 +3,8 @@ import "./importer.js";
 import { SkyEnvironment } from "./scene/environment.js";
 import { lawnTextures, sidingTextures, shingleTextures, concreteTile, paverTextures } from "./scene/textures.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { TreeLibrary, leafKindFor } from "./trees/trees.js";
+import { TreeLibrary, SUN } from "./botany/library.js";
+import { speciesFor } from "./botany/species.js";
 import { createPost } from "./post.js";
 
 const DEG = Math.PI/180;
@@ -472,6 +473,21 @@ function bloomState(kind){
   const amount = clamp(Math.min(phase/.2, (1-phase)/.1), 0, 1);
   return {amount: .15 + .85*amount, phase};
 }
+/* The season as the trees see it: leaves expand over the fortnight after
+   leaf-out, colour over the three weeks before leaf drop, and fall over its
+   last ten days; `day` counts days since leaf-out (negative before it) so
+   flowers, fruit, catkins and cones can keep their own calendars. */
+function seasonNow(){
+  const day = mdDay(seasonMD()) - mdDay(S.leafOut);
+  if(!S.leafSeason) return {grow:1, fall:0, drop:0, day:60};
+  const toDrop = mdDay(S.leafDrop) - mdDay(seasonMD());
+  return {
+    grow: leafOn() ? clamp(day/16, 0, 1) : 1,
+    fall: fallAmount(),
+    drop: leafOn() ? clamp((10 - toDrop)/10, 0, 1)*.92 : 0,
+    day
+  };
+}
 function bearingVec(az){
   const a = (az - S.north)*DEG;
   return {x:Math.sin(a), y:-Math.cos(a)};
@@ -863,7 +879,7 @@ function buildTree(t){
   if(S.simple){ buildTreeSimple(grp, t, {cb, top, R, fn}); return grp; }
 
   const sh = SHAPES[t.shape] || SHAPES.round;
-  grp.add(trees.build(t, {bare, fall:fallAmount(), bloom:bloomState, crownBase:crownBaseFt(t)/Math.max(1, t.height), profile:sh.r}));
+  grp.add(trees.build(t, {bare, season:seasonNow(), crownBase:crownBaseFt(t)/Math.max(1, t.height), profile:sh.r}));
 
   const r0 = Math.max(.5, trunkR*2.1);
   const ring = new THREE.Mesh(new THREE.RingGeometry(r0, r0+.3, 28),
@@ -1586,6 +1602,7 @@ function updateSun(){
   sunLight.target.position.set(cx, 0, cz);
   sunLight.target.updateMatrixWorld();
   sunLight.visible = sp.el > 0;
+  SUN.uSunDir.value.copy(dir);
   const R = span*.8, sc = sunLight.shadow.camera;
   sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R;
   sc.near = span*.4; sc.far = span*3.4;
@@ -2627,7 +2644,7 @@ function shortSide(n){ n = String(n); return n.length > 7 ? n.slice(0,6)+"…" :
 function presetFor(o){ return o && o.type === "tree" ? PRESETS.find(p=>p.n === o.name) : null; }
 function shadeClass(d){ return d < .65 ? "Dappled" : d < .88 ? "Moderate" : "Dense"; }
 function bloomLabel(o){
-  const k = o.type === "tree" && !o.evergreen ? leafKindFor(o) : null;
+  const k = o.type === "tree" && !o.evergreen ? speciesFor(o) : null;
   return k === "crabapple" ? "Blooms in spring" : k === "hydrangea" ? "Blooms midsummer to fall" : "";
 }
 function footHTML(o){
@@ -3448,7 +3465,7 @@ function afterDateChange(){
   buildArc();
   const leaf = leafOn();
   if(leaf !== lastLeaf){ lastLeaf = leaf; rebuildAll(); }
-  else trees.setFall(objGroup, fallAmount(), bloomState);
+  else trees.setSeason(objGroup, seasonNow());
   scheduleCompute();
   syncLocationUI();
   markDirty();
