@@ -332,19 +332,24 @@ function freshState(){
     place:"Fargo, ND", tzMode:"zone", tzZone:"America/Chicago",
     date: isoToday(), minutes: 13*60,
     north:0, grid:5, snap:true, showGrid:true, simple:false, gridFrame:null,
-    yard:{w:110, h:90},
-    boundary: rectPoly(110, 90),
+    yard:{w:160, h:130},
+    boundary: rectPoly(160, 130),
     boundaryLabels:[], boundaryImage:null, boundaryImageDraft:null,
     fence:{on:true, style:"picket", height:5, density:.5, sides:[true,true,true,true]},
     heat:false, leafSeason:true, fullSun:6,
     leafOut:"05-05", leafDrop:"10-12",
     objects:[
-      {id:nid(), type:"structure", name:"House", x:0, y:-28, rot:0, height:22, poly:rectPoly(44,26)},
-      {id:nid(), type:"deck", name:"Patio", x:0, y:-8, rot:0, height:0.5, surface:"concrete", poly:rectPoly(24,12)},
-      fromPreset("Sienna Glen Maple", -32, 8),
-      fromPreset("Black Hills spruce", 34, -2),
-      {id:nid(), type:"bed", name:"Vegetable bed", x:2, y:20, w:16, h:8, rot:0},
-      {id:nid(), type:"bed", name:"Perennial bed", x:-26, y:30, w:20, h:6, rot:0}
+      {id:nid(), type:"structure", name:"House", x:0, y:-46, rot:0, height:22, poly:rectPoly(44,26)},
+      {id:nid(), type:"deck", name:"Patio", x:0, y:-26, rot:0, height:0.5, surface:"concrete", poly:rectPoly(24,12)},
+      fromPreset("Sienna Glen Maple", -48, 12),
+      fromPreset("Black Hills spruce", 60, -26),
+      fromPreset("Redmond Linden", -52, -38),
+      fromPreset("Colorado Blue Spruce", -64, 50),
+      fromPreset("Parkland Pillar Birch", 30, -46),
+      fromPreset("Northern Red Oak", 46, 36),
+      fromPreset("Prairifire Crabapple", 18, 6),
+      {id:nid(), type:"bed", name:"Vegetable bed", x:-2, y:30, w:16, h:8, rot:0},
+      {id:nid(), type:"bed", name:"Perennial bed", x:-28, y:54, w:20, h:6, rot:0}
     ],
     sel:null
   };

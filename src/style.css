@@ -276,7 +276,7 @@ body.inspoff #layers{max-width:calc(100vw - var(--leftX) - var(--sunW) - 40px)}
 .tagp.sky{background:rgba(143,184,202,.14);color:var(--sky)}
 .tagp.pink{background:rgba(216,120,150,.16);color:#E8A6BC}
 .tagp.warn{background:rgba(214,120,90,.16);color:#E8A48A}
-#inspbody{overflow-y:auto;flex:1;overscroll-behavior:contain;position:relative}
+#inspbody{overflow-y:auto;flex:1;overscroll-behavior:contain;position:relative;scroll-padding-bottom:84px}
 #props{padding:0 20px}
 #props>.field:first-child{margin-top:14px}
 .isec{padding:14px 20px;margin:0 -20px;border-bottom:1px solid var(--line-2)}

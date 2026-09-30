@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Yard Shade Studio</title>
 <script>
-  /* Opened straight from disk (e.g. a downloaded ZIP)? The source page needs a
-     dev server, so hand over to the self-contained build next to it. */
-  if (location.protocol === "file:" && !/yard-shade-studio\.html$/.test(location.pathname))
-    location.replace("yard-shade-studio.html");
+  /* Opened straight from disk (e.g. a downloaded ZIP) or served as plain files
+     by GitHub Pages? This source page needs the Vite dev server, so hand over
+     to the self-contained build next to it. */
+  if ((location.protocol === "file:" || /\.github\.io$/.test(location.hostname))
+      && !/yard-shade-studio\.html$/.test(location.pathname))
+    location.replace("yard-shade-studio.html" + location.search + location.hash);
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
