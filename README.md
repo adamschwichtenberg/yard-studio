@@ -1,6 +1,29 @@
 # Yard Shade Studio
 
-Plan a yard and see where the shade falls, at any time of day, on any date, anywhere on Earth. This is the original Yard Shade Studio planner with a realistic three.js renderer underneath it.
+Plan a yard and see where the shade falls, at any time of day, on any date, anywhere on Earth.
+
+## v2: the living diorama (this branch)
+
+Inspired by three pieces of web work: Lusion's *Of the Oak* (a procedurally grown oak as a living system), Shader's *eHealth Arena* (a scene presented as a diorama on a studio plinth), and Gavin Shapiro's *Firewood* (scanned materials, soft light). v1 is kept unchanged on the `claude/yard-shade-simulator-threejs-q8uehi` branch.
+
+- **Botanical trees.** Every tree is grown, not modelled:
+  - **Broadleaves** grow by space colonization (branches reach toward light points filling the species' crown), then fan into fine twigs, and taper by the pipe model.
+  - **Conifers** grow a whorl of branches a year with branchlets. Norway spruce's hang in curtains.
+  - **Leaves** are individual instances in the species' true shape and arrangement: opposite pairs on maples, alternate on lindens, a fiddle outline on bur oak, pinnae on honeylocust. They're lit from both sides, with pale undersides and sun glowing through.
+  - **Research.** Species data comes from arboretum and extension fact sheets; see [docs/botany.md](docs/botany.md).
+- **Seasons in the trees.** Everything is timed from the leaf-out and leaf-drop dates:
+  - Leaves expand over the fortnight after leaf-out.
+  - Fall colour starts on the outer leaves; then leaves drop a few at a time, and litter builds under the tree and is gone three weeks later.
+  - Crabapples blossom for two weeks at leaf-out. Hydrangea panicles go lime, then white, then pink.
+  - Lindens carry their June bracts; acorns, pods, crabapple fruit and alder cones hang into winter; spruces carry their cones.
+- **Diorama stage** (Display → Stage).
+  - **Diorama:** the lot is cut from the earth, its edge showing turf over a scanned soil profile, on a plinth in a studio. The sky still lights it. Tilt-shift grows as you pull back.
+  - **Landscape:** keeps the open-country view.
+- **Sun path.** Today's sun path arcs over the yard with hour beads and the sun riding it.
+- **Scanned materials.** CC0 bark, soil, mulch, lawn detail and leaf litter from Poly Haven. Birch bark is painted.
+- **Light.** AgX filmic tone mapping, HDR bloom for the sun, softer ambient occlusion.
+- **Photo mode** (camera button or **P**). A path-traced still of the current view (three-gpu-pathtracer). It refines while you wait; **Save image** downloads a PNG.
+
 
 ![The planner with the tree inspector open](docs/screenshot.png)
 

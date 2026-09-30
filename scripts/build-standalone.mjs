@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = join(root, 'node_modules', '.standalone');
 
-await build({ root, base: './', logLevel: 'warn', build: { outDir: out, emptyOutDir: true, copyPublicDir: false, chunkSizeWarningLimit: 20000 } });
+await build({ root, base: './', logLevel: 'warn', build: { outDir: out, emptyOutDir: true, copyPublicDir: false, chunkSizeWarningLimit: 20000, assetsInlineLimit: 100_000_000 } });
 
 const assets = readdirSync(join(out, 'assets'));
 const css = assets.filter((f) => f.endsWith('.css')).map((f) => readFileSync(join(out, 'assets', f), 'utf8')).join('\n');
