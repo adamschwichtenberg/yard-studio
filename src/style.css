@@ -409,6 +409,20 @@ body.inspoff #layers{max-width:calc(100vw - var(--leftX) - var(--sunW) - 40px)}
 .qseg{display:flex}
 .qseg button{flex:1}
 
+/* ---------- photo mode ---------- */
+#photohud{left:50%;bottom:var(--gut);transform:translateX(-50%);width:min(720px,calc(100vw - 24px));padding:10px 10px 10px 18px;display:grid;
+  grid-template-columns:1fr auto;grid-template-rows:auto auto;align-items:center;gap:6px 14px;z-index:12}
+#photohud .t{display:flex;align-items:baseline;gap:12px;min-width:0}
+#photohud .t i{display:none}
+#photohud b{font-family:var(--serif);font-weight:400;font-size:20px;line-height:1.1;white-space:nowrap}
+#photohud .bar{grid-column:1;grid-row:2;height:2px;background:var(--line-3);border-radius:2px;overflow:hidden}
+#photohud .bar i{display:block;height:100%;width:0;background:var(--brass);transition:width .3s}
+#photohud .btns{grid-column:2;grid-row:1/3;display:flex;gap:8px}
+@media (min-width:900px){ #photohud .t i{display:inline;font-style:normal;font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} }
+body.photo #dock,body.photo #top,body.photo #sunpanel,body.photo #layers,body.photo #inspector,body.photo #legend,
+body.photo #projhead,body.photo #labels,body.photo #shapeEdit,body.photo #compass,body.photo #toast,body.photo #addmenu{display:none !important}
+body.photo #gl{pointer-events:none}
+
 /* ---------- species library ---------- */
 #library{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(6,9,8,.62);
   -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);padding:24px}

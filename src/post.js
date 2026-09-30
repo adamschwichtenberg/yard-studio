@@ -52,6 +52,8 @@ export function createPost(renderer, scene, camera) {
   composer.addPass(smaaPass);
 
   let current = camera;
+  let stageTilt = true;
+  let tiltAmount = 1;
   const passes = [renderPass, bloomPass, tiltPass, tonePass, smaaPass];
   return {
     composer,
@@ -77,8 +79,16 @@ export function createPost(renderer, scene, camera) {
     },
     /** Diorama look: tilt-shift and a stronger vignette. */
     setStage(diorama, planView) {
-      tiltPass.enabled = !!diorama && !planView;
+      stageTilt = !!diorama && !planView;
+      tiltPass.enabled = stageTilt && tiltAmount > 0.04;
       vignette.darkness = diorama ? 0.5 : 0.28;
+    },
+    /** 0 = everything sharp (close up), 1 = full miniature blur (pulled back). */
+    setTilt(k) {
+      tiltAmount = k;
+      tilt.focusArea = 0.62 + (1 - k) * 0.5;
+      tilt.feather = 0.28 + (1 - k) * 0.15;
+      tiltPass.enabled = stageTilt && k > 0.04;
     },
     setBloom(on) {
       bloomPass.enabled = !!on;

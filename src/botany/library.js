@@ -4,6 +4,7 @@ import { SPECIES, LEAF, SHOOT, BARK, speciesFor } from './species.js';
 import { growBroadleaf, growConifer } from './grow.js';
 import { leafCard, shootCard, flowerCard, bractCard } from './leafArt.js';
 import { barkMaps } from './barkMaps.js';
+import { mulchRing, leafLitter } from '../scene/ground.js';
 
 /*
  * Botanical trees for the planner. Each tree is grown from its species
@@ -438,6 +439,14 @@ export class TreeLibrary {
     }
     this.setSeason(grp, season);
 
+    // Ground under the tree: a hardwood mulch ring, and leaf litter in fall.
+    grp.add(mulchRing(THREE.MathUtils.clamp(t.spread * 0.09 + 1.4, 2.2, 4.6)));
+    if (!t.evergreen) {
+      const litter = leafLitter(Math.max(2.5, t.spread * 0.58), fallColor);
+      grp.add(litter);
+      writeLitter(litter, season);
+    }
+
     // Cheap invisible pick target covering trunk and crown.
     const proxy = new THREE.Mesh(
       new THREE.CylinderGeometry(t.spread * 0.42, t.spread * 0.3, t.height * 0.96, 10),
@@ -487,12 +496,23 @@ export class TreeLibrary {
         writeLeaves(o, season);
       }
       if (o.userData.orn) writeOrnament(o, season);
+      if (o.userData.litter) writeLitter(o, season);
     });
   }
   /** v1 compatibility. */
   setFall(root, fall) {
     this.setSeason(root, { fall, grow: 1 });
   }
+}
+
+/* Litter builds as leaves drop, lies for about three weeks, then is raked or blown away. */
+function writeLitter(mesh, season) {
+  const since = season.sinceDrop ?? -99;
+  let a = 0;
+  if (since < 0) a = season.drop ? Math.min(1, season.drop * 1.1) : 0;
+  else a = since < 22 ? 1 : Math.max(0, 1 - (since - 22) / 20);
+  mesh.material.opacity = 0.92 * a;
+  mesh.visible = a > 0.01;
 }
 
 function barkKey(t, key) {

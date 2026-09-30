@@ -52,6 +52,7 @@
   <symbol id="i-check" viewBox="0 0 16 16"><path d="M3.2 8.3l3 3 6.6-6.6"/></symbol>
   <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.8"/><path d="M10.6 10.6L14 14"/></symbol>
   <symbol id="i-cal" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="11" rx="1.6"/><path d="M2 6.5h12M5.2 1.6v3M10.8 1.6v3"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 16 16"><path d="M2 5.2h2.6l1.2-1.8h4.4l1.2 1.8H14v7.6H2z"/><circle cx="8" cy="8.8" r="2.4"/></symbol>
   <symbol id="i-leaf" viewBox="0 0 16 16"><path d="M8 14.5v-4"/><path d="M8 1.8c3 0 5 2.3 5 5.2S10.8 12.3 8 12.3 3 9.9 3 7s2-5.2 5-5.2z"/></symbol>
 </defs></svg>
 
@@ -134,6 +135,7 @@
     <button id="vfit" title="Frame the whole lot (0)"><svg class="ic"><use href="#i-fit"/></svg></button>
     <button id="vfocus" title="Centre on the selection (F)"><svg class="ic"><use href="#i-focus"/></svg></button>
     <button id="vsimple" title="Simple schematic view (G)"><svg class="ic"><use href="#i-grid"/></svg></button>
+    <button id="vphoto" title="Photo: a path-traced still of this view (P)"><svg class="ic"><use href="#i-camera"/></svg></button>
   </div>
   <div class="div"></div>
   <button class="ibtn" id="undoBtn" title="Undo (Ctrl+Z)" disabled><svg class="ic"><use href="#i-undo"/></svg></button>
@@ -148,6 +150,13 @@
   <button data-tool="deck" role="menuitem"><svg class="ic"><use href="#i-deck"/></svg><span><b>Deck or patio</b><i>Raised decks cast shade</i></span></button>
   <button data-tool="driveway" role="menuitem"><svg class="ic"><use href="#i-driveway"/></svg><span><b>Driveway</b><i>Editable outline</i></span></button>
   <button data-tool="sidewalk" role="menuitem"><svg class="ic"><use href="#i-sidewalk"/></svg><span><b>Sidewalk</b><i>Editable outline</i></span></button>
+</div>
+
+<div id="photohud" class="panel" hidden>
+  <div class="t"><span class="eyebrow">Photo</span><b id="photostatus">Preparing the scene…</b>
+    <i id="photohint">Real light bounces · sharpens as you wait</i></div>
+  <div class="bar"><i id="photobar"></i></div>
+  <div class="btns"><button class="btn" id="photodone">Done</button><button class="btn solid" id="photosave" disabled>Save image</button></div>
 </div>
 
 <div id="layers" class="panel" role="group" aria-label="Map layers">

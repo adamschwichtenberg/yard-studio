@@ -8,6 +8,8 @@ import { speciesFor } from "./botany/species.js";
 import { createPost } from "./post.js";
 import { Diorama, studioBackdrop } from "./scene/diorama.js";
 import { SunPath } from "./scene/sunpath.js";
+import { lawnDetail } from "./scene/ground.js";
+import { PhotoMode } from "./photo.js";
 
 const DEG = Math.PI/180;
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
@@ -481,13 +483,14 @@ function bloomState(kind){
    flowers, fruit, catkins and cones can keep their own calendars. */
 function seasonNow(){
   const day = mdDay(seasonMD()) - mdDay(S.leafOut);
-  if(!S.leafSeason) return {grow:1, fall:0, drop:0, day:60};
+  if(!S.leafSeason) return {grow:1, fall:0, drop:0, day:60, sinceDrop:-99};
   const toDrop = mdDay(S.leafDrop) - mdDay(seasonMD());
   return {
     grow: leafOn() ? clamp(day/16, 0, 1) : 1,
     fall: fallAmount(),
     drop: leafOn() ? clamp((10 - toDrop)/10, 0, 1)*.92 : 0,
-    day
+    day,
+    sinceDrop: -toDrop
   };
 }
 function bearingVec(az){
@@ -883,13 +886,6 @@ function buildTree(t){
   const sh = SHAPES[t.shape] || SHAPES.round;
   grp.add(trees.build(t, {bare, season:seasonNow(), crownBase:crownBaseFt(t)/Math.max(1, t.height), profile:sh.r}));
 
-  const r0 = Math.max(.5, trunkR*2.1);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(r0, r0+.3, 28),
-    new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.7, depthWrite:false, side:THREE.DoubleSide}));
-  ring.rotation.x = -Math.PI/2; ring.position.y = OVER; ring.renderOrder = 3; grp.add(ring);
-  const ring2 = new THREE.Mesh(new THREE.RingGeometry(r0+.3, r0+.45, 28),
-    new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.45, depthWrite:false, side:THREE.DoubleSide}));
-  ring2.rotation.x = -Math.PI/2; ring2.position.y = OVER; ring2.renderOrder = 3; grp.add(ring2);
   return grp;
 }
 
@@ -1261,18 +1257,27 @@ function lawnMaterial(repeat, stripes){
     normalScale:new THREE.Vector2(.8,.8), roughness:.95, metalness:0});
   /* world-space colour drift hides the texture repeat; mowing stripes run
      along the grid's axis, 6 ft wide (coords in feet) */
+  const detail = lawnDetail();
   mat.onBeforeCompile = shader=>{
     shader.uniforms.uStripe = stripeUniform;
+    shader.uniforms.uDetail = {value: detail.map};
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec2 vGroundXZ;")
       .replace("#include <begin_vertex>", "#include <begin_vertex>\nvGroundXZ = (modelMatrix * vec4(position, 1.0)).xz;");
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", "#include <common>\nvarying vec2 vGroundXZ;\nuniform vec2 uStripe;")
+      .replace("#include <common>", "#include <common>\nvarying vec2 vGroundXZ;\nuniform vec2 uStripe;\nuniform sampler2D uDetail;")
       .replace("#include <map_fragment>", `#include <map_fragment>
         vec2 gp = vGroundXZ * .3048;
         float macro = sin(gp.x*.071 + sin(gp.y*.053)*2.) * sin(gp.y*.067 + sin(gp.x*.041)*2.);
         float micro = sin(gp.x*.37 + gp.y*.21) * sin(gp.y*.31 - gp.x*.17);
         diffuseColor.rgb *= .92 + .1*macro + .04*micro;
+        // Scanned turf (clover, thin spots, blade clumps) as detail over the base lawn.
+        vec3 det = texture2D(uDetail, vGroundXZ / 9.0).rgb;
+        vec3 det2 = texture2D(uDetail, vGroundXZ / 31.0 + .37).rgb;
+        float dl = dot(det, vec3(.2126, .7152, .0722)) / .2;
+        diffuseColor.rgb *= mix(1., clamp(.55 + .45*dl, .6, 1.35), .55);
+        float patchy = smoothstep(.15, .55, .5 + .5*sin(gp.x*.11 + det2.r*6.) * sin(gp.y*.09 - det2.g*5.));
+        diffuseColor.rgb = mix(diffuseColor.rgb, det2 * vec3(.95, 1.05, .8) * 1.1, .18 * patchy);
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(1.06,1.,.84), .5 + .5*macro);
         float along = dot(vGroundXZ, vec2(-uStripe.y, uStripe.x));
         float stripe = smoothstep(-.15, .15, sin(along * 3.14159 / 6.));
@@ -1703,6 +1708,9 @@ function applyCamera(){
   camera = activeView === "vplan" ? planCamera : perspectiveCamera;
   post?.setCamera(camera);
   post?.setStage(stageOn(), activeView === "vplan");
+  /* Miniature blur grows as you pull back from the model and fades up close. */
+  { const b = yardBounds(), span = Math.max(b.w, b.h);
+    post?.setTilt(THREE.MathUtils.smoothstep(orbit.dist, span*.9, span*2.4)); }
   if(activeView === "vplan"){
     orbit.el = 90; orbit.ty = 0;
     updateCameraProjection();
@@ -1823,6 +1831,7 @@ document.addEventListener("pointermove", e=>{ if(e.buttons) lastInput = performa
 canvas.addEventListener("wheel", ()=>{ lastInput = performance.now(); }, {passive:true});
 function loop(){
   requestAnimationFrame(loop);
+  if(photo?.active){ photoFrame(); return; }
   if(camAnim) camAnim();
   const now = performance.now();
   const moving = !!camAnim || playing || now - lastInput < 160;
@@ -3173,6 +3182,59 @@ function setSimple(v){
   toast(S.simple ? "Simple view — tree canopy outlines and grid; no tree trunks or branches" : "Realistic view");
 }
 $("vsimple").addEventListener("click", ()=>setSimple(!S.simple));
+
+/* ---------- photo mode: a path-traced still of the current view ---------- */
+let photo = null, photoBusy = false;
+async function enterPhoto(){
+  if(photoBusy || photo?.active) return;
+  if(activeView === "vplan"){ toast("Photo mode works from the 3D and eye-level views"); return; }
+  if(S.simple){ toast("Switch off the schematic view for a photo"); return; }
+  if(playing) $("playbtn").click();
+  camAnim = null;
+  photoBusy = true;
+  document.body.classList.add("photo");
+  $("photohud").hidden = false;
+  $("photosave").disabled = true;
+  $("photostatus").textContent = "Preparing the scene…";
+  $("photobar").style.width = "0%";
+  photo ??= new PhotoMode(renderer);
+  updateSun();
+  await new Promise(r=>setTimeout(r, 30));
+  try{
+    await photo.start(scene, camera, [helperGroup, sunPath.group], renderer.toneMappingExposure,
+      p=>{ $("photobar").style.width = Math.round(p*60)+"%"; });
+    $("photosave").disabled = false;
+  }catch(err){
+    console.error(err);
+    toast("This browser couldn't start the path tracer");
+    exitPhoto();
+  }
+  photoBusy = false;
+}
+function photoFrame(){
+  const n = photo.render();
+  const target = 256;
+  $("photobar").style.width = (60 + 40*Math.min(1, n/target)).toFixed(1)+"%";
+  $("photostatus").textContent = n < 4 ? "Tracing light…" : n < target ? `Refining · ${n} samples` : `Ready · ${n} samples`;
+}
+function exitPhoto(){
+  photo?.stop();
+  document.body.classList.remove("photo");
+  $("photohud").hidden = true;
+  markDirty();
+}
+$("vphoto").addEventListener("click", enterPhoto);
+$("photodone").addEventListener("click", exitPhoto);
+$("photosave").addEventListener("click", ()=>{
+  if(!photo?.active) return;
+  photo.render();
+  const url = canvas.toDataURL("image/png");
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = (S.title || "yard").replace(/[^\w-]+/g, "-").toLowerCase() + "-" + S.date + ".png";
+  a.click();
+  toast("Image saved");
+});
 $("simpleview").addEventListener("change", e=>setSimple(e.target.checked));
 
 /* ---------- layout: sidebar and sun timeline ---------- */
@@ -3640,7 +3702,9 @@ document.addEventListener("keydown", e=>{
   if(mod) return;
   if(/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
   if($("modal").classList.contains("on")) return;
+  if(document.body.classList.contains("photo")){ if(e.key === "Escape") exitPhoto(); return; }
   if(!$("library").hidden){ if(e.key === "Escape") closeLibrary(); return; }
+  if(e.key === "p" || e.key === "P"){ enterPhoto(); return; }
   if(e.key === "Escape"){
     if(!addMenu.hidden){ showAddMenu(false); return; }
     if(nodeEdit){ nodeEdit = false; activeNode = null; panelFor = null; drawPanel(); markDirty(); return; }
@@ -4086,7 +4150,7 @@ async function boot(){
 }
 window.applyImportedBoundary = applyImportedBoundary;   // hook for the property-image importer
 /* development-only hook for automated screenshots */
-if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, rebuildAll, fromPreset, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute };
+if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, get photo(){ return photo; }, rebuildAll, fromPreset, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute };
 initLocationUI();
 initPrefsUI();
 if(document.readyState === "complete") boot();
