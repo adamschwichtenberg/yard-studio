@@ -21,6 +21,7 @@ fact sheets:
 - Hackberry: [Go Botany](https://gobotany.nativeplanttrust.org/species/celtis/occidentalis/)
 - American elm: [Oregon State](https://landscapeplants.oregonstate.edu/plants/ulmus-americana)
 - Prairie Horizon alder: [NDSU Extension](https://www.ndsu.edu/agriculture/extension/publications/prairie-horizon-manchurian-alder)
+- Added species (sugar, red, silver and Japanese maples, boxelder, northern pin and red oaks, Siberian elm, Prairie Sentinel hackberry, Siouxland cottonwood, green ash, Kentucky coffeetree, Ohio and Autumn Splendor buckeyes, Japanese tree lilac, serviceberry, Canada Red chokecherry, Newport and Princess Kay plums, Toba and cockspur hawthorns, showy mountain ash, pagoda and flowering dogwoods, ironwood, blue beech, ginkgo, tamarack, Merrill magnolia, eastern redbud, sweetgum, tulip tree, black gum, concolor and balsam firs, eastern white and Scotch pines, weeping white spruce): leaf form, size, arrangement, habit, bloom and fruit timing, and hardiness from the Morton Arboretum tree profiles (mortonarb.org), University of Minnesota Extension and the UMN Landscape Arboretum (extension.umn.edu, arb.umn.edu), NDSU Extension (ndsu.edu/agriculture/extension), Missouri Botanical Garden Plant Finder (missouribotanicalgarden.org) and NC State Extension Gardener Plant Toolbox (plants.ces.ncsu.edu). Hardiness ranges are whole USDA zones as those sources list them.
 
 Growth method: A. Runions, B. Lane, P. Prusinkiewicz, *Modeling Trees with a
 Space Colonization Algorithm* (Eurographics Workshop on Natural Phenomena, 2007).

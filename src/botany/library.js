@@ -271,7 +271,8 @@ function windowPhase(d, from, to) {
 
 const DEFAULT_LEAF = 0x46702c;
 const DEFAULT_FALL = 0xb5782a;
-const DEFAULT_NEEDLE = { spruce: 0x2c4a2e, bluespruce: 0x7092a8, norway: 0x284a26, pine: 0x2e4d22, redpine: 0x2e4d22, arborvitae: 0x3f6a2e, juniper: 0x5f7a6c };
+const DEFAULT_NEEDLE = { spruce: 0x2c4a2e, bluespruce: 0x7092a8, norway: 0x284a26, pine: 0x2e4d22, redpine: 0x2e4d22, arborvitae: 0x3f6a2e, juniper: 0x5f7a6c,
+  weepingspruce: 0x3a5a4a, fir: 0x2a4a2e, whitepine: 0x3a6048, scotchpine: 0x4a6a5a, tamarack: 0x6a9a4a };
 const DEFAULT_BLOOM = { blossom: [0xb0305a, 0xe89ab4, 0xf2d6de], panicle: [0xc8dc8a, 0xf1f1e2, 0xd8a4a4] };
 
 export class TreeLibrary {
@@ -390,9 +391,11 @@ export class TreeLibrary {
     const leafColor = t.leaf ?? (sp.conifer ? DEFAULT_NEEDLE[key] : DEFAULT_LEAF);
     const fallColor = t.fall ?? (sp.conifer ? leafColor : DEFAULT_FALL);
 
-    if (sp.conifer) {
+    if (sp.conifer && sp.deciduous && bare) {
+      // A tamarack in winter: bare twigs only.
+    } else if (sp.conifer) {
       const tex = shootCard(key, this.high);
-      const mat = foliageMaterial({ map: tex.map, luma: tex.luma, leaf: leafColor, fall: leafColor, under: new THREE.Color(leafColor).multiplyScalar(1.15), translucency: 0.2, shoot: true });
+      const mat = foliageMaterial({ map: tex.map, luma: tex.luma, leaf: leafColor, fall: sp.deciduous ? fallColor : leafColor, under: new THREE.Color(leafColor).multiplyScalar(1.15), translucency: sp.deciduous ? 0.4 : 0.2, shoot: true });
       const mesh = instanced(crossGeometry(0.85), mat, g.shoots.length, (i, m, pos, q, s) => {
         const sh = g.shoots[i];
         const x = V().crossVectors(sh.axis, sh.face).normalize();
@@ -401,10 +404,33 @@ export class TreeLibrary {
         pos.copy(sh.pos).addScaledVector(sh.axis, -sh.s * 0.15);
         s.setScalar(sh.s);
       });
-      fillAttrs(mesh.geometry, g.shoots.map((s) => s.rand), g.shoots.map((s) => s.ao), g.shoots.map(() => 0));
-      mesh.userData.foliage = { kind: 'shoots', evergreen: true };
+      if (sp.deciduous) {
+        // Needles that colour and fall like leaves: hand the shoots to the leaf writer.
+        const n = g.shoots.length;
+        const lv = { count: n, pos: new Float32Array(n * 3), quat: new Float32Array(n * 4), scale: new Float32Array(n), rand: new Float32Array(n), ao: new Float32Array(n), order: new Float32Array(n) };
+        const m4 = new THREE.Matrix4();
+        const p3 = V(), s3 = V(), q4 = new THREE.Quaternion();
+        for (let i = 0; i < n; i++) {
+          mesh.getMatrixAt(i, m4);
+          m4.decompose(p3, q4, s3);
+          p3.toArray(lv.pos, i * 3);
+          q4.toArray(lv.quat, i * 4);
+          lv.scale[i] = s3.x;
+          lv.rand[i] = g.shoots[i].rand;
+          lv.ao[i] = g.shoots[i].ao;
+          lv.order[i] = THREE.MathUtils.clamp(0.6 * (1 - g.shoots[i].ao) + 0.4 * g.shoots[i].rand, 0, 1);
+        }
+        fillAttrs(mesh.geometry, lv.rand, lv.ao, lv.order);
+        mesh.userData.leafData = lv;
+        mesh.userData.foliage = { kind: 'leaves', evergreen: false };
+        writeLeaves(mesh, season);
+      } else {
+        fillAttrs(mesh.geometry, g.shoots.map((s) => s.rand), g.shoots.map((s) => s.ao), g.shoots.map(() => 0));
+        mesh.userData.foliage = { kind: 'shoots', evergreen: true };
+      }
       inner.add(mesh);
-      if (g.coreGeo) {
+      // Dense conifers get a dark inner mass; open pines and tamarack show daylight through.
+      if (g.coreGeo && !sp.deciduous && !sp.open) {
         const cm = new THREE.MeshStandardMaterial({ color: new THREE.Color(leafColor).multiplyScalar(0.3), roughness: 1 });
         const core = new THREE.Mesh(g.coreGeo, cm);
         core.castShadow = core.receiveShadow = true;
@@ -419,8 +445,11 @@ export class TreeLibrary {
       const lv = g.leaves;
       const mesh = new THREE.InstancedMesh(leafGeometry(tex.aspect), mat, lv.count);
       fillAttrs(mesh.geometry, lv.rand, lv.ao, lv.order);
-      mesh.userData.leafData = lv;
+      // Ginkgo turns together and drops within a day or two: squeeze the drop order.
+      mesh.userData.leafData = sp.syncDrop ? { ...lv, order: lv.order.map((o) => 0.86 + 0.06 * o) } : lv;
       mesh.userData.foliage = { kind: 'leaves', evergreen: !!t.evergreen };
+      // Canada Red chokecherry: leaves open green and turn purple by midsummer.
+      if (sp.shift && t.leaf2 != null) mesh.userData.foliage.shift = { ...sp.shift, c0: new THREE.Color(leafColor), c1: new THREE.Color(t.leaf2) };
       mesh.castShadow = mesh.receiveShadow = true;
       mesh.raycast = () => {};
       inner.add(mesh);
@@ -496,6 +525,10 @@ export class TreeLibrary {
       const f = o.userData.foliage;
       if (f && f.kind === 'leaves') {
         f.uniforms.uFall.value = f.evergreen ? 0 : season.fall || 0;
+        if (f.shift) {
+          const k = THREE.MathUtils.smoothstep(season.day ?? 60, f.shift.from, f.shift.to);
+          f.uniforms.uLeafColor.value.copy(f.shift.c0).lerp(f.shift.c1, k);
+        }
         writeLeaves(o, season);
       }
       if (o.userData.orn) writeOrnament(o, season);

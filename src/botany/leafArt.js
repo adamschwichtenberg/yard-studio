@@ -56,7 +56,8 @@ function palmate(spec) {
   const lobes = [];
   for (let k = 0; k < n; k++) {
     const t = n === 1 ? 0 : (k / (n - 1)) * 2 - 1;
-    lobes.push({ a: t * spread, r: 1 - 0.42 * Math.abs(t) ** 1.6, w: (spread * 2) / (n - 1) * 0.5 });
+    // Star leaves (sweetgum) have lobes of nearly equal length.
+    lobes.push({ a: t * spread, r: spec.even ? 1 - 0.1 * Math.abs(t) : 1 - 0.42 * Math.abs(t) ** 1.6, w: (spread * 2) / (n - 1) * 0.5 });
   }
   const inner = 1 - spec.depth;
   const pts = [];
@@ -83,7 +84,9 @@ function palmate(spec) {
 const OUTLINES = {
   palmate,
   cordate: (s) => sides((u, side) => {
-    const heart = u < 0.18 ? 0.36 + 0.14 * Math.sin((Math.PI / 2) * (u / 0.18)) : 0.5 * Math.pow(Math.sin(Math.PI * Math.min(1, (u - 0.02) * 1.02)), 0.55) * (1 - 0.38 * u);
+    // Body of the blade, with the rounded basal lobes of a heart blended in.
+    const body = 0.5 * Math.pow(Math.max(0, Math.sin(Math.PI * Math.min(1, (u - 0.02) * 1.02))), 0.55) * (1 - 0.38 * u);
+    const heart = Math.max(body, 0.36 * Math.exp(-(((u - 0.1) / 0.16) ** 2)));
     return heart * (side > 0 ? 1.04 : 0.96);
   }, 100, teeth(s.margin, 34, 0.014)),
   deltoid: (s) => sides((u) => 0.5 * Math.pow(1 - u, 1.05) * Math.min(1, u * 6 + 0.25) ** 0.5, 90, teeth(s.margin, 22, 0.018)),
@@ -100,8 +103,28 @@ const OUTLINES = {
   }, 140),
   lobed: (s) => sides((u) => {
     const body = 0.5 * Math.pow(Math.sin(Math.PI * u), 0.55) * Math.min(1, u * 5);
+    if (s.pointed) {
+      // Red-oak group: sharp, bristle-tipped lobes over rounded sinuses.
+      const x = (u * (s.lobes - 0.5)) % 1;
+      const tri = 1 - Math.abs(x * 2 - 1);
+      const bristle = 0.06 * Math.max(0, tri - 0.93) / 0.07;
+      return body * (1 - s.depth + s.depth * tri ** 1.7) + bristle * (u > 0.12 ? 1 : 0);
+    }
     const lob = 1 - s.depth + s.depth * Math.abs(Math.sin(u * Math.PI * (s.lobes - 0.5)));
     return body * lob;
+  }, 200),
+  // Ginkgo: a wedge widening from the stalk to a broad, wavy outer edge.
+  fan: () => sides((u) => {
+    if (u < 0.86) return 0.56 * Math.pow(u / 0.86, 1.25) * (1 + 0.02 * Math.sin(u * 30));
+    const t = (u - 0.86) / 0.14;
+    return 0.56 * Math.sqrt(Math.max(0, 1 - t * t)) * (1 + 0.03 * Math.sin(t * 9));
+  }, 120),
+  // Tulip tree: two broad lower lobes, a waist, two short upper lobes, a square tip.
+  tulip: () => sides((u) => {
+    const w = 0.24 + 0.3 * Math.exp(-(((u - 0.3) / 0.2) ** 2)) + 0.16 * Math.exp(-(((u - 0.84) / 0.1) ** 2)) - 0.04 * Math.exp(-(((u - 0.62) / 0.08) ** 2));
+    // The tip is cut square with a shallow notch.
+    const notch = u > 0.96 ? (u - 0.96) / 0.04 : 0;
+    return w * Math.min(1, u * 5 + 0.2) ** 0.5 * (1 - 0.5 * notch);
   }, 140),
 };
 
@@ -138,7 +161,8 @@ function drawBlade(g, spec, pts, sc, ox, oy, rand) {
     const spread = n === 7 ? 2.35 : 2.05;
     for (let k = 0; k < n; k++) {
       const a = ((k / (n - 1)) * 2 - 1) * spread;
-      const L = (1 - 0.42 * Math.abs((k / (n - 1)) * 2 - 1) ** 1.6) * 0.6 * sc;
+      const tk = Math.abs((k / (n - 1)) * 2 - 1);
+      const L = (spec.even ? 1 - 0.1 * tk : 1 - 0.42 * tk ** 1.6) * 0.6 * sc;
       g.lineWidth = Math.max(1, sc * 0.012);
       g.beginPath();
       g.moveTo(0, -0.42 * sc + 0.4 * sc * 0.62);
@@ -156,6 +180,16 @@ function drawBlade(g, spec, pts, sc, ox, oy, rand) {
           g.stroke();
         }
       }
+    }
+  } else if (spec.outline === 'fan') {
+    // Ginkgo: fine veins fanning and forking from the stalk.
+    g.lineWidth = Math.max(0.6, sc * 0.005);
+    for (let k = 0; k < 26; k++) {
+      const a = ((k / 25) * 2 - 1) * 0.62;
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.lineTo(Math.sin(a) * sc * 1.05, -Math.cos(a) * sc * 0.98);
+      g.stroke();
     }
   } else {
     g.lineWidth = Math.max(1, sc * 0.014);
@@ -178,35 +212,89 @@ function drawBlade(g, spec, pts, sc, ox, oy, rand) {
   }
   g.restore();
   // A thin darker rim reads as the leaf's edge.
+  g.beginPath();
+  pts.forEach(([x, y], i) => (i ? g.lineTo(x * sc, y * sc) : g.moveTo(x * sc, y * sc)));
+  g.closePath();
   g.strokeStyle = 'rgba(20,40,10,.35)';
   g.lineWidth = Math.max(0.6, sc * 0.006);
   g.stroke();
   g.restore();
 }
 
+function leaflet(g, L, lw, rand, toothed) {
+  // One leaflet pointing up from the origin, with a midrib.
+  g.fillStyle = `hsl(${90 + rand() * 12}, ${44 + rand() * 10}%, ${30 + rand() * 12}%)`;
+  g.beginPath();
+  const n = 28;
+  for (let i = 0; i <= n * 2; i++) {
+    const up = i <= n;
+    const u = up ? i / n : 2 - i / n;
+    let w = L * lw * Math.pow(Math.sin(Math.PI * u), 0.8);
+    if (toothed) w += L * 0.018 * Math.max(0, Math.sin(u * 40)) * Math.sin(Math.PI * u);
+    const x = up ? w : -w;
+    if (i) g.lineTo(x, -u * L);
+    else g.moveTo(x, 0);
+  }
+  g.closePath();
+  g.fill();
+  g.strokeStyle = 'rgba(214,230,170,.45)';
+  g.lineWidth = Math.max(0.6, L * 0.015);
+  g.beginPath();
+  g.moveTo(0, 0);
+  g.lineTo(0, -L * 0.95);
+  g.stroke();
+}
 function paintPinna(g, W, H, spec, rand) {
-  // Honeylocust: one pinna, a rachis with paired leaflets under an inch long.
+  // A rachis with paired leaflets (honeylocust shows one pinna; ash, mountain
+  // ash and boxelder the whole leaf, with its end leaflet).
   const cx = W / 2;
-  g.strokeStyle = '#6a6a36';
+  const pairs = spec.pairs ?? 11;
+  const lw = spec.lw ?? 0.22;
+  const toothed = spec.margin === 'serrate' || spec.margin === 'crenate';
+  g.strokeStyle = spec.petioleColor || '#6a6a36';
   g.lineWidth = Math.max(1, W * 0.02);
   g.beginPath();
   g.moveTo(cx, H);
-  g.lineTo(cx, H * 0.03);
+  g.lineTo(cx, H * (spec.terminal ? spec.terminalAt ?? 0.3 : 0.03));
   g.stroke();
-  const pairs = 11;
+  const top = spec.terminal ? spec.terminalAt ?? 0.3 : 0.06;
   for (let i = 0; i < pairs; i++) {
-    const y = H * (0.9 - (i / pairs) * 0.84);
-    const L = W * 0.42 * (1 - 0.25 * (i / pairs));
+    const y = H * (0.9 - (i / Math.max(1, pairs - (spec.terminal ? 0 : 1))) * (0.9 - top));
+    const rot = Math.PI / 2 - (spec.spread ?? 0.35);
+    const L = Math.min((W * 0.48) / Math.sin(rot), H * 0.45) * (1 - 0.25 * (i / pairs));
     for (const s of [-1, 1]) {
       g.save();
       g.translate(cx + s * W * 0.02, y);
-      g.rotate(s * (Math.PI / 2 - 0.35));
-      g.fillStyle = `hsl(${90 + rand() * 12}, ${44 + rand() * 10}%, ${30 + rand() * 12}%)`;
-      g.beginPath();
-      g.ellipse(0, -L / 2, L * 0.22, L / 2, 0, 0, Math.PI * 2);
-      g.fill();
+      g.rotate(s * rot);
+      leaflet(g, L, lw, rand, toothed);
       g.restore();
     }
+  }
+  if (spec.terminal) {
+    g.save();
+    g.translate(cx, H * top);
+    leaflet(g, H * top * 0.96, lw * 0.9, rand, toothed);
+    g.restore();
+  }
+}
+function paintPalmCompound(g, W, H, spec, rand) {
+  // Buckeye: five leaflets radiating from the end of a long stalk.
+  const cx = W / 2;
+  const hub = H * 0.62;
+  g.strokeStyle = spec.petioleColor;
+  g.lineWidth = Math.max(1.2, W * 0.022);
+  g.beginPath();
+  g.moveTo(cx, H);
+  g.lineTo(cx, hub);
+  g.stroke();
+  const n = spec.leaflets || 5;
+  for (let k = 0; k < n; k++) {
+    const t = (k / (n - 1)) * 2 - 1;
+    g.save();
+    g.translate(cx, hub);
+    g.rotate(t * 1.25);
+    leaflet(g, hub * 0.98 * (1 - 0.3 * t * t), 0.16, rand, true);
+    g.restore();
   }
 }
 
@@ -237,8 +325,11 @@ export function leafCard(key, high = false) {
   const pet = spec.petiole / spec.length; // petiole length in blade units
   let pts;
   let bx0 = -0.5, bx1 = 0.5, by0 = -1, by1 = 0;
-  if (spec.outline !== 'pinnate') {
+  const painted = spec.outline === 'pinnate' || spec.outline === 'palmcompound';
+  if (!painted) {
     pts = OUTLINES[spec.outline](spec);
+    // Narrower or broader than the outline family's default blade.
+    if (spec.wx) pts = pts.map(([x, y]) => [x * spec.wx, y]);
     bx0 = Math.min(...pts.map((p) => p[0]));
     bx1 = Math.max(...pts.map((p) => p[0]));
     by0 = Math.min(...pts.map((p) => p[1]));
@@ -247,7 +338,7 @@ export function leafCard(key, high = false) {
   const half = Math.max(-bx0, bx1) * 1.04;
   const hBlade = by1 - by0;
   const total = hBlade + pet;
-  const aspect = spec.outline === 'pinnate' ? 0.55 : (2 * half) / total;
+  const aspect = spec.outline === 'pinnate' ? spec.aspect ?? 0.55 : spec.outline === 'palmcompound' ? 1.05 : (2 * half) / total;
   const H = high ? 512 : 256;
   const W = Math.max(16, Math.round(H * aspect));
   const c = document.createElement('canvas');
@@ -255,6 +346,7 @@ export function leafCard(key, high = false) {
   c.height = H;
   const g = c.getContext('2d');
   if (spec.outline === 'pinnate') paintPinna(g, W, H, spec, rand);
+  else if (spec.outline === 'palmcompound') paintPalmCompound(g, W, H, spec, rand);
   else {
     const sc = H / total;
     const baseY = H - pet * sc; // where the blade meets the petiole
@@ -333,19 +425,20 @@ function paintBottlebrush(g, W, H, rand, needle) {
     g.stroke();
   }
 }
-function paintTuft(g, W, H, rand) {
+function paintTuft(g, W, H, rand, soft = false) {
   const cx = W / 2;
   // Needles spray from along the upper third of the shoot, arching outward.
+  // White pine: longer, finer needles that droop softly.
   for (let pass = 0; pass < 2; pass++) {
-    for (let i = 0; i < (pass ? 300 : 220); i++) {
+    for (let i = 0; i < (pass ? (soft ? 420 : 300) : 220); i++) {
       const t = 0.35 + 0.6 * Math.sqrt(rand());
       const y0 = H - t * H * 0.8;
-      const ang = (rand() - 0.5) * 2.2 * (1.1 - t * 0.6);
-      const len = H * (0.34 + rand() * 0.12);
+      const ang = (rand() - 0.5) * (soft ? 2.8 : 2.2) * (1.1 - t * 0.6);
+      const len = H * (soft ? 0.42 + rand() * 0.14 : 0.34 + rand() * 0.12);
       const x1 = cx + Math.sin(ang) * len;
       const y1 = y0 - Math.cos(ang) * len * 0.9;
       g.strokeStyle = `hsl(${118 + rand() * 20}, ${30 + rand() * 20}%, ${pass ? 20 + rand() * 20 : 12 + rand() * 6}%)`;
-      g.lineWidth = pass ? Math.max(1, W * 0.012) : Math.max(1.8, W * 0.026);
+      g.lineWidth = pass ? Math.max(1, W * (soft ? 0.008 : 0.012)) : Math.max(1.8, W * (soft ? 0.02 : 0.026));
       g.lineCap = 'round';
       g.beginPath();
       g.moveTo(cx, y0);
@@ -367,6 +460,34 @@ function paintTuft(g, W, H, rand) {
   g.lineTo(cx, H * 0.1);
   g.stroke();
 }
+function paintLarch(g, W, H, rand) {
+  // Tamarack: a twig set with spur shoots, each a rosette of soft needles.
+  const cx = W / 2;
+  g.strokeStyle = '#7a5a3a';
+  g.lineWidth = Math.max(1.5, W * 0.018);
+  g.beginPath();
+  g.moveTo(cx, H);
+  g.lineTo(cx, H * 0.06);
+  g.stroke();
+  for (let pass = 0; pass < 2; pass++) {
+    for (let k = 0; k < 11; k++) {
+      const y = H * (0.9 - k * 0.078);
+      const x = cx + (k % 2 ? 1 : -1) * W * 0.05;
+      const n = pass ? 26 : 16;
+      for (let i = 0; i < n; i++) {
+        const a = (rand() - 0.5) * 2.6;
+        const len = H * (0.1 + rand() * 0.06) * (1 - k * 0.03);
+        g.strokeStyle = `hsl(${95 + rand() * 20}, ${35 + rand() * 20}%, ${pass ? 28 + rand() * 18 : 16 + rand() * 6}%)`;
+        g.lineWidth = pass ? Math.max(1, W * 0.01) : Math.max(1.6, W * 0.022);
+        g.lineCap = 'round';
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(x + Math.sin(a) * len, y - Math.cos(a) * len);
+        g.stroke();
+      }
+    }
+  }
+}
 export function shootCard(kind, high = false) {
   const ck = 'shoot:' + kind + (high ? '@hi' : '');
   if (cache.has(ck)) return cache.get(ck);
@@ -380,7 +501,9 @@ export function shootCard(kind, high = false) {
     c.height = H;
     const g = c.getContext('2d');
     const rand = rng(kind.length * 131 + 7);
-    if (kind === 'pine' || kind === 'redpine') paintTuft(g, W, H, rand);
+    if (kind === 'pine' || kind === 'redpine' || kind === 'scotchpine') paintTuft(g, W, H, rand);
+    else if (kind === 'whitepine') paintTuft(g, W, H, rand, true);
+    else if (kind === 'tamarack') paintLarch(g, W, H, rand);
     else paintBottlebrush(g, W, H, rand);
     const map = new THREE.CanvasTexture(c);
     map.colorSpace = THREE.SRGBColorSpace;

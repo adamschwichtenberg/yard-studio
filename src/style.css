@@ -275,6 +275,7 @@ body.inspoff #layers{max-width:calc(100vw - var(--leftX) - var(--sunW) - 40px)}
 .tagp.brass{background:rgba(212,168,90,.16);color:var(--brass-2)}
 .tagp.sky{background:rgba(143,184,202,.14);color:var(--sky)}
 .tagp.pink{background:rgba(216,120,150,.16);color:#E8A6BC}
+.tagp.warn{background:rgba(214,120,90,.16);color:#E8A48A}
 #inspbody{overflow-y:auto;flex:1;overscroll-behavior:contain;position:relative}
 #props{padding:0 20px}
 #props>.field:first-child{margin-top:14px}
@@ -483,6 +484,22 @@ body.photo #gl{pointer-events:none}
 .lcard .mt .sh{color:var(--sky)}
 .lcard .mt .bl{color:#E8A6BC}
 .lcard .btn{height:36px;min-height:36px}
+.lcard .mt .zn{color:var(--faint)}
+.lcard .mt .wn{color:#E8A48A}
+.lcard.cold .mt .zn{color:#E8A48A}
+#libsize{flex:none;background:var(--well)}
+#libsize button{height:44px;padding:0 14px}
+/* Compact cards: about twice as many trees on screen. */
+#libgrid.compact .libcards{grid-template-columns:repeat(auto-fill,minmax(146px,1fr));gap:8px}
+#libgrid.compact .lcard{gap:6px;padding:10px 12px 12px;border-radius:12px}
+#libgrid.compact .lcard svg{height:58px}
+#libgrid.compact .lcard h4{font-size:15px}
+#libgrid.compact .lcard .la,#libgrid.compact .lcard .tg:empty{display:none}
+#libgrid.compact .lcard .nm{flex-direction:column;align-items:flex-start;gap:2px}
+#libgrid.compact .lcard .ft{flex-direction:column;align-items:stretch;gap:8px}
+#libgrid.compact .lcard .mt{gap:3px 8px;font-size:10.5px}
+#libgrid.compact .lcard .btn{height:30px;min-height:30px;font-size:12.5px}
+#libgrid.compact .libgenus{margin:10px 0 8px}
 .libempty{padding:40px 0;color:var(--faint);font-size:14px}
 
 /* ---------- overlays ---------- */
@@ -600,6 +617,8 @@ body.photo #gl{pointer-events:none}
   #libfilters{width:auto;flex-direction:row;flex-wrap:wrap;gap:12px;overflow:visible}
   #libfilters .fgroup:nth-child(n+3),#libfilters .grow,.libnote{display:none}
   .libcards{grid-template-columns:1fr}
+  #libgrid.compact .libcards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #libsize button{height:36px}
 }
 @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
 /* PROPERTY_IMPORT_CSS_BEGIN */

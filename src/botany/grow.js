@@ -149,8 +149,24 @@ export function growBroadleaf(p) {
     const y = cb + u * crownH;
     const env = envelope(y);
     if (r() > (env / R) ** 2 + 0.02) continue; // more points where the crown is wide
-    const k = hollow + (1 - hollow) * Math.pow(r(), 0.38);
+    // Pagoda dogwood: twigs only in flat layers, open air between them.
+    if (sp.tiers && Math.abs(((u * sp.tiers + 0.35) % 1) - 0.5) > 0.12) continue;
+    // Vase and weeping crowns are open inside, but their top still closes
+    // over in a dome of twigs, so the hollow fades out through the upper crown.
+    const h = hollow * (1 - THREE.MathUtils.smoothstep(u, 0.55, 0.85));
+    const k = h + (1 - h) * Math.pow(r(), 0.38);
     const a = r() * Math.PI * 2;
+    attr.push({ p: V(Math.cos(a) * env * k, y, Math.sin(a) * env * k), alive: true });
+  }
+  // The crown's top is narrow, so area-weighted sampling leaves it thin; a
+  // cap of extra points gives it the twig dome real crowns carry up there.
+  const cap = sp.tiers ? 0 : Math.round(na * (sp.vase ? 0.16 : 0.1));
+  for (let i = 0; i < cap; i++) {
+    const u = 0.72 + 0.27 * Math.sqrt(r());
+    const y = cb + u * crownH;
+    const k = Math.sqrt(r()) * (0.5 + 0.5 * r());
+    const a = r() * Math.PI * 2;
+    const env = envelope(y);
     attr.push({ p: V(Math.cos(a) * env * k, y, Math.sin(a) * env * k), alive: true });
   }
 
@@ -350,7 +366,7 @@ export function growBroadleaf(p) {
 
   const chains = buildChains(nodes, rad);
   const leaves = placeLeaves(nodes, rad, depth, { ...p, envelope, crownH, D, r, streamers, chains });
-  const ornaments = placeOrnaments(nodes, depth, { ...p, envelope, crownH, D, r });
+  const ornaments = placeOrnaments(nodes, depth, { ...p, envelope, crownH, D, r, leafLen: leaves.length || D });
   return { chains, leaves, ornaments, trunkR, D };
 }
 
@@ -430,7 +446,9 @@ function placeLeaves(nodes, rad, depth, p) {
   const len = leaf.length + leaf.petiole;
   const count = Math.round(THREE.MathUtils.clamp(target, 800, 120000));
   const want = 2.4 * (0.5 + 0.6 * p.dens);
-  const scale = THREE.MathUtils.clamp(Math.sqrt((shell * want) / (count * len * len * leafArea)), 1, 2.2);
+  // Very small leaves (Siberian elm, 2 in) may grow until each blocks about
+  // 0.12 sq ft: at yard scale that reads the same, and keeps the count affordable.
+  const scale = THREE.MathUtils.clamp(Math.sqrt((shell * want) / (count * len * len * leafArea)), 1, Math.max(2.2, Math.sqrt(0.12 / (len * len * leafArea))));
   const perShoot = Math.max(1, Math.round((count * 0.75) / shoots.length));
 
   const P = [];
@@ -694,8 +712,11 @@ function placeOrnaments(nodes, depth, p) {
   const out = [];
   for (const orn of sp.ornaments || []) {
     const list = [];
+    // Trees that flower on bare wood (redbud, magnolia, plums) carry flowers
+    // all along last year's twigs, not only at the tips: a cloud of colour.
+    const bareWood = orn.type === 'blossom' && orn.to != null && orn.to <= 8;
     for (let i = 0; i < nodes.length; i++) {
-      if (depth[i] !== 0 || nodes.pos[i].y < cb) continue;
+      if (depth[i] > (bareWood ? 1 : 0) || nodes.pos[i].y < cb) continue;
       const b = nodes.pos[i];
       const a = nodes.pos[nodes.parent[i]] || b;
       const dir = V().subVectors(b, a).normalize();
@@ -707,9 +728,16 @@ function placeOrnaments(nodes, depth, p) {
       const hang = { blossom: false, panicle: false }[orn.type] === false ? false : true;
       const d = hang ? V(dir.x * 0.25, -1, dir.z * 0.25).addScaledVector(randUnit(r), 0.25).normalize()
         : dir.clone().lerp(UP, orn.type === 'panicle' ? 0.6 : 0.3).addScaledVector(randUnit(r), 0.4).normalize();
-      const reps = orn.type === 'blossom' ? 3 : orn.type === 'pome' ? 2 : 1;
+      const reps = orn.type === 'blossom' ? (bareWood ? 4 : 3) : orn.type === 'pome' ? 2 : 1;
+      // The coverage pass clothes the crown out past the twig tips, so flowers
+      // sit out at that leaf surface (fruit a little inside it) to be seen.
+      // (Flowers that open on bare wood stay on the twigs.)
+      const leafy = orn.to == null || orn.to > 8;
+      const reach = leafy ? (p.D * 1.3 + (p.leafLen || p.D) * 0.9) * (hang ? 0.6 : 0.95) : 0;
+      const out = V(b.x, 0, b.z).normalize().multiplyScalar(0.7).add(dir.clone().multiplyScalar(0.5)).add(V(0, hang ? 0 : 0.3, 0)).normalize();
+      const at = b.clone().addScaledVector(out, reach);
       for (let k = 0; k < reps; k++) {
-        const pos = b.clone().addScaledVector(randUnit(r), reps > 1 ? 0.18 : 0.02);
+        const pos = (bareWood ? b.clone().lerp(a, r() * 0.8) : at.clone()).addScaledVector(randUnit(r), reps > 1 ? 0.18 : 0.02);
         list.push({ pos, dir: k ? d.clone().addScaledVector(randUnit(r), 0.35).normalize() : d, rand: r(), outer });
       }
     }
@@ -758,7 +786,7 @@ export function growConifer(p) {
   // Whorls: one a year up the leader, branches spaced by the golden angle.
   const whorl = Math.max(0.35, sp.whorl * Math.min(1, R / 5 + 0.35));
   const nWhorls = Math.max(5, Math.round(crownH / whorl));
-  const ascend = { spruce: -0.12, bluespruce: -0.06, norway: 0.05 }[p.key] ?? (p.key === 'arborvitae' || p.key === 'juniper' ? 0.9 : 0.35);
+  const ascend = sp.ascend ?? { spruce: -0.12, bluespruce: -0.06, norway: 0.05 }[p.key] ?? (p.key === 'arborvitae' || p.key === 'juniper' ? 0.9 : 0.35);
   const flat = p.key === 'arborvitae' || p.key === 'juniper';
   const shootCount = Math.max(1, p.target);
   const branches = [];
@@ -766,16 +794,24 @@ export function growConifer(p) {
     const u = (j + 0.5) / nWhorls;
     const y = cb + u * crownH;
     const L = Math.max(0.25, envelope(y));
-    const n = THREE.MathUtils.clamp(Math.round(4 + L * 0.8 + (r() - 0.5) * 2), 4, 9);
+    const n = sp.perWhorl ? Math.max(3, sp.perWhorl + Math.round((r() - 0.5) * 2)) : THREE.MathUtils.clamp(Math.round(4 + L * 0.8 + (r() - 0.5) * 2), 4, 9);
     for (let k = 0; k < n; k++) {
       if (r() < 0.07) continue;
       const a = (k / n) * Math.PI * 2 + j * GOLDEN + (r() - 0.5) * 0.4;
       const dir = V(Math.cos(a), 0, Math.sin(a));
-      const len = L * (0.85 + 0.25 * r()) * (flat ? 0.9 : 1);
+      let len = L * (0.85 + 0.25 * r()) * (flat ? 0.9 : 1);
       const start = V(0, y - (flat ? len * 0.4 : 0), 0);
       // Spruce: out and slightly down, tips lifting. Pines and cedars ascend.
-      const end = start.clone().addScaledVector(dir, len).addScaledVector(UP, len * ascend + (p.key === 'norway' ? len * 0.12 : 0));
-      const mid = start.clone().addScaledVector(dir, len * 0.55).addScaledVector(UP, len * (ascend - (flat ? 0 : 0.16)));
+      let end = start.clone().addScaledVector(dir, len).addScaledVector(UP, len * ascend + (p.key === 'norway' ? len * 0.12 : 0));
+      let mid = start.clone().addScaledVector(dir, len * 0.55).addScaledVector(UP, len * (ascend - (flat ? 0 : 0.16)));
+      if (sp.weep) {
+        // Weeping spruce: a short limb that turns over and hangs against the trunk.
+        const reach = L * (0.75 + 0.2 * r());
+        const drop = Math.min(y - 0.4, 1.2 + reach * (1.6 + r()));
+        mid = start.clone().addScaledVector(dir, reach * 1.15).addScaledVector(UP, reach * 0.15);
+        end = start.clone().addScaledVector(dir, reach * 0.95).addScaledVector(UP, -drop);
+        len = reach + drop * 0.8;
+      }
       const pts = [];
       const rs = [];
       for (let i = 0; i <= 6; i++) {
@@ -804,7 +840,8 @@ export function growConifer(p) {
   }
 
   // Secondary branchlets and foliage shoots along them.
-  const pendulous = !!sp.pendulous;
+  const pend = sp.pendulous === true ? 0.6 : sp.pendulous || 0;
+  const pendulous = pend > 0;
   let total = 0;
   const lens = branches.map((b) => b.len);
   const sumLen = lens.reduce((s, v) => s + v, 0) || 1;
@@ -820,12 +857,12 @@ export function growConifer(p) {
       const at = V().lerpVectors(b.pts[k], b.pts[k + 1], seg - k);
       const along = V().subVectors(b.pts[k + 1], b.pts[k]).normalize();
       const sign = s % 2 ? 1 : -1;
-      const lenSec = (b.len * 0.45 * (1 - t * 0.7) + scaleSeg * 0.6) * (0.8 + 0.4 * r());
+      const lenSec = (b.len * (sp.weep ? 0.12 : 0.45) * (1 - t * 0.7) + scaleSeg * 0.6) * (0.8 + 0.4 * r());
       let dir2;
       if (s === nSec) dir2 = along.clone();
       // Norway spruce: most branchlets hang in curtains, the rest lie flat
       // along the limb so the crown still closes over from above.
-      else if (pendulous && t > 0.25 && r() < 0.6) dir2 = V(along.x * 0.15, -1, along.z * 0.15).addScaledVector(side, sign * 0.1).normalize();
+      else if (pend && t > 0.25 && r() < pend) dir2 = V(along.x * 0.15, -1, along.z * 0.15).addScaledVector(side, sign * 0.1).normalize();
       else dir2 = along.clone().multiplyScalar(0.55).addScaledVector(side, sign * 0.8).addScaledVector(UP, flat ? 0.5 : 0.05).normalize();
       const end = at.clone().addScaledVector(dir2, lenSec);
       if (lenSec > 0.4 && s !== nSec) chains.push({ pts: [at, end], rs: [0.022, 0.01] });

@@ -4,7 +4,7 @@ import { SkyEnvironment } from "./scene/environment.js";
 import { lawnTextures, sidingTextures, shingleTextures, concreteTile, paverTextures } from "./scene/textures.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { TreeLibrary, SUN } from "./botany/library.js";
-import { speciesFor } from "./botany/species.js";
+import { speciesFor, phenology } from "./botany/species.js";
 import { createPost } from "./post.js";
 import { Diorama, studioBackdrop } from "./scene/diorama.js";
 import { SunPath } from "./scene/sunpath.js";
@@ -41,83 +41,182 @@ const SHAPES = {
    `bloom` colours (opening, full, fading) are for species that flower. */
 const PRESETS = [
  // ---- Deciduous
- {gn:"Maples", n:"Autumn Blaze Maple", s:"oval", h:50, w:40, ev:false, d:.85, leaf:0x46702c, fall:0xb8321c,
+ {gn:"Maples", n:"Autumn Blaze Maple", z:[3,8], s:"oval", h:50, w:40, ev:false, d:.85, leaf:0x46702c, fall:0xb8321c,
   sci:"Acer × freemanii 'Jeffersred'", note:"Freeman maple (Jeffersred). Upright oval, fast, brilliant orange-red in fall. Hardy to zone 3."},
- {gn:"Maples", n:"Sienna Glen Maple", s:"oval", h:55, w:38, ev:false, d:.82, leaf:0x46702c, fall:0xb5512a,
+ {gn:"Maples", n:"Sienna Glen Maple", z:[3,8], s:"oval", h:55, w:38, ev:false, d:.82, leaf:0x46702c, fall:0xb5512a,
   sci:"Acer × freemanii 'Sienna'", note:"Freeman maple. Upright oval that broadens with age, fast growth, hardy to zone 3."},
- {gn:"Maples", n:"Matador Maple", s:"oval", h:45, w:35, ev:false, d:.90, leaf:0x42692a, fall:0xb3261e,
+ {gn:"Maples", n:"Matador Maple", z:[3,8], s:"oval", h:45, w:35, ev:false, d:.90, leaf:0x42692a, fall:0xb3261e,
   sci:"Acer × freemanii 'Bailston'", note:"Freeman maple, tighter and more uniform than Sienna Glen. Heavy shade underneath."},
- {gn:"Maples", n:"Crimson King maple", s:"round", h:40, w:35, ev:false, d:.95, leaf:0x7e1a26, fall:0x8e2a1c,
+ {gn:"Maples", n:"Crimson King maple", z:[4,7], warn:"Invasive risk", s:"round", h:40, w:35, ev:false, d:.95, leaf:0x7e1a26, fall:0x8e2a1c,
   sci:"Acer platanoides 'Crimson King'", note:"Norway maple with deep red-maroon leaves all season. Dense, round crown and heavy shade."},
- {gn:"Maples", n:"Crimson Sunset maple", s:"oval", h:35, w:22, ev:false, d:.90, leaf:0x92222e, fall:0xa0301e,
+ {gn:"Maples", n:"Crimson Sunset maple", z:[4,7], s:"oval", h:35, w:22, ev:false, d:.90, leaf:0x92222e, fall:0xa0301e,
   sci:"Acer truncatum × platanoides 'JFS-KW202'", note:"Upright oval, purple foliage, denser and narrower than a Freeman maple."},
- {gn:"Maples", n:"Royal Red maple", s:"round", h:35, w:25, ev:false, d:.95, leaf:0x8a2230, fall:0x9a2a1c,
+ {gn:"Maples", n:"Royal Red maple", z:[4,7], warn:"Invasive risk", s:"round", h:35, w:25, ev:false, d:.95, leaf:0x8a2230, fall:0x9a2a1c,
   sci:"Acer platanoides 'Royal Red'", note:"Norway maple. Round, very dense crown — the deepest shade of the maples here."},
- {gn:"Lindens", n:"Redmond Linden", s:"linden", h:55, w:35, ev:false, d:.90, leaf:0x3f6a2a, fall:0xb89a3a,
+ {gn:"Maples", n:"Fall Fiesta Sugar Maple", z:[4,8], s:"oval", h:50, w:40, ev:false, d:.90, leaf:0x3e6a2a, fall:0xd0601c,
+  sci:"Acer saccharum 'Bailsta'", note:"Sugar maple with thick, glossy leaves that turn orange, red and yellow. Dense shade; the classic big yard maple."},
+ {gn:"Maples", n:"Unity Sugar Maple", z:[3,7], s:"oval", h:50, w:35, ev:false, d:.88, leaf:0x3e6a2a, fall:0xd8741e,
+  sci:"Acer saccharum 'Unity'", note:"Minnesota-bred sugar maple, hardy to zone 3 and slow to scorch in wind. Yellow-orange fall colour."},
+ {gn:"Maples", n:"Northwood Red Maple", z:[3,8], s:"oval", h:45, w:35, ev:false, d:.80, leaf:0x46702c, fall:0xc0301e,
+  bloom:[0x7a1414, 0xb8281e, 0x9a3a2a], bt:"Red flowers on bare twigs",
+  sci:"Acer rubrum 'Northwood'", note:"Minnesota red maple. Tiny red flowers on bare twigs in early spring, orange-red in fall. Wants slightly acid soil; can yellow on alkaline clay."},
+ {gn:"Maples", n:"Firedance Red Maple", z:[3,8], s:"oval", h:35, w:30, ev:false, d:.80, leaf:0x46702c, fall:0xb8201c,
+  bloom:[0x7a1414, 0xb8281e, 0x9a3a2a], bt:"Red flowers on bare twigs",
+  sci:"Acer rubrum 'Firedance'", note:"Compact red maple with early, reliable scarlet fall colour."},
+ {gn:"Maples", n:"Silver maple", z:[3,9], s:"spreading", h:70, w:50, ev:false, d:.72, leaf:0x5a7a3a, fall:0xc8a040, warn:"Brittle limbs",
+  sci:"Acer saccharinum", note:"Common in older yards: huge and fast, with deeply cut leaves silver underneath. Brittle limbs and shallow roots. Shade to plan around more than to plant."},
+ {gn:"Maples", n:"Boxelder", z:[2,9], s:"spreading", h:45, w:40, ev:false, d:.70, leaf:0x5a8038, fall:0xc0a840,
+  sci:"Acer negundo", note:"Native maple with three-leaflet leaves. Fast, weak-wooded, often several trunks. Common along fencelines and in older lots."},
+ {gn:"Maples", n:"Bloodgood Japanese Maple", z:[5,8], s:"round", h:18, w:18, ev:false, d:.82, leaf:0x6a1a24, fall:0xb0201a,
+  sci:"Acer palmatum 'Bloodgood'", note:"Deep red-purple, finely cut leaves on a low, layered crown. Zone 5–8: not hardy on the northern plains."},
+ {gn:"Lindens", n:"Redmond Linden", z:[3,8], s:"linden", h:55, w:35, ev:false, d:.90, leaf:0x3f6a2a, fall:0xb89a3a,
   sci:"Tilia americana 'Redmond'", note:"American linden. Broad pyramidal, very dense. Handles wind and alkaline soil."},
- {gn:"Lindens", n:"Greenspire Linden", s:"linden", h:45, w:30, ev:false, d:.88, leaf:0x3f6a2a, fall:0xb8a040,
+ {gn:"Lindens", n:"Greenspire Linden", z:[3,7], s:"linden", h:45, w:30, ev:false, d:.88, leaf:0x3f6a2a, fall:0xb8a040,
   sci:"Tilia cordata 'Greenspire'", note:"Littleleaf linden. Tight pyramidal form, dense shade, narrower than Redmond."},
- {gn:"Birches", n:"Parkland Pillar Birch", s:"fastigiate", h:40, w:8, ev:false, d:.72, leaf:0x4e7a2e, fall:0xd0a630,
+ {gn:"Birches", n:"Parkland Pillar Birch", z:[3,7], s:"fastigiate", h:40, w:8, ev:false, d:.72, leaf:0x4e7a2e, fall:0xd0a630,
   sci:"Betula platyphylla 'Jefpark'", note:"Columnar white-barked birch. A narrow, airy column: light shade in a tiny footprint. Bronze birch borer resistant."},
- {gn:"Birches", n:"River Birch", s:"oval", h:40, w:30, ev:false, d:.62, leaf:0x46702c, fall:0xc8a040,
+ {gn:"Birches", n:"River Birch", z:[4,9], s:"oval", h:40, w:30, ev:false, d:.62, leaf:0x46702c, fall:0xc8a040,
   sci:"Betula nigra", note:"Often multi-stemmed, with peeling cinnamon bark. Open oval crown, light dappled shade. Likes moist soil."},
- {gn:"Oaks", n:"Bur Oak", s:"spreading", h:60, w:55, ev:false, d:.78, leaf:0x3e5c28, fall:0x8a6a30,
+ {gn:"Oaks", n:"Bur Oak", z:[3,8], s:"spreading", h:60, w:55, ev:false, d:.78, leaf:0x3e5c28, fall:0x8a6a30,
   sci:"Quercus macrocarpa", note:"The prairie oak. Massive, wide crown on stout limbs; deep shade once mature. Slow, very long-lived, zone 3."},
- {gn:"Oaks", n:"Crimson Spire Oak", s:"fastigiate", h:45, w:15, ev:false, d:.85, leaf:0x3f6030, fall:0x9a3a24,
+ {gn:"Oaks", n:"Crimson Spire Oak", z:[4,8], s:"fastigiate", h:45, w:15, ev:false, d:.85, leaf:0x3f6030, fall:0x9a3a24,
   sci:"Quercus robur × alba 'Crimschmidt'", note:"Columnar oak. Dense upright column with rusty-red fall colour; holds some leaves into winter."},
- {gn:"Oaks", n:"Swamp white oak", s:"spreading", h:55, w:50, ev:false, d:.70, leaf:0x3f5f2a, fall:0x8a5a2a,
+ {gn:"Oaks", n:"Swamp white oak", z:[4,8], s:"spreading", h:55, w:50, ev:false, d:.70, leaf:0x3f5f2a, fall:0x8a5a2a,
   sci:"Quercus bicolor", note:"Wide spreading crown with a fairly open interior. Leafs out late."},
- {gn:"Elms", n:"Prairie Expedition elm", s:"vase", h:50, w:40, ev:false, d:.70, leaf:0x3f6a2a, fall:0xb09a3a,
+ {gn:"Oaks", n:"Northern Pin Oak", z:[3,7], s:"oval", h:55, w:40, ev:false, d:.78, leaf:0x3e6028, fall:0xa02a1e,
+  sci:"Quercus ellipsoidalis", note:"Upper-Midwest native with deeply cut, bristle-tipped leaves; scarlet to russet in fall. Handles alkaline soil far better than pin oak."},
+ {gn:"Oaks", n:"Northern Red Oak", z:[3,8], s:"round", h:60, w:50, ev:false, d:.82, leaf:0x3e6028, fall:0x8a2a1c,
+  sci:"Quercus rubra", note:"Fast for an oak, with a broad rounded crown and deep shade. Russet-red in fall. Best in slightly acid soil."},
+ {gn:"Elms", n:"Prairie Expedition elm", z:[3,9], s:"vase", h:50, w:40, ev:false, d:.70, leaf:0x3f6a2a, fall:0xb09a3a,
   sci:"Ulmus americana 'Lewis & Clark'", note:"Vase shape with a high crown, so shade lands well out from the trunk."},
- {gn:"Hackberries", n:"Common Hackberry", s:"spreading", h:50, w:45, ev:false, d:.75, leaf:0x4a6a30, fall:0xb0a040,
+ {gn:"Elms", n:"Siberian elm", z:[3,9], s:"round", h:50, w:40, ev:false, d:.70, leaf:0x46702c, fall:0xb0a040, warn:"Invasive",
+  sci:"Ulmus pumila", note:"Common volunteer in older plains yards: small leaves on a rangy, brittle crown. Invasive; here to model trees you already have."},
+ {gn:"Hackberries", n:"Common Hackberry", z:[2,9], s:"spreading", h:50, w:45, ev:false, d:.75, leaf:0x4a6a30, fall:0xb0a040,
   sci:"Celtis occidentalis", note:"Tough native with an elm-like, arching crown and warty grey bark. Medium-dense shade."},
- {gn:"Honeylocusts", n:"Thornless Honeylocust", s:"spreading", h:45, w:40, ev:false, d:.45, leaf:0x5a8030, fall:0xd0b030,
+ {gn:"Hackberries", n:"Prairie Sentinel Hackberry", z:[3,9], s:"fastigiate", h:45, w:12, ev:false, d:.78, leaf:0x4a6a30, fall:0xb0a040,
+  sci:"Celtis occidentalis 'JFS-KSU1'", note:"Columnar hackberry from Kansas State. All of hackberry's toughness in a 12 ft wide column."},
+ {gn:"Honeylocusts", n:"Thornless Honeylocust", z:[4,9], s:"spreading", h:45, w:40, ev:false, d:.45, leaf:0x5a8030, fall:0xd0b030,
   sci:"Gleditsia triacanthos var. inermis", note:"Fine, feathery leaflets make light, dappled shade — lawn and beds still grow underneath."},
- {gn:"Poplars & aspens", n:"Quaking Aspen", s:"oval", h:40, w:20, ev:false, d:.58, leaf:0x5a7a30, fall:0xd8b030,
+ {gn:"Poplars & aspens", n:"Quaking Aspen", z:[1,7], s:"oval", h:40, w:20, ev:false, d:.58, leaf:0x5a7a30, fall:0xd8b030,
   sci:"Populus tremuloides", note:"Narrow oval, white bark, leaves that flutter in the slightest breeze. Light shade; suckers freely."},
- {gn:"Poplars & aspens", n:"Swedish Columnar Aspen", s:"fastigiate", h:40, w:8, ev:false, d:.72, leaf:0x4e7030, fall:0xc8a030,
+ {gn:"Poplars & aspens", n:"Swedish Columnar Aspen", z:[2,8], s:"fastigiate", h:40, w:8, ev:false, d:.72, leaf:0x4e7030, fall:0xc8a030,
   sci:"Populus tremula 'Erecta'", note:"Tight column for screening. Very narrow shadow; yellow fall colour."},
- {gn:"Poplars & aspens", n:"Hybrid Poplar", s:"oval", h:55, w:30, ev:false, d:.78, leaf:0x46702c, fall:0xc8b040,
+ {gn:"Poplars & aspens", n:"Hybrid Poplar", z:[3,9], s:"oval", h:55, w:30, ev:false, d:.78, leaf:0x46702c, fall:0xc8b040,
   sci:"Populus × canadensis", note:"Very fast screen tree with triangular, cottonwood-like leaves. Short-lived; big shade quickly."},
- {gn:"Poplars & aspens", n:"Tower Poplar", s:"fastigiate", h:45, w:10, ev:false, d:.75, leaf:0x46702c, fall:0xc8b040,
+ {gn:"Poplars & aspens", n:"Tower Poplar", z:[2,8], s:"fastigiate", h:45, w:10, ev:false, d:.75, leaf:0x46702c, fall:0xc8b040,
   sci:"Populus × canescens 'Tower'", note:"Hardy columnar poplar used for windbreaks and privacy. Fast, narrow shadow."},
- {gn:"Willows", n:"Weeping Willow", s:"weeping", h:40, w:40, cb:10, ev:false, d:.72, leaf:0x6a8a36, fall:0xc0b040,
+ {gn:"Poplars & aspens", n:"Siouxland Cottonwood", z:[2,9], s:"spreading", h:75, w:50, ev:false, d:.72, leaf:0x46702c, fall:0xd0b030,
+  sci:"Populus deltoides 'Siouxland'", note:"Cottonless eastern cottonwood from South Dakota. Enormous and fast, with fluttering triangular leaves. Needs room."},
+ {gn:"Willows", n:"Weeping Willow", z:[3,8], s:"weeping", h:40, w:40, cb:10, ev:false, d:.72, leaf:0x6a8a36, fall:0xc0b040,
   sci:"Salix alba 'Tristis'", note:"Golden weeping willow. Broad dome of hanging streamers; wants room and moist ground."},
- {gn:"Crabapples", n:"Prairifire Crabapple", s:"round", h:20, w:20, ev:false, d:.72, leaf:0x40522e, fall:0x8a4a2a,
+ {gn:"Crabapples", n:"Prairifire Crabapple", bt:"Blooms in spring", z:[4,8], s:"round", h:20, w:20, ev:false, d:.72, leaf:0x40522e, fall:0x8a4a2a,
   bloom:[0x9c1848, 0xd8306e, 0xe0628e], sci:"Malus 'Prairifire'",
   note:"Deep pink-red blossoms for about two weeks in spring, then reddish-purple leaves maturing to dark green. Disease resistant."},
- {gn:"Crabapples", n:"Flowering crabapple", s:"round", h:18, w:18, ev:false, d:.70, leaf:0x4a7030, fall:0xa0702a,
+ {gn:"Crabapples", n:"Flowering crabapple", z:[3,8], s:"round", h:18, w:18, ev:false, d:.70, leaf:0x4a7030, fall:0xa0702a,
   bloom:[0xd06a8a, 0xf2c8d4, 0xf6ecee], sci:"Malus", note:"Small round crown, light shade. Pink buds opening pale in spring. Safe near a bed."},
- {gn:"Hydrangeas", n:"Limelight Hydrangea tree", s:"round", h:8, w:6, ev:false, d:.78, leaf:0x46702c, fall:0x8a6a30,
+ {gn:"Hydrangeas", n:"Limelight Hydrangea tree", z:[3,8], s:"round", h:8, w:6, ev:false, d:.78, leaf:0x46702c, fall:0x8a6a30,
   bloom:[0xc2d888, 0xf0f0e0, 0xd89aa0], sci:"Hydrangea paniculata 'Limelight'",
   note:"Tree-form panicle hydrangea. Lime-green cones from midsummer turn white, then blush pink in fall."},
- {gn:"Hydrangeas", n:"Pinky Winky hydrangea", s:"round", h:8, w:6, ev:false, d:.75, leaf:0x4a7a30, fall:0x8a6a30,
+ {gn:"Hydrangeas", n:"Pinky Winky hydrangea", z:[3,8], s:"round", h:8, w:6, ev:false, d:.75, leaf:0x4a7a30, fall:0x8a6a30,
   bloom:[0xeeeedc, 0xf2e6e2, 0xd0607e], sci:"Hydrangea paniculata 'DVPpinky'",
   note:"Tree-form panicle hydrangea. White cones that turn pink from the base up. Its shadow only matters to a bed right beside it."},
- {gn:"Alders", n:"Prairie Horizon Alder", s:"oval", h:35, w:28, ev:false, d:.55, leaf:0x2f5424, fall:0x6e6a2c,
+ {gn:"Alders", n:"Prairie Horizon Alder", z:[3,7], s:"oval", h:35, w:28, ev:false, d:.55, leaf:0x2f5424, fall:0x6e6a2c,
   sci:"Alnus hirsuta 'Harbin'", note:"Manchurian alder. Open canopy, so the shade underneath stays dappled. Very hardy and fast."},
+ {gn:"Ashes", n:"Green ash", z:[3,9], s:"oval", h:50, w:35, ev:false, d:.70, leaf:0x46702c, fall:0xc8b030, warn:"Emerald ash borer",
+  sci:"Fraxinus pennsylvanica", note:"Once the most-planted boulevard tree on the plains. Emerald ash borer kills untreated trees: model the ones you have, don't plant new."},
+ {gn:"Kentucky coffeetrees", n:"Espresso Kentucky Coffeetree", z:[3,8], s:"oval", h:50, w:35, ev:false, d:.55, leaf:0x3e6a38, fall:0xc8b040,
+  sci:"Gymnocladus dioicus 'Espresso'", note:"Tough native with huge, twice-divided leaves. Leafs out about two weeks late and drops early, so its shade season is short and light. Seedless: no pods."},
+ {gn:"Buckeyes", n:"Autumn Splendor Buckeye", z:[3,7], s:"round", h:30, w:30, ev:false, d:.88, leaf:0x3e6a2a, fall:0xb04a1e,
+  bloom:[0xb8a050, 0xe8d888, 0xd8c890], bt:"Flower spikes in late spring",
+  sci:"Aesculus × arnoldiana 'Autumn Splendor'", note:"Minnesota-bred buckeye. Hand-shaped leaves, yellow flower spikes in late spring, maroon-orange fall colour. Nuts are toxic."},
+ {gn:"Buckeyes", n:"Ohio Buckeye", z:[3,7], s:"round", h:40, w:35, ev:false, d:.85, leaf:0x46702c, fall:0xd07a28,
+  bloom:[0xa8b060, 0xd8d890, 0xc8c080], bt:"Flower spikes in late spring",
+  sci:"Aesculus glabra", note:"Native buckeye: first to leaf out and first to colour and drop, often bare by mid-September. Nuts are toxic."},
+ {gn:"Lilacs", n:"Ivory Silk Japanese Tree Lilac", z:[3,7], s:"round", h:25, w:20, ev:false, d:.80, leaf:0x3e6028, fall:0x8a7a3a,
+  bloom:[0xd8d0a8, 0xf6f0d8, 0xd8d0b0], bt:"Cream flowers in June",
+  sci:"Syringa reticulata 'Ivory Silk'", note:"The boulevard lilac. Big cream flower plumes in June, after the shrub lilacs, and glossy cherry-like bark."},
+ {gn:"Serviceberries", n:"Autumn Brilliance Serviceberry", z:[3,8], s:"oval", h:20, w:15, ev:false, d:.62, leaf:0x46702c, fall:0xd05a20,
+  bloom:[0xe0d8d8, 0xfafaf6, 0xf0e8e8], bt:"White flowers in early spring",
+  sci:"Amelanchier × grandiflora 'Autumn Brilliance'", note:"Multi-stem small tree. White flowers just before the leaves, purple berries in June the birds love, orange-red fall colour."},
+ {gn:"Cherries & plums", n:"Canada Red Chokecherry", z:[2,7], s:"round", h:25, w:20, ev:false, d:.75, leaf:0x4a7a30, leaf2:0x5a1e30, fall:0x8a2a2a,
+  bloom:[0xe0e0d4, 0xfafaf2, 0xe8e0d8], bt:"White flowers in May",
+  sci:"Prunus virginiana 'Schubert'", note:"Leaves open green and turn deep purple by early summer. White flower spikes in May, dark fruit in August. Suckers; watch for black knot."},
+ {gn:"Cherries & plums", n:"Newport Plum", z:[4,8], s:"round", h:20, w:20, ev:false, d:.75, leaf:0x5a1c2a, fall:0x6a2020,
+  bloom:[0xd890a8, 0xf6dce4, 0xf0e4e8], bt:"Pale pink flowers in spring",
+  sci:"Prunus cerasifera 'Newport'", note:"Purple-leaf plum with pale pink flowers before the leaves. Small, rounded and dark all season."},
+ {gn:"Cherries & plums", n:"Princess Kay Plum", z:[3,6], s:"oval", h:18, w:12, ev:false, d:.60, leaf:0x46702c, fall:0xc05a2a,
+  bloom:[0xeeeee4, 0xffffff, 0xf2ecea], bt:"White flowers in spring",
+  sci:"Prunus nigra 'Princess Kay'", note:"Canada plum found in Minnesota. Fragrant white double flowers on bare dark branches, then red fruit and orange fall colour."},
+ {gn:"Hawthorns", n:"Toba Hawthorn", z:[3,7], s:"round", h:20, w:15, ev:false, d:.75, leaf:0x3e6a2a, fall:0x9a6a2a,
+  bloom:[0xf0f0e8, 0xf6dce4, 0xe8a8bc], bt:"Flowers in late May",
+  sci:"Crataegus × mordenensis 'Toba'", note:"Manitoba-bred hawthorn. White flowers that age to pink in late May, a few red haws, few thorns."},
+ {gn:"Hawthorns", n:"Thornless Cockspur Hawthorn", z:[4,7], s:"spreading", h:20, w:25, ev:false, d:.80, leaf:0x3a6428, fall:0xa03a1e,
+  bloom:[0xe8e8e0, 0xfafaf4, 0xf0ece8], bt:"White flowers in late spring",
+  sci:"Crataegus crus-galli var. inermis", note:"Wide, flat-topped crown of glossy leaves. White flowers, red fruit into winter, orange-red fall colour."},
+ {gn:"Mountain ash", n:"Showy Mountain Ash", z:[2,6], s:"oval", h:25, w:20, ev:false, d:.60, leaf:0x46702c, fall:0xc05020,
+  bloom:[0xe0d8b8, 0xf8f4e8, 0xe8e0c8], bt:"White flowers, orange berries",
+  sci:"Sorbus decora", note:"North-woods native. Feathery leaves, flat white flower clusters in late spring and heavy orange-red berry clusters into winter."},
+ {gn:"Dogwoods", n:"Pagoda Dogwood", z:[3,7], s:"spreading", h:20, w:25, ev:false, d:.66, leaf:0x46702c, fall:0x8a2a3a,
+  bloom:[0xe0dcc0, 0xf8f6e8, 0xe8e4d0], bt:"Cream flowers in June",
+  sci:"Cornus alternifolia", note:"Native understory tree with branches in flat, horizontal tiers. Creamy flower clusters in June, blue-black fruit. Likes part shade."},
+ {gn:"Dogwoods", n:"Flowering Dogwood", z:[5,9], s:"spreading", h:25, w:25, ev:false, d:.75, leaf:0x46702c, fall:0x9a1e2a,
+  bloom:[0xe8e8d8, 0xfafaf4, 0xf0e8e4], bt:"White bracts in spring",
+  sci:"Cornus florida", note:"Four white bracts on bare branches in spring, red fruit and burgundy fall colour. Zone 5–9."},
+ {gn:"Hornbeams", n:"Ironwood", z:[3,9], s:"oval", h:35, w:25, ev:false, d:.80, leaf:0x3e6a2a, fall:0xb8a040,
+  sci:"Ostrya virginiana", note:"Shade-tolerant native with birch-like leaves, shreddy bark and hop-like seed clusters. Slow, very hard wood, very tough."},
+ {gn:"Hornbeams", n:"Blue Beech (Musclewood)", z:[3,9], s:"round", h:25, w:25, ev:false, d:.80, leaf:0x46702c, fall:0xc0501e,
+  sci:"Carpinus caroliniana", note:"Small native tree with smooth, fluted grey trunks like flexed muscle. Takes shade; orange-red in fall."},
+ {gn:"Ginkgos", n:"Autumn Gold Ginkgo", z:[4,8], s:"oval", h:45, w:30, ev:false, d:.72, leaf:0x5a8a3a, fall:0xe8c020,
+  sci:"Ginkgo biloba 'Autumn Gold'", note:"Fan-shaped leaves turn butter-gold, then drop almost all at once, often in a single day. Male clone: no smelly fruit."},
+ {gn:"Ginkgos", n:"Princeton Sentry Ginkgo", z:[4,8], s:"fastigiate", h:40, w:15, ev:false, d:.72, leaf:0x5a8a3a, fall:0xe8c020,
+  sci:"Ginkgo biloba 'Princeton Sentry'", note:"Narrow, upright ginkgo for tight spaces. Same gold fall and one-day leaf drop."},
+ {gn:"Larches", n:"Tamarack", z:[1,6], s:"pyramidal", h:50, w:20, ev:false, d:.55, leaf:0x6a9a4a, fall:0xd8b030,
+  sci:"Larix laricina", note:"A conifer that loses its needles. Soft, bright green tufts in spring, glowing gold in October, then bare all winter."},
+ {gn:"Magnolias", n:"Merrill Magnolia", z:[5,9], s:"round", h:25, w:25, ev:false, d:.78, leaf:0x46702c, fall:0xa08a3a,
+  bloom:[0xe8dcd8, 0xfcfaf6, 0xf2e6e0], bt:"White flowers before the leaves",
+  sci:"Magnolia × loebneri 'Merrill'", note:"Fragrant white star-shaped flowers on bare branches in early spring. Zone 5; a late frost can brown the flowers."},
+ {gn:"Redbuds", n:"Eastern Redbud", z:[5,9], s:"spreading", h:25, w:30, ev:false, d:.72, leaf:0x46702c, fall:0xc8a030,
+  bloom:[0x8a2060, 0xd060a0, 0xe090c0], bt:"Magenta flowers on bare wood",
+  sci:"Cercis canadensis", note:"Magenta-pink flowers straight on bare branches in spring, then heart-shaped leaves. Zone 5–9; a northern seed source helps in zone 4."},
+ {gn:"Sweetgums", n:"American Sweetgum", z:[5,9], s:"oval", h:60, w:40, ev:false, d:.82, leaf:0x3e6a2a, fall:0x9a1e3a,
+  sci:"Liquidambar styraciflua", note:"Star-shaped leaves that turn purple, red and orange late into fall. Spiky gumballs underfoot. Zone 5–9."},
+ {gn:"Tulip trees", n:"Tulip Tree", z:[5,9], s:"oval", h:80, w:40, ev:false, d:.80, leaf:0x46702c, fall:0xd8b030,
+  bloom:[0xc89040, 0xe8d890, 0xe89040], bt:"Tulip flowers in June",
+  sci:"Liriodendron tulipifera", note:"Tall, straight native with square-tipped leaves and green-and-orange tulip flowers in June. Clear yellow fall. Zone 5–9."},
+ {gn:"Tupelos", n:"Black Gum", z:[5,9], s:"oval", h:45, w:25, ev:false, d:.82, leaf:0x3a6028, fall:0xb01a1a,
+  sci:"Nyssa sylvatica", note:"Glossy leaves and some of the best scarlet fall colour of any tree, on horizontal branches. Zone 5–9."},
  // ---- Evergreen
- {gn:"Spruces", n:"Norway Spruce", s:"pyramidal", h:60, w:28, ev:true, d:.92, leaf:0x284a26,
+ {gn:"Spruces", n:"Norway Spruce", z:[2,7], s:"pyramidal", h:60, w:28, ev:true, d:.92, leaf:0x284a26,
   sci:"Picea abies", note:"Big, dark pyramid with branchlets that hang in curtains. Fast for a spruce; a year-round windbreak."},
- {gn:"Spruces", n:"Columnar Norway Spruce", s:"columnar", h:30, w:6, ev:true, d:.92, leaf:0x264221,
+ {gn:"Spruces", n:"Columnar Norway Spruce", z:[3,7], s:"columnar", h:30, w:6, ev:true, d:.92, leaf:0x264221,
   sci:"Picea abies 'Cupressina'", note:"Very narrow column that keeps its lower branches. Hardy to zone 3."},
- {gn:"Spruces", n:"Colorado Blue Spruce", s:"pyramidal", h:50, w:20, ev:true, d:.93, leaf:0x7092a8,
+ {gn:"Spruces", n:"Colorado Blue Spruce", z:[2,7], s:"pyramidal", h:50, w:20, ev:true, d:.93, leaf:0x7092a8,
   sci:"Picea pungens 'Glauca'", note:"Silver-blue needles on a stiff, broad pyramid. Very hardy (zone 2); shades year round."},
- {gn:"Spruces", n:"Black Hills spruce", s:"pyramidal", h:35, w:18, ev:true, d:.95, leaf:0x3a5a4a,
+ {gn:"Spruces", n:"Black Hills spruce", z:[2,6], s:"pyramidal", h:35, w:18, ev:true, d:.95, leaf:0x3a5a4a,
   sci:"Picea glauca var. densata", note:"Dense conifer that shades year round, including the low winter sun."},
- {gn:"Pines", n:"Tannenbaum Mugo Pine", s:"pyramidal", h:11, w:7, ev:true, d:.90, leaf:0x2e4d22,
+ {gn:"Spruces", n:"Weeping White Spruce", z:[2,6], s:"columnar", h:30, w:8, ev:true, d:.90, leaf:0x4a6a5a,
+  sci:"Picea glauca 'Pendula'", note:"Narrow white spruce whose branches hang straight down against the trunk: a dark, slim column with a leader that wanders at the top."},
+ {gn:"Firs", n:"Concolor Fir", z:[3,7], s:"pyramidal", h:45, w:22, ev:true, d:.90, leaf:0x7a98a0,
+  sci:"Abies concolor", note:"Soft, silvery blue-green needles on a full, even pyramid. Softer to the touch and more heat tolerant than blue spruce."},
+ {gn:"Firs", n:"Balsam Fir", z:[2,6], s:"pyramidal", h:45, w:18, ev:true, d:.90, leaf:0x2a4a2e,
+  sci:"Abies balsamea", note:"The north-woods Christmas tree: a slender, fragrant spire of flat dark needles. Prefers cool, moist ground."},
+ {gn:"Pines", n:"Tannenbaum Mugo Pine", z:[2,7], s:"pyramidal", h:11, w:7, ev:true, d:.90, leaf:0x2e4d22,
   sci:"Pinus mugo 'Tannenbaum'", note:"Compact pyramidal mugo. Slow, stays small, casts dense shade low to the ground."},
- {gn:"Pines", n:"Columnar Mugo Pine", s:"columnar", h:12, w:5, ev:true, d:.90, leaf:0x2e4d22,
+ {gn:"Pines", n:"Columnar Mugo Pine", z:[2,7], s:"columnar", h:12, w:5, ev:true, d:.90, leaf:0x2e4d22,
   sci:"Pinus mugo", note:"Narrow upright mugo. Slow-growing evergreen screen without a wide shadow."},
- {gn:"Pines", n:"Columnar Norway Pine", s:"columnar", h:25, w:8, ev:true, d:.85, leaf:0x2a4a26,
+ {gn:"Pines", n:"Columnar Norway Pine", z:[2,5], s:"columnar", h:25, w:8, ev:true, d:.85, leaf:0x2a4a26,
   sci:"Pinus resinosa", note:"Narrow upright conifer. Mature size varies a lot between growers — confirm the tag."},
- {gn:"Junipers & arborvitae", n:"Techny Arborvitae", s:"pyramidal", h:18, w:10, ev:true, d:.95, leaf:0x3a6428,
+ {gn:"Pines", n:"Eastern White Pine", z:[3,8], s:"pyramidal", h:60, w:35, ev:true, d:.66, leaf:0x3a6048,
+  sci:"Pinus strobus", note:"Soft, long blue-green needles in fives. Grows into a tall tree with layered, horizontal branches. Salt-sensitive: keep it back from the street."},
+ {gn:"Pines", n:"Scotch Pine", z:[2,7], s:"round", h:50, w:30, cb:20, ev:true, d:.62, leaf:0x4a6a5a,
+  sci:"Pinus sylvestris", note:"Twisted blue-green needles and bright orange bark on the upper trunk. Matures into an open, flat-topped crown."},
+ {gn:"Junipers & arborvitae", n:"Techny Arborvitae", z:[2,7], s:"pyramidal", h:18, w:10, ev:true, d:.95, leaf:0x3a6428,
   sci:"Thuja occidentalis 'Techny'", note:"Broad, dense pyramid of flat, bright-green sprays that stay green in winter. Hardy to zone 3."},
- {gn:"Junipers & arborvitae", n:"Emerald Green Arborvitae", s:"columnar", h:14, w:4, ev:true, d:.95, leaf:0x3f6e2c,
+ {gn:"Junipers & arborvitae", n:"Emerald Green Arborvitae", z:[3,7], s:"columnar", h:14, w:4, ev:true, d:.95, leaf:0x3f6e2c,
   sci:"Thuja occidentalis 'Smaragd'", note:"Narrow, formal column for hedges and screens. Slim year-round shadow."},
- {gn:"Junipers & arborvitae", n:"Spartan Juniper", s:"columnar", h:18, w:5, ev:true, d:.95, leaf:0x2f4a2a,
+ {gn:"Junipers & arborvitae", n:"Spartan Juniper", z:[4,9], s:"columnar", h:18, w:5, ev:true, d:.95, leaf:0x2f4a2a,
   sci:"Juniperus chinensis 'Spartan'", note:"Narrow columnar evergreen. Thin but solid shadow, year round. Rated zone 4, marginal in 4a."},
- {gn:"Junipers & arborvitae", n:"Moonglow Juniper", s:"pyramidal", h:20, w:10, ev:true, d:.92, leaf:0x66796b,
+ {gn:"Junipers & arborvitae", n:"Moonglow Juniper", z:[3,7], s:"pyramidal", h:20, w:10, ev:true, d:.92, leaf:0x66796b,
   sci:"Juniperus scopulorum 'Moonglow'", note:"Broad pyramidal blue-green evergreen. Dense year-round shade in a compact footprint."}
 ];
 /* Deciduous first, then evergreen; genera in the order they appear above. */
@@ -214,6 +313,7 @@ function fromPreset(name, x, y){
   const o = {id:nid(), type:"tree", name:d.n, x, y, shape:d.s, height:d.h, spread:d.w,
           evergreen:d.ev, density:d.d, note:d.note, leaf:d.leaf, fall:d.fall};
   if(d.bloom) o.bloom = d.bloom;
+  if(d.leaf2 != null) o.leaf2 = d.leaf2;
   if(d.cb != null) o.crownBase = d.cb;
   return o;
 }
@@ -449,17 +549,43 @@ function seasonMD(){
   const d = new Date(Date.UTC(Y, M-1+6, Math.min(D, 28)));
   return String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");
 }
-function leafOn(){
+/* Each species keeps its own leaf season around the plan's leaf-out and
+   leaf-drop dates: buckeyes leaf out a week early and are bare by
+   mid-September, Kentucky coffeetree is two weeks late and drops early. */
+function mdShift(md, days){
+  if(!days) return md;
+  const d = new Date(Date.UTC(2001, +md.slice(0,2)-1, +md.slice(3)+days));
+  return String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");
+}
+const leafDateCache = new Map();
+function leafDates(t){
+  if(!t) return {out:S.leafOut, drop:S.leafDrop};
+  const k = t.name+"|"+t.shape+"|"+S.leafOut+"|"+S.leafDrop;
+  let d = leafDateCache.get(k);
+  if(!d){
+    const ph = phenology(speciesFor(t));
+    d = {out:mdShift(S.leafOut, ph.out), drop:mdShift(S.leafDrop, ph.drop)};
+    if(leafDateCache.size > 400) leafDateCache.clear();
+    leafDateCache.set(k, d);
+  }
+  return d;
+}
+function leafOn(t){
   if(!S.leafSeason) return true;
-  const md = seasonMD();
-  return md >= S.leafOut && md <= S.leafDrop;
+  const md = seasonMD(), {out, drop} = leafDates(t);
+  return md >= out && md <= drop;
+}
+/* Which deciduous trees are in leaf; a change means rebuilding them. */
+function leafKey(){
+  if(!S.leafSeason) return "on";
+  return S.objects.filter(o=>o.type === "tree" && !o.evergreen).map(o=>leafOn(o) ? 1 : 0).join("");
 }
 const mdDay = md=>{ const [m,d] = md.split("-").map(Number); return Date.UTC(2001, m-1, d)/86400000; };
 /* 0 → 1 over the three weeks before leaf drop. Visual only: the shade maths
    keeps full density until the leaves are off. */
-function fallAmount(){
-  if(!S.leafSeason || !leafOn()) return 0;
-  const left = mdDay(S.leafDrop) - mdDay(seasonMD());
+function fallAmount(t){
+  if(!S.leafSeason || !leafOn(t)) return 0;
+  const left = mdDay(leafDates(t).drop) - mdDay(seasonMD());
   return clamp((24 - left)/21, 0, 1);
 }
 /* Flowering windows, in days after leaf-out (so they follow the leaf season
@@ -481,14 +607,16 @@ function bloomState(kind){
    leaf-out, colour over the three weeks before leaf drop, and fall over its
    last ten days; `day` counts days since leaf-out (negative before it) so
    flowers, fruit, catkins and cones can keep their own calendars. */
-function seasonNow(){
-  const day = mdDay(seasonMD()) - mdDay(S.leafOut);
+function seasonNow(t){
+  const {out, drop} = leafDates(t);
+  const day = mdDay(seasonMD()) - mdDay(out);
   if(!S.leafSeason) return {grow:1, fall:0, drop:0, day:60, sinceDrop:-99};
-  const toDrop = mdDay(S.leafDrop) - mdDay(seasonMD());
+  const toDrop = mdDay(drop) - mdDay(seasonMD());
+  const on = leafOn(t);
   return {
-    grow: leafOn() ? clamp(day/16, 0, 1) : 1,
-    fall: fallAmount(),
-    drop: leafOn() ? clamp((10 - toDrop)/10, 0, 1)*.92 : 0,
+    grow: on ? clamp(day/16, 0, 1) : 1,
+    fall: fallAmount(t),
+    drop: on ? clamp((10 - toDrop)/10, 0, 1)*.92 : 0,
     day,
     sinceDrop: -toDrop
   };
@@ -578,11 +706,10 @@ function casters(minutes){
   const dir = bearingVec(sp.az);
   const u = {x:-dir.x, y:-dir.y};
   const cot = 1/Math.tan(Math.max(1.2, sp.el)*DEG);
-  const leaves = leafOn();
   const trees = [], rects = [], polys = [];
   for(const o of S.objects){
     if(o.type === "tree"){
-      const dens = o.evergreen ? (o.density ?? .9) : (leaves ? (o.density ?? .85) : .12);
+      const dens = o.evergreen ? (o.density ?? .9) : (leafOn(o) ? (o.density ?? .85) : .12);
       if(dens <= .02) continue;
       trees.push({discs: treeDiscs(o, u, cot), dens});
     } else if((o.type === "structure" || o.type === "deck") && o.poly && o.poly.length > 2){
@@ -878,13 +1005,13 @@ function buildTreeSimple(grp, t, crown){
 function buildTree(t, draft = false){
   const grp = new THREE.Group();
   const {cb, top, R, fn} = treeCrown(t);
-  const bare = !t.evergreen && !leafOn();
+  const bare = !t.evergreen && !leafOn(t);
   const trunkR = Math.max(.16, t.height*.0135);
 
   if(S.simple){ buildTreeSimple(grp, t, {cb, top, R, fn}); return grp; }
 
   const sh = SHAPES[t.shape] || SHAPES.round;
-  grp.add(trees.build(t, {bare, draft, season:seasonNow(), crownBase:crownBaseFt(t)/Math.max(1, t.height), profile:sh.r}));
+  grp.add(trees.build(t, {bare, draft, season:seasonNow(t), crownBase:crownBaseFt(t)/Math.max(1, t.height), profile:sh.r}));
 
   return grp;
 }
@@ -2711,8 +2838,11 @@ function presetFor(o){ return o && o.type === "tree" ? PRESETS.find(p=>p.n === o
 function shadeClass(d){ return d < .65 ? "Dappled" : d < .88 ? "Moderate" : "Dense"; }
 function bloomLabel(o){
   const k = o.type === "tree" && !o.evergreen ? speciesFor(o) : null;
+  const p = presetFor(o);
+  if(p?.bt) return p.bt;
   return k === "crabapple" ? "Blooms in spring" : k === "hydrangea" ? "Blooms midsummer to fall" : "";
 }
+function zoneLabel(p){ return p?.z ? `Zone ${p.z[0]}–${p.z[1]}` : ""; }
 function footHTML(o){
   return `<div class="ifoot">`
     + (o.type !== "boundary" ? `<button class="btn" data-act="dup">Duplicate</button><button class="btn danger" data-act="del">Remove</button>` : "")
@@ -2732,6 +2862,11 @@ function inspectorHeader(o){
       + `<span class="tagp sky">${shadeClass(d)} shade</span>`;
     const bl = bloomLabel(o);
     if(bl) t += `<span class="tagp pink">${bl}</span>`;
+    if(p?.z){
+      const zh = placeZone(), ok = !zh || (zh >= p.z[0] && zh <= p.z[1]);
+      t += `<span class="tagp${ok ? "" : " warn"}" title="USDA hardiness zones">${zoneLabel(p)}${ok ? "" : " · not hardy here"}</span>`;
+    }
+    if(p?.warn) t += `<span class="tagp warn">${escapeHTML(p.warn)}</span>`;
     t += `<span class="tagp">${o.height} × ${o.spread} ft</span>`;
   } else if(o.type === "bed"){
     const st = bedStats.get(o.id);
@@ -3392,7 +3527,9 @@ $("projstatus").addEventListener("click", ()=>savePlan());
 
 /* ---------- species library ---------- */
 let libMode = "place", pendingPreset = null;
-const lib = {type:"all", hmin:5, hmax:60, shade:new Set(["Dappled","Moderate","Dense"]), bloom:false, q:""};
+const lib = {type:"all", hmin:5, hmax:60, shade:new Set(["Dappled","Moderate","Dense"]), bloom:false, q:"", zone:"auto", hardy:false};
+function libZone(){ return lib.zone === "auto" ? placeZone() : +lib.zone; }
+const LIB_TALLEST = Math.max(62, ...PRESETS.map(p=>p.h + 2));
 function openLibrary(mode){
   libMode = mode;
   showAddMenu(false);
@@ -3407,7 +3544,7 @@ function openLibrary(mode){
 }
 function closeLibrary(){ $("library").hidden = true; }
 function libSilhouette(p){
-  const sh = SHAPES[p.s] || SHAPES.round, k = 84/62, g = 94, cx = 140;
+  const sh = SHAPES[p.s] || SHAPES.round, k = 84/LIB_TALLEST, g = 94, cx = 140;
   const top = g - p.h*k, cbFt = p.cb ?? (Number.isFinite(sh.baseFt) ? sh.baseFt : p.h*sh.base), cb = g - cbFt*k, half = p.w/2*k;
   const col = new THREE.Color(p.leaf ?? 0x46702c);
   const hex = "#"+col.getHexString(), line = "#"+col.clone().lerp(new THREE.Color(0xC9D8B8), .5).getHexString();
@@ -3434,6 +3571,8 @@ function libMatches(p){
   if(p.h < lib.hmin || p.h > lib.hmax + (lib.hmax >= 60 ? 99 : 0)) return false;
   if(!lib.shade.has(shadeClass(p.d))) return false;
   if(lib.bloom && !p.bloom) return false;
+  const z = libZone();
+  if(lib.hardy && z && p.z && (z < p.z[0] || z > p.z[1])) return false;
   if(lib.q){
     const hay = (p.n+" "+(p.sci||"")+" "+p.gn+" "+(p.note||"")).toLowerCase();
     if(!lib.q.split(/\s+/).every(w=>hay.includes(w))) return false;
@@ -3444,6 +3583,12 @@ function renderLibrary(){
   const cur = selected(), here = new Map();
   for(const o of S.objects) if(o.type === "tree") here.set(o.name, (here.get(o.name)||0) + 1);
   $("libhval").textContent = `${lib.hmin}–${lib.hmax}${lib.hmax >= 60 ? "+" : ""} ft`;
+  const zone = libZone();
+  $("libzval").textContent = zone ? "Zone "+zone : "Not set";
+  $("libzone").value = lib.zone;
+  $("libhardy").disabled = !zone;
+  $("libgrid").classList.toggle("compact", prefs.libSize === "compact");
+  document.querySelectorAll("#libsize button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.size === (prefs.libSize || "large")));
   const a = (lib.hmin-5)/55*100, b = (lib.hmax-5)/55*100;
   const dual = document.querySelector(".dual");
   dual.style.setProperty("--a", a+"%"); dual.style.setProperty("--b", b+"%");
@@ -3462,10 +3607,11 @@ function renderLibrary(){
         const btn = libMode === "replace"
           ? (isCur ? `<button class="btn" disabled>Current</button>` : `<button class="btn" data-pick="${i}">Use this</button>`)
           : `<button class="btn${count ? "" : ""}" data-pick="${i}">${count ? "Add another" : "Place"}</button>`;
-        html += `<article class="lcard${isCur ? " cur" : ""}">${libSilhouette(p)}
+        const cold = zone && p.z && (zone < p.z[0] || zone > p.z[1]);
+        html += `<article class="lcard${isCur ? " cur" : ""}${cold ? " cold" : ""}">${libSilhouette(p)}
           <div class="nm"><h4>${escapeHTML(p.n)}</h4><span class="tg${count ? " here" : ""}">${count ? (count > 1 ? count+" in your yard" : "In your yard") : ""}</span></div>
           <div class="la">${escapeHTML(p.sci || "")}</div>
-          <div class="ft"><div class="mt"><span>${p.h} × ${p.w} ft</span><span class="sh">${shadeClass(p.d)}</span>${p.bloom ? `<span class="bl">Blooms</span>` : ""}</div>${btn}</div>
+          <div class="ft"><div class="mt"><span>${p.h} × ${p.w} ft</span><span class="sh">${shadeClass(p.d)}</span>${p.bloom ? `<span class="bl">Blooms</span>` : ""}${p.z ? `<span class="zn" title="${cold ? "Not hardy in zone "+zone : "USDA hardiness zones"}">Z${p.z[0]}–${p.z[1]}</span>` : ""}${p.warn ? `<span class="wn">${escapeHTML(p.warn)}</span>` : ""}</div>${btn}</div>
         </article>`;
       }
       html += `</div>`;
@@ -3507,6 +3653,13 @@ $("libshade").addEventListener("change", e=>{
   renderLibrary();
 });
 $("libbloom").addEventListener("change", e=>{ lib.bloom = e.target.checked; renderLibrary(); });
+$("libzone").addEventListener("change", e=>{ lib.zone = e.target.value; renderLibrary(); });
+$("libhardy").addEventListener("change", e=>{ lib.hardy = e.target.checked; renderLibrary(); });
+$("libsize").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-size]");
+  if(!b) return;
+  prefs.libSize = b.dataset.size; savePrefs(); renderLibrary();
+});
 
 /* ---------- lot plan, fence tiles and the north dial in the Lot pane ---------- */
 const FENCE_ICONS = {
@@ -3582,9 +3735,12 @@ function afterDateChange(){
   const {rise, set} = dayEdges();
   S.minutes = clamp(S.minutes, Math.round(rise), Math.round(set));
   buildArc();
-  const leaf = leafOn();
+  const leaf = leafKey();
   if(leaf !== lastLeaf){ lastLeaf = leaf; rebuildAll(); }
-  else trees.setSeason(objGroup, seasonNow());
+  else for(const o of S.objects){
+    const m = o.type === "tree" && meshes.get(o.id);
+    if(m) trees.setSeason(m, seasonNow(o));
+  }
   scheduleCompute();
   syncLocationUI();
   markDirty();
@@ -3835,7 +3991,7 @@ function loadState(data, frame){
     }
     uid = Math.max(...S.objects.map(o=>o.id), 0) + 1;
     measure = {a:null, b:null, live:null};
-    nodeEdit = false; activeNode = null; panelFor = "init"; lastLeaf = leafOn();
+    nodeEdit = false; activeNode = null; panelFor = "init"; lastLeaf = leafKey();
     applySimpleChrome();
     syncInputs(); buildGround(); rebuildAll(); buildArc(); drawMeasureLine();
     const keep = S.sel;
@@ -3963,20 +4119,27 @@ function syncInputs(){
 
 /* ============================================================ location ----- */
 const PLACES = [
-  {n:"Fargo, ND", lat:46.8772, lon:-96.7898, z:"America/Chicago"},
-  {n:"Moorhead, MN", lat:46.8738, lon:-96.7678, z:"America/Chicago"},
-  {n:"Bismarck, ND", lat:46.8083, lon:-100.7837, z:"America/Chicago"},
-  {n:"Grand Forks, ND", lat:47.9253, lon:-97.0329, z:"America/Chicago"},
-  {n:"Minneapolis, MN", lat:44.9778, lon:-93.2650, z:"America/Chicago"},
-  {n:"Sioux Falls, SD", lat:43.5446, lon:-96.7311, z:"America/Chicago"},
-  {n:"Chicago, IL", lat:41.8781, lon:-87.6298, z:"America/Chicago"},
-  {n:"Denver, CO", lat:39.7392, lon:-104.9903, z:"America/Denver"},
-  {n:"Phoenix, AZ", lat:33.4484, lon:-112.0740, z:"America/Phoenix"},
-  {n:"Seattle, WA", lat:47.6062, lon:-122.3321, z:"America/Los_Angeles"},
-  {n:"Toronto, ON", lat:43.6532, lon:-79.3832, z:"America/Toronto"},
-  {n:"London, UK", lat:51.5074, lon:-0.1278, z:"Europe/London"},
-  {n:"Sydney, AU", lat:-33.8688, lon:151.2093, z:"Australia/Sydney"}
+  {n:"Fargo, ND", hz:4, lat:46.8772, lon:-96.7898, z:"America/Chicago"},
+  {n:"Moorhead, MN", hz:4, lat:46.8738, lon:-96.7678, z:"America/Chicago"},
+  {n:"Bismarck, ND", hz:4, lat:46.8083, lon:-100.7837, z:"America/Chicago"},
+  {n:"Grand Forks, ND", hz:3, lat:47.9253, lon:-97.0329, z:"America/Chicago"},
+  {n:"Minneapolis, MN", hz:5, lat:44.9778, lon:-93.2650, z:"America/Chicago"},
+  {n:"Sioux Falls, SD", hz:5, lat:43.5446, lon:-96.7311, z:"America/Chicago"},
+  {n:"Chicago, IL", hz:6, lat:41.8781, lon:-87.6298, z:"America/Chicago"},
+  {n:"Denver, CO", hz:6, lat:39.7392, lon:-104.9903, z:"America/Denver"},
+  {n:"Phoenix, AZ", hz:10, lat:33.4484, lon:-112.0740, z:"America/Phoenix"},
+  {n:"Seattle, WA", hz:9, lat:47.6062, lon:-122.3321, z:"America/Los_Angeles"},
+  {n:"Toronto, ON", hz:6, lat:43.6532, lon:-79.3832, z:"America/Toronto"},
+  {n:"London, UK", hz:9, lat:51.5074, lon:-0.1278, z:"Europe/London"},
+  {n:"Sydney, AU", hz:11, lat:-33.8688, lon:151.2093, z:"Australia/Sydney"}
 ];
+/* USDA hardiness zone (whole zones, rounded to the colder half) for a preset
+   place; null for custom coordinates, where the library asks instead. */
+function placeZone(){
+  if(S.zone) return S.zone;
+  const p = PLACES.find(p=>p.n === S.place && Math.abs(p.lat-S.lat) < 1e-3 && Math.abs(p.lon-S.lon) < 1e-3);
+  return p ? p.hz : null;
+}
 function fmtCoord(v, pos, neg){ return Math.abs(v).toFixed(3)+"°"+(v >= 0 ? pos : neg); }
 function placeLabel(){
   return (S.place ? S.place+" · " : "")+fmtCoord(S.lat,"N","S")+" "+fmtCoord(S.lon,"E","W");
@@ -4166,7 +4329,7 @@ async function boot(){
     document.querySelector("#boot .ring").style.animation = "none";
     return;
   }
-  lastLeaf = leafOn();
+  lastLeaf = leafKey();
   applySimpleChrome();
   syncInputs(); buildArc(); drawList(); drawPanel(); setTool("select"); scheduleCompute();
   setNavCollapsed(true);

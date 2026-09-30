@@ -50,6 +50,9 @@ const BY_KIND = {
   locust: ['brown', 0x8a7a6c], alder: ['willow', 0xa8a498], oak: ['oak', 0xbab0a2], hackberry: ['hack', 0xd8d2c8],
   aspen: ['hack', 0xf0f2e2], willow: ['willow', 0xb8a890], hydrangea: ['willow', 0xc0a888], crabapple: ['brown', 0x9a8878],
   spruce: ['plate', 0x9a8878], pine: ['plate', 0xc89a78], cedar: ['cedar', 0xc8a898],
+  brown: ['brown', 0xb0a698], smooth: ['brown', 0xd8d6d0], cherry: ['brown', 0x9a6450], ash: ['oak', 0xc4bcb0],
+  ginkgo: ['oak', 0xb4a894], fir: ['brown', 0xc0beba], whitepine: ['plate', 0x8a847c], scotch: ['plate', 0xe89a62],
+  larch: ['plate', 0xb08a72],
 };
 
 export function barkMaps(kind) {

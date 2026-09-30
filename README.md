@@ -10,11 +10,14 @@ Inspired by three pieces of web work: Lusion's *Of the Oak* (a procedurally grow
   - **Broadleaves** grow by space colonization (branches reach toward light points filling the species' crown), then fan into fine twigs, and taper by the pipe model.
   - **Conifers** grow a whorl of branches a year with branchlets. Norway spruce's hang in curtains.
   - **Leaves** are individual instances in the species' true shape and arrangement: opposite pairs on maples, alternate on lindens, a fiddle outline on bur oak, pinnae on honeylocust. They're lit from both sides, with pale undersides and sun glowing through.
+  - **78 trees for zones 2–9**, each tagged with its USDA hardiness range: sugar, red, silver and Japanese maples, boxelder, northern pin and red oaks, Kentucky coffeetree, buckeyes, Japanese tree lilac, serviceberry, Canada Red chokecherry, plums, hawthorns, mountain ash, pagoda and flowering dogwoods, ironwood, blue beech, ginkgo, tamarack, magnolia, redbud, sweetgum, tulip tree, black gum, firs, white and Scotch pines, weeping white spruce, and the trees already in many older yards (green ash, cottonwood, Siberian elm).
+  - Special growth where the species needs it: pagoda dogwood in flat tiers, weeping white spruce with limbs hanging against the trunk, tamarack needles that turn gold and drop, compound leaves (ash, coffeetree, buckeye, mountain ash), a fan for ginkgo, square-tipped tulip tree leaves.
   - **Research.** Species data comes from arboretum and extension fact sheets; see [docs/botany.md](docs/botany.md).
-- **Seasons in the trees.** Everything is timed from the leaf-out and leaf-drop dates:
+- **Seasons in the trees.** Everything is timed from the leaf-out and leaf-drop dates, shifted per species (buckeyes leaf out a week early and are bare by mid-September; Kentucky coffeetree is two weeks late and drops early; willows hold on late). The shade maps follow the same calendar.
   - Leaves expand over the fortnight after leaf-out.
   - Fall colour starts on the outer leaves; then leaves drop a few at a time, and litter builds under the tree and is gone three weeks later.
-  - Crabapples blossom for two weeks at leaf-out. Hydrangea panicles go lime, then white, then pink.
+  - Crabapples blossom for two weeks at leaf-out. Redbud, magnolia, plums and serviceberry flower on bare wood. Lilac plumes open in June. Hydrangea panicles go lime, then white, then pink.
+  - Canada Red chokecherry opens green and turns purple by midsummer; ginkgo turns gold and drops nearly all at once.
   - Lindens carry their June bracts; acorns, pods, crabapple fruit and alder cones hang into winter; spruces carry their cones.
 - **Diorama stage** (Display → Stage).
   - **Diorama:** the lot is cut from the earth, its edge showing turf over a scanned soil profile, on a plinth in a studio. The sky still lights it. Tilt-shift grows as you pull back.
@@ -62,7 +65,9 @@ All of the original planner's features are here, in a quieter "field notebook" i
   - Readouts show sun height, bearing, the shadow cast by a 10 ft object, daylight and solar noon.
 - **Species library:** every tree drawn to the same scale.
   - Grouped Deciduous → genus (maples, lindens, birches, oaks…) and Evergreen → genus (spruces, pines, junipers & arborvitae).
-  - Filter by type, mature height, shade density and flowering, or search.
+  - Filter by type, mature height, shade density, flowering and hardiness zone (taken from the yard's location, or pick one), or search.
+  - **Large** or **Compact** cards; compact fits about twice as many trees on screen.
+  - Tags flag invasive species and emerald ash borer risk.
   - Place one, or use it to change the species of the selected tree.
 - **Tree inspector:**
   - A to-scale elevation (height, crown width, a 6 ft figure). Drag its brass line to set **canopy starts at** (ft, 0.5 ft steps). The shade engine uses it too.

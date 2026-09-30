@@ -192,6 +192,10 @@
         <h1 id="libtitle">Choose a tree</h1>
         <p id="libsubtitle">Hardy trees for cold-winter yards, drawn to the same scale so you can compare their size at maturity.</p>
       </div>
+      <div class="seg" id="libsize" role="group" aria-label="Card size">
+        <button data-size="large" aria-pressed="true" title="Large cards">Large</button>
+        <button data-size="compact" aria-pressed="false" title="Compact cards: more trees at once">Compact</button>
+      </div>
       <label class="search"><svg class="ic"><use href="#i-search"/></svg>
         <input type="search" id="libsearch" placeholder="Search species or cultivar" aria-label="Search species"></label>
       <button class="ibtn big" id="libclose" title="Close (Esc)"><svg class="ic"><use href="#i-close"/></svg></button>
@@ -220,6 +224,16 @@
             <label><input type="checkbox" value="Moderate" checked><i class="sh2"></i>Moderate, 65–87%</label>
             <label><input type="checkbox" value="Dense" checked><i class="sh3"></i>Dense, 88% and up</label>
           </div>
+        </div>
+        <div class="fgroup">
+          <div class="fh"><h2>Hardiness</h2><span class="num" id="libzval">—</span></div>
+          <select id="libzone" aria-label="Your hardiness zone">
+            <option value="auto">From the yard's location</option>
+            <option value="2">Zone 2</option><option value="3">Zone 3</option><option value="4">Zone 4</option>
+            <option value="5">Zone 5</option><option value="6">Zone 6</option><option value="7">Zone 7</option>
+            <option value="8">Zone 8</option><option value="9">Zone 9</option>
+          </select>
+          <label class="chk"><input type="checkbox" id="libhardy">Only trees hardy here</label>
         </div>
         <div class="fgroup">
           <h2>Flowers</h2>
