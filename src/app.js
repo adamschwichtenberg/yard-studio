@@ -112,9 +112,9 @@ const PRESETS = [
  {gn:"Crabapples", n:"Prairifire Crabapple", bt:"Blooms in spring", z:[4,8], s:"round", h:20, w:20, ev:false, d:.72, leaf:0x6a2a34, leaf2:0x33402a, fall:0x8a4a2a,
   bloom:[0x9c1848, 0xd8306e, 0xe0628e], sci:"Malus 'Prairifire'",
   note:"Deep pink-red blossoms for about two weeks in spring, then reddish-purple leaves maturing to dark green. Disease resistant."},
- {gn:"Crabapples", n:"Snowbound Crabapple", z:[3,8], s:"round", h:20, w:20, ev:false, d:.72, leaf:0x5a8a3a, fall:0xa8802a,
-  bloom:[0xeee6e2, 0xffffff, 0xf4f2ee], bt:"White blossoms in spring", sci:"Malus",
-  note:"White-flowered crabapple: pure white blossoms for about two weeks in spring over fresh, light green leaves. Small fruit into winter."},
+ {gn:"Crabapples", n:"Snowdrift Crabapple", z:[4,8], s:"round", h:20, w:20, ev:false, d:.72, leaf:0x5a8a3a, fall:0xa8802a,
+  bloom:[0xc8505a, 0xffffff, 0xf4f2ee], bt:"White blossoms in spring", fruit:[0xe0561e, 0xc83a1a], sci:"Malus 'Snowdrift'",
+  note:"Red buds open to pure white blossoms for about two weeks in spring, over fresh, light green leaves. Orange-red fruit hangs into winter."},
  {gn:"Apples", n:"Honeycrisp Apple", z:[3,7], s:"round", h:18, w:18, ev:false, d:.74, leaf:0x4e7a32, fall:0x9a8a30,
   bloom:[0xd88aa0, 0xf6e4ea, 0xfaf4f2], bt:"Blossoms in spring, apples in fall",
   sci:"Malus domestica 'Honeycrisp'", note:"University of Minnesota apple. Pink-budded white blossoms in spring, then large red-and-yellow apples ripening in September."},
@@ -318,6 +318,7 @@ function fromPreset(name, x, y){
           evergreen:d.ev, density:d.d, note:d.note, leaf:d.leaf, fall:d.fall};
   if(d.bloom) o.bloom = d.bloom;
   if(d.leaf2 != null) o.leaf2 = d.leaf2;
+  if(d.fruit) o.fruit = d.fruit;
   if(d.cb != null) o.crownBase = d.cb;
   return o;
 }
@@ -373,6 +374,11 @@ function ensureFenceSides(){
   if(!Array.isArray(S.fence.sides)) S.fence.sides = [];
   while(S.fence.sides.length < n) S.fence.sides.push(true);
   if(S.fence.sides.length > n) S.fence.sides.length = n;
+  /* Optional span per side, in feet from the side's first corner: {a, b}, or
+     null for the whole side. */
+  if(!Array.isArray(S.fence.spans)) S.fence.spans = [];
+  while(S.fence.spans.length < n) S.fence.spans.push(null);
+  S.fence.spans.length = n;
   if(!Array.isArray(S.boundaryLabels)) S.boundaryLabels = [];
   while(S.boundaryLabels.length < n) S.boundaryLabels.push("");
   S.boundaryLabels.length = n;
@@ -384,6 +390,9 @@ function insertBoundaryCorner(k, point){
   S.boundary.splice(k+1, 0, point);
   S.boundaryLabels.splice(k+1, 0, S.boundaryLabels[k]);
   S.fence.sides.splice(k+1, 0, S.fence.sides[k]);
+  /* the split side's partial run no longer means the same thing */
+  S.fence.spans[k] = null;
+  S.fence.spans.splice(k+1, 0, null);
 }
 function removeBoundaryCorner(k){
   ensureFenceSides();
@@ -394,6 +403,8 @@ function removeBoundaryCorner(k){
   S.boundary.splice(k, 1);
   S.boundaryLabels.splice(k, 1);
   S.fence.sides.splice(k, 1);
+  S.fence.spans.splice(k, 1);
+  if(k > 0) S.fence.spans[k-1] = null;
 }
 /* edge i runs from boundary[i] to boundary[i+1] */
 function boundaryEdges(){
@@ -410,6 +421,25 @@ function boundaryEdges(){
     const direction = compassName(bear);
     out.push({i, A, B, len, mx, my, nx, ny, bear, direction,
               name:S.boundaryLabels?.[i] || direction});
+  }
+  return out;
+}
+/* The fenced stretch of each side: the whole side, or the part between its
+   span's two distances (measured from the side's first corner). */
+function fenceSpanOf(e){
+  const sp = ensureFenceSides() && S.fence.spans[e.i];
+  const a = sp ? clamp(sp.a, 0, e.len) : 0, b = sp ? clamp(sp.b, a, e.len) : e.len;
+  return {a, b};
+}
+function fenceSegments(){
+  const sides = ensureFenceSides(), out = [];
+  for(const e of boundaryEdges()){
+    if(!sides[e.i] || e.len < .3) continue;
+    const {a, b} = fenceSpanOf(e);
+    if(b - a < .3) continue;
+    const ux = (e.B.x-e.A.x)/e.len, uy = (e.B.y-e.A.y)/e.len;
+    const A = {x:e.A.x+ux*a, y:e.A.y+uy*a}, B = {x:e.A.x+ux*b, y:e.A.y+uy*b};
+    out.push({...e, A, B, len:b-a, mx:(A.x+B.x)/2, my:(A.y+B.y)/2, partial: a > .05 || b < e.len-.05});
   }
   return out;
 }
@@ -695,9 +725,8 @@ function inPolyShadow(ps, px, py){
 }
 function fenceCasters(u, cot){
   if(!S.fence.on || S.fence.height <= 0) return [];
-  const sides = ensureFenceSides(), H = S.fence.height, out = [];
-  for(const e of boundaryEdges()){
-    if(!sides[e.i] || e.len < .2) continue;
+  const H = S.fence.height, out = [];
+  for(const e of fenceSegments()){
     out.push({sh: sweptRect(e.mx, e.my, e.len, .35,
                             Math.atan2(e.B.y-e.A.y, e.B.x-e.A.x)/DEG, H, u, cot),
               dens:S.fence.density});
@@ -1287,7 +1316,7 @@ function buildFence(){
   const st = FENCE_STYLES[S.fence.style] || FENCE_STYLES.picket;
   const H = S.fence.height, g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({color:st.color, roughness:st.rough, metalness:st.metal});
-  const segs = boundaryEdges().filter(e=>sides[e.i] && e.len > .3);
+  const segs = fenceSegments();
   if(!segs.length) return;
 
   if(S.simple){
@@ -1743,6 +1772,7 @@ function applyImportedBoundary({points, labels, reference, source}){
   S.boundaryLabels = points.map((p,i)=>typeof labels?.[i] === "string" ? labels[i].trim().slice(0,80) : "");
   S.gridFrame = null;
   S.fence.sides = points.map(()=>true);
+  S.fence.spans = points.map(()=>null);
   S.boundaryImage = {source, reference:{...reference}, geometryEdited:false};
   S.boundaryImageDraft = null;
   nodeEdit = true; activeNode = null; panelFor = "init";
@@ -3114,6 +3144,7 @@ function applyPreset(o, p, fromSelect = false){
   o.evergreen = p.ev; o.density = p.d; o.note = p.note; o.leaf = p.leaf; o.fall = p.fall;
   if(p.bloom) o.bloom = p.bloom; else delete o.bloom;
   if(p.leaf2 != null) o.leaf2 = p.leaf2; else delete o.leaf2;
+  if(p.fruit) o.fruit = p.fruit; else delete o.fruit;
   if(p.cb != null) o.crownBase = p.cb;
   /* Keep the inspector where it was, so you can step through species one
      after another without scrolling back down each time. */
@@ -3273,11 +3304,24 @@ function drawFenceEdges(){
   const host = document.getElementById("fenceedges");
   if(!host) return;
   const sides = ensureFenceSides();
-  host.innerHTML = boundaryEdges().map(e=>`
+  host.innerHTML = boundaryEdges().map(e=>{
+    const {a, b} = fenceSpanOf(e), L = Math.round(e.len*10)/10;
+    const partial = a > .05 || b < e.len-.05;
+    return `<div class="edgeitem ${sides[e.i]?"on":""}">
     <label class="edgerow ${sides[e.i]?"on":""}" data-edge="${e.i}">
-      <span class="w"><b>${escapeHTML(e.name)}</b> side · ${e.len.toFixed(1)} ft</span>
+      <span class="w"><b>${escapeHTML(e.name)}</b> side · ${e.len.toFixed(1)} ft${partial && sides[e.i] ? ` · <em>${(b-a).toFixed(1)} ft fenced</em>` : ""}</span>
       <input type="checkbox" class="sw" data-edge="${e.i}" ${sides[e.i]?"checked":""}>
-    </label>`).join("");
+    </label>
+    ${sides[e.i] ? `<div class="edgespan" data-span="${e.i}">
+      <span>Runs from</span>
+      <span class="inp"><input type="number" data-spanend="a" min="0" max="${L}" step="1" value="${Math.round(a*10)/10}" aria-label="${escapeHTML(e.name)} fence starts at, feet from its first corner"><i>ft</i></span>
+      <span>to</span>
+      <span class="inp"><input type="number" data-spanend="b" min="0" max="${L}" step="1" value="${Math.round(b*10)/10}" aria-label="${escapeHTML(e.name)} fence ends at, feet from its first corner"><i>ft</i></span>
+      <span>from the ${compassName(vecBearing(e.A.x-e.B.x, e.A.y-e.B.y))} end</span>
+      ${partial ? `<button class="linkbtn" data-spanreset="${e.i}">Whole side</button>` : ""}
+    </div>` : ""}
+    </div>`;
+  }).join("");
   drawLotPlan();
 }
 document.getElementById("objlist").addEventListener("click", e=>{
@@ -3287,10 +3331,30 @@ document.getElementById("objlist").addEventListener("click", e=>{
   select(b.dataset.id === BOUNDARY ? BOUNDARY : +b.dataset.id);
 });
 document.getElementById("fenceedges").addEventListener("change", e=>{
-  const i = e.target.dataset.edge;
-  if(i == null) return;
-  ensureFenceSides()[+i] = e.target.checked;
-  buildFence(); scheduleCompute(); drawFenceEdges(); markDirty();
+  const span = e.target.closest("[data-span]");
+  if(span){
+    /* Part of a side: keep the two ends in order and on the side. */
+    const i = +span.dataset.span, edge = boundaryEdges()[i];
+    const cur = fenceSpanOf(edge);
+    const v = parseFloat(e.target.value);
+    let a = cur.a, b = cur.b;
+    if(Number.isFinite(v)){ if(e.target.dataset.spanend === "a") a = v; else b = v; }
+    a = clamp(a, 0, edge.len); b = clamp(b, 0, edge.len);
+    if(a > b) [a, b] = [b, a];
+    ensureFenceSides();
+    S.fence.spans[i] = a < .05 && b > edge.len-.05 ? null : {a, b};
+  } else {
+    const i = e.target.dataset.edge;
+    if(i == null) return;
+    ensureFenceSides()[+i] = e.target.checked;
+  }
+  buildFence(); scheduleCompute(); drawFenceEdges(); markDirty(); scheduleHist();
+});
+document.getElementById("fenceedges").addEventListener("click", e=>{
+  const r = e.target.closest("[data-spanreset]");
+  if(!r) return;
+  ensureFenceSides(); S.fence.spans[+r.dataset.spanreset] = null;
+  buildFence(); scheduleCompute(); drawFenceEdges(); markDirty(); scheduleHist();
 });
 
 /* ============================================================ controls ----- */
@@ -3714,9 +3778,11 @@ function drawLotPlan(){
     if(o.type === "bed") h += `<polygon points="${worldPoly({...o, poly:rectPoly(o.w,o.h)}).map(q=>X(q.x).toFixed(1)+","+Y(q.y).toFixed(1)).join(" ")}" fill="rgba(212,168,90,.18)"/>`;
   }
   const cx = X(bb.cx), cy = Y(bb.cy);
+  const fenced = new Map(S.fence.on !== false ? fenceSegments().map(f=>[f.i, f]) : []);
   for(const e of boundaryEdges()){
-    const on = S.fence.on !== false && sides[e.i];
-    h += `<line x1="${X(e.A.x).toFixed(1)}" y1="${Y(e.A.y).toFixed(1)}" x2="${X(e.B.x).toFixed(1)}" y2="${Y(e.B.y).toFixed(1)}" stroke="${on ? "#D4A85A" : "rgba(236,231,218,.45)"}" stroke-width="${on ? 3 : 1.2}" ${on ? "" : `stroke-dasharray="4 3"`}/>`;
+    const f = fenced.get(e.i);
+    h += `<line x1="${X(e.A.x).toFixed(1)}" y1="${Y(e.A.y).toFixed(1)}" x2="${X(e.B.x).toFixed(1)}" y2="${Y(e.B.y).toFixed(1)}" stroke="rgba(236,231,218,.45)" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+    if(f) h += `<line x1="${X(f.A.x).toFixed(1)}" y1="${Y(f.A.y).toFixed(1)}" x2="${X(f.B.x).toFixed(1)}" y2="${Y(f.B.y).toFixed(1)}" stroke="#D4A85A" stroke-width="3" stroke-linecap="round"/>`;
     if(e.len < 1) continue;
     let mx = X((e.A.x+e.B.x)/2), my = Y((e.A.y+e.B.y)/2);
     const dx = mx - cx, dy = my - cy, dl = Math.hypot(dx,dy) || 1;
@@ -3729,8 +3795,10 @@ function drawLotPlan(){
   const na = -S.north;
   h += `<g transform="translate(${W-16} ${H-18}) rotate(${na})"><path d="M0 -12l4 10h-8z" fill="#D4A85A"/></g><text x="${W-16}" y="${H-2}" text-anchor="middle" fill="#A6A89A" font-family="Geist,sans-serif" font-size="9.5">N</text>`;
   svg.innerHTML = h;
-  const on = boundaryEdges().filter(e=>S.fence.on !== false && sides[e.i]).length, n = boundaryEdges().length;
-  $("lotfenced").textContent = on === 0 ? "No fence" : on === n ? `Fenced: all ${n} sides` : `Fenced: ${on} of ${n} sides`;
+  const n = boundaryEdges().length, on = fenced.size, part = [...fenced.values()].filter(f=>f.partial).length;
+  const run = Math.round([...fenced.values()].reduce((t,f)=>t+f.len, 0));
+  $("lotfenced").textContent = on === 0 ? "No fence"
+    : (on === n && !part ? `Fenced: all ${n} sides` : `Fenced: ${on} of ${n} sides${part ? `, ${part} in part` : ""}`) + ` · ${run} ft`;
 }
 function drawNorthDial(){
   const d = $("northdial");
@@ -3829,6 +3897,7 @@ $("fencestyle").addEventListener("change", e=>{
 $("fenceall").addEventListener("click", ()=>{
   S.fence.on = true;
   ensureFenceSides().fill(true);
+  S.fence.spans.fill(null);
   buildFence(); scheduleCompute(); drawFenceEdges(); markDirty();
 });
 $("fencenone").addEventListener("click", ()=>{
@@ -3989,7 +4058,7 @@ function loadState(data, frame){
   try{
     S = Object.assign(freshState(), data);
     /* Presets that were renamed or replaced. */
-    for(const o of S.objects || []) if(o.type === "tree" && o.name === "Flowering crabapple") o.name = "Snowbound Crabapple";
+    for(const o of S.objects || []) if(o.type === "tree" && (o.name === "Flowering crabapple" || o.name === "Snowbound Crabapple")) o.name = "Snowdrift Crabapple";
     /* plans saved before time zones existed used a fixed offset */
     if(!("tzMode" in data)){ S.tzMode = "manual"; S.place = ""; }
     S.fence = Object.assign({on:true, style:"picket", height:5, density:.5, sides:[]}, data.fence||{});

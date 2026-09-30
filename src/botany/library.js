@@ -4,7 +4,7 @@ import { SPECIES, LEAF, SHOOT, BARK, speciesFor } from './species.js';
 import { growBroadleaf, growConifer } from './grow.js';
 import { leafCard, shootCard, flowerCard, bractCard } from './leafArt.js';
 import { barkMaps } from './barkMaps.js';
-import { mulchRing, leafLitter } from '../scene/ground.js';
+import { leafLitter } from '../scene/ground.js';
 
 /*
  * Botanical trees for the planner. Each tree is grown from its species
@@ -478,8 +478,7 @@ export class TreeLibrary {
     }
     this.setSeason(grp, season);
 
-    // Ground under the tree: a hardwood mulch ring, and leaf litter in fall.
-    grp.add(mulchRing(THREE.MathUtils.clamp(t.spread * 0.09 + 1.4, 2.2, 4.6)));
+    // Ground under the tree: leaf litter in fall only (lawn runs right up to the trunk otherwise).
     if (!t.evergreen) {
       const litter = leafLitter(Math.max(2.5, t.spread * 0.58), fallColor);
       grp.add(litter);
@@ -515,8 +514,10 @@ export class TreeLibrary {
         : sharedGeo('berry', () => new THREE.IcosahedronGeometry(0.5, 1));
       const mat = new THREE.MeshStandardMaterial({ roughness: orn.type === 'berry' || orn.type === 'pome' ? 0.45 : 0.85 });
       mesh = new THREE.InstancedMesh(geo, mat, n);
-      const c0 = new THREE.Color((orn.color || [0x888888])[0]);
-      const c1 = new THREE.Color((orn.color || [0x888888, 0x888888])[1]);
+      // A variety's own fruit colour (Snowdrift's orange-red crabs) wins over the species'.
+      const fc = orn.type === 'pome' && t.fruit ? t.fruit : orn.color || [0x888888, 0x888888];
+      const c0 = new THREE.Color(fc[0]);
+      const c1 = new THREE.Color(fc[1] ?? fc[0]);
       const c = new THREE.Color();
       for (let i = 0; i < n; i++) mesh.setColorAt(i, c.copy(c0).lerp(c1, orn.list[i].rand));
     }
