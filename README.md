@@ -4,11 +4,18 @@ Plan a yard and see where the shade falls, at any time of day, on any date, anyw
 
 ![The planner with the tree inspector open](docs/screenshot.png)
 
+**Just want to run it?** Download the ZIP (or clone) and double-click `yard-shade-studio.html`. It's the whole app in one file and works straight from disk, no install or server needed. Opening `index.html` from disk forwards you to it. An internet connection only adds the web fonts and a sharper sky photo; without one it falls back to the bundled sky.
+
+To work on the code:
+
 ```bash
 npm install
 npm run dev            # http://localhost:5173
 npm run fetch-assets   # optional: 4k Poly Haven sky HDRI (~25 MB) into public/hdri
+npm run build:standalone   # rebuild yard-shade-studio.html after changing the code
 ```
+
+`index.html` is the development page: it loads the source modules, so it needs `npm run dev` (browsers block module scripts on `file://` pages).
 
 The original single-file app is kept for reference at `legacy/yard-shade-studio-original.html`.
 

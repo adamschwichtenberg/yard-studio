@@ -63,7 +63,12 @@ export class SkyEnvironment {
 
   async loadHDRI(onStatus = () => {}) {
     const loader = new HDRLoader();
-    for (const src of HDRI_SOURCES) {
+    // The standalone single-file build carries the bundled sky inline, since a
+    // page opened from disk can't fetch files next to it.
+    const sources = globalThis.__YARD_HDRI_B64
+      ? [HDRI_SOURCES[1], { label: 'Quarry (bundled 1k)', url: 'embedded:quarry_01_1k' }]
+      : HDRI_SOURCES;
+    for (const src of sources) {
       try {
         onStatus(`Loading ${src.label}…`);
         const tex = await loadHDR(loader, src.url);
@@ -132,10 +137,14 @@ export class SkyEnvironment {
 }
 
 async function loadHDR(loader, url) {
-  if (!url.endsWith('.b64.txt')) return loader.loadAsync(url);
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`${res.status} ${url}`);
-  const bin = Uint8Array.from(atob((await res.text()).trim()), (c) => c.charCodeAt(0));
+  let b64;
+  if (url.startsWith('embedded:')) b64 = globalThis.__YARD_HDRI_B64;
+  else if (url.endsWith('.b64.txt')) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${res.status} ${url}`);
+    b64 = await res.text();
+  } else return loader.loadAsync(url);
+  const bin = Uint8Array.from(atob(b64.trim()), (c) => c.charCodeAt(0));
   const d = loader.parse(bin.buffer);
   const tex = new THREE.DataTexture(d.data, d.width, d.height, THREE.RGBAFormat, d.type);
   Object.assign(tex, {

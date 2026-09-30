@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Yard Shade Studio</title>
+<script>
+  /* Opened straight from disk (e.g. a downloaded ZIP)? The source page needs a
+     dev server, so hand over to the self-contained build next to it. */
+  if (location.protocol === "file:" && !/yard-shade-studio\.html$/.test(location.pathname))
+    location.replace("yard-shade-studio.html");
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
