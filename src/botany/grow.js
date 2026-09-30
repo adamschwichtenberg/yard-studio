@@ -82,11 +82,12 @@ class Grid {
     this.cell = cell;
     this.map = new Map();
   }
-  key(x, y, z) {
-    return `${Math.floor(x / this.cell)},${Math.floor(y / this.cell)},${Math.floor(z / this.cell)}`;
+  // Numeric keys: cells are small integers well inside ±512.
+  static k(cx, cy, cz) {
+    return ((cx + 512) * 1024 + (cy + 512)) * 1024 + (cz + 512);
   }
   add(i, p) {
-    const k = this.key(p.x, p.y, p.z);
+    const k = Grid.k(Math.floor(p.x / this.cell), Math.floor(p.y / this.cell), Math.floor(p.z / this.cell));
     let b = this.map.get(k);
     if (!b) this.map.set(k, (b = []));
     b.push(i);
@@ -98,10 +99,25 @@ class Grid {
     for (let dx = -1; dx <= 1; dx++)
       for (let dy = -1; dy <= 1; dy++)
         for (let dz = -1; dz <= 1; dz++) {
-          const b = this.map.get(`${cx + dx},${cy + dy},${cz + dz}`);
-          if (b) for (const i of b) fn(i);
+          const b = this.map.get(Grid.k(cx + dx, cy + dy, cz + dz));
+          if (b) for (let j = 0; j < b.length; j++) fn(b[j]);
         }
   }
+}
+
+/** Crown radius at height y, from a 512-entry table of the profile (it's called a lot). */
+function envelopeLUT(fn, R, cb, crownH) {
+  const n = 512;
+  const t = new Float32Array(n + 1);
+  for (let i = 0; i <= n; i++) t[i] = R * fn(i / n);
+  return (y) => {
+    const u = (y - cb) / crownH;
+    if (u <= 0) return t[0];
+    if (u >= 1) return t[n];
+    const f = u * n;
+    const i = f | 0;
+    return t[i] + (t[i + 1] - t[i]) * (f - i);
+  };
 }
 
 /* ------------------------------------------------------------ broadleaves */
@@ -113,7 +129,7 @@ export function growBroadleaf(p) {
   const { H, R, cb, fn, sp, shape, variant } = p;
   const r = rng(hash(`${shape}|${p.key}|${H.toFixed(1)}|${R.toFixed(1)}|${cb.toFixed(2)}|${variant}`));
   const crownH = Math.max(0.5, H - cb);
-  const envelope = (y) => R * fn(THREE.MathUtils.clamp((y - cb) / crownH, 0, 1));
+  const envelope = envelopeLUT(fn, R, cb, crownH);
   const D = THREE.MathUtils.clamp(Math.max(H, R * 1.4) / 42, 0.3, 1.15);
   const nodes = new Nodes();
 
@@ -190,6 +206,8 @@ export function growBroadleaf(p) {
   const dk = D * 2.1;
   const grid = new Grid(di);
   for (let i = 0; i < nodes.length; i++) grid.add(i, nodes.pos[i]);
+  const attrGrid = new Grid(dk);
+  attr.forEach((a, i) => attrGrid.add(i, a.p));
   const tropism = V(0, sp.tropism * 0.45, 0);
   let idle = 0;
   for (let it = 0; it < 140 && idle < 3; it++) {
@@ -226,13 +244,13 @@ export function growBroadleaf(p) {
       grid.add(j, q);
       fresh.push(j);
     }
-    for (const a of attr) {
-      if (!a.alive) continue;
-      for (const j of fresh)
-        if (nodes.pos[j].distanceToSquared(a.p) < dk * dk) {
-          a.alive = false;
-          break;
-        }
+    // Attractors reached by a new shoot are used up.
+    for (const j of fresh) {
+      const q = nodes.pos[j];
+      attrGrid.near(q, (i) => {
+        const a = attr[i];
+        if (a.alive && q.distanceToSquared(a.p) < dk * dk) a.alive = false;
+      });
     }
   }
 
@@ -331,7 +349,7 @@ export function growBroadleaf(p) {
   if (kTrunk > 1) for (let i = 0; i < N; i++) rad[i] *= 1 + (kTrunk - 1) * Math.sqrt(rad[i] / rad[0]);
 
   const chains = buildChains(nodes, rad);
-  const leaves = placeLeaves(nodes, rad, depth, { ...p, envelope, crownH, D, r, streamers });
+  const leaves = placeLeaves(nodes, rad, depth, { ...p, envelope, crownH, D, r, streamers, chains });
   const ornaments = placeOrnaments(nodes, depth, { ...p, envelope, crownH, D, r });
   return { chains, leaves, ornaments, trunkR, D };
 }
@@ -372,14 +390,20 @@ function buildChains(nodes, rad) {
  * twig tip. Each shoot carries the species' leaf count in its arrangement
  * (opposite pairs turned 90° each node, or alternate on a 2/5 spiral), on
  * petioles angled out from the twig, blades turned toward the light.
+ *
+ * Then a coverage pass: the crown is projected straight down and from four
+ * 40° sun angles, and wherever the leaves leave a gap, a short twig carries a
+ * small leaf cluster into it, until the crown blocks about as much light as
+ * the tree's density says (a mature maple or linden casts near-solid shade;
+ * a honeylocust stays dappled).
  */
 function placeLeaves(nodes, rad, depth, p) {
-  const { sp, leaf, H, cb, envelope, crownH, r, D, target, streamers } = p;
+  const { sp, leaf, cb, envelope, crownH, r, D, target, streamers, chains } = p;
+  const leafArea = p.leafArea || 0.3; // opaque area of one leaf card, per length²
   const shoots = [];
   for (let i = 0; i < nodes.length; i++) {
     if (depth[i] > 1 || nodes.pos[i].y < cb * 0.85) continue;
-    const par = nodes.parent[i];
-    if (par < 0) continue;
+    if (nodes.parent[i] < 0) continue;
     shoots.push(i);
   }
   const streamerSet = new Set();
@@ -391,85 +415,273 @@ function placeLeaves(nodes, rad, depth, p) {
         i = nodes.parent[i];
       }
     }
-    for (const i of streamerSet) if (!shoots.includes(i)) shoots.push(i);
+    const inShoots = new Set(shoots);
+    for (const i of streamerSet) if (!inShoots.has(i)) shoots.push(i);
   }
   if (!shoots.length) return emptyLeaves();
 
-  // Leaf scale: real size, enlarged just enough that the target count still
-  // clothes the crown (the fact sheet size at High detail with more leaves).
+  // Leaf scale: real size, enlarged only as far as the leaf budget needs to
+  // clothe the crown, using the leaf's measured opaque area.
   const shell = (() => {
     let a = 0;
     for (let i = 0; i < 24; i++) a += 2 * Math.PI * Math.max(0.3, envelope(cb + ((i + 0.5) / 24) * crownH));
     return (a * crownH) / 24;
   })();
   const len = leaf.length + leaf.petiole;
-  const area1 = leaf.length * leaf.length * leaf.width * 0.6;
-  const coverage = 2.0 * (0.55 + 0.6 * p.dens);
-  const count = Math.round(THREE.MathUtils.clamp(target, 800, 90000));
-  const scale = THREE.MathUtils.clamp(Math.sqrt((shell * coverage) / (count * area1)), 1, 2.6);
-  const perShoot = Math.max(1, Math.round(count / shoots.length));
+  const count = Math.round(THREE.MathUtils.clamp(target, 800, 120000));
+  const want = 2.4 * (0.5 + 0.6 * p.dens);
+  const scale = THREE.MathUtils.clamp(Math.sqrt((shell * want) / (count * len * len * leafArea)), 1, 2.2);
+  const perShoot = Math.max(1, Math.round((count * 0.75) / shoots.length));
 
-  const n = shoots.length * perShoot;
-  const out = {
-    count: 0,
-    pos: new Float32Array(n * 3),
-    quat: new Float32Array(n * 4),
-    scale: new Float32Array(n),
-    rand: new Float32Array(n),
-    ao: new Float32Array(n),
-    order: new Float32Array(n),
-    length: len * scale,
-  };
+  const P = [];
+  const Q = [];
+  const S = [];
+  const RND = [];
+  const AO = [];
+  const ORD = [];
   const q = new THREE.Quaternion();
   const m = new THREE.Matrix4();
-  const crownMid = cb + crownH * 0.5;
+  const aoAt = (b) => {
+    const env = Math.max(0.3, envelope(b.y));
+    const outer = THREE.MathUtils.clamp(Math.hypot(b.x, b.z) / env, 0, 1);
+    const height = THREE.MathUtils.clamp((b.y - cb) / crownH, 0, 1);
+    return { outer, height, ao: THREE.MathUtils.clamp(0.2 + 0.6 * outer * outer + 0.2 * height, 0, 1) };
+  };
+  const push = (base, tip, face, sz, info) => {
+    const x = V().crossVectors(tip, face).normalize();
+    m.makeBasis(x, tip, face);
+    q.setFromRotationMatrix(m);
+    P.push(base.x, base.y, base.z);
+    Q.push(q.x, q.y, q.z, q.w);
+    S.push(sz);
+    RND.push(r());
+    AO.push(info.ao);
+    // Fall: outer, sunlit and upper leaves turn and drop first.
+    ORD.push(THREE.MathUtils.clamp(0.55 * (1 - info.outer) + 0.25 * (1 - info.height) + 0.3 * r(), 0, 1));
+  };
+  const orientFace = (tip, outward, outer) => {
+    // Sun leaves hold their blades flat to the light; shade leaves less so.
+    const face = UP.clone().multiplyScalar(0.9).addScaledVector(outward, 0.45 + 0.4 * outer).addScaledVector(randUnit(r), 0.55);
+    face.addScaledVector(tip, -face.dot(tip)).normalize();
+    if (face.lengthSq() < 1e-4) face.copy(perp(tip));
+    return face;
+  };
+
   for (const i of shoots) {
     const a = nodes.pos[nodes.parent[i]];
     const b = nodes.pos[i];
     const dir = V().subVectors(b, a).normalize();
     const hanging = streamerSet.has(i);
     const shootLen = D * (hanging ? 1 : 0.9);
-    const outward = V(b.x, 0, b.z);
-    const radial = outward.length();
-    outward.normalize();
-    const env = Math.max(0.3, envelope(b.y));
-    const outer = THREE.MathUtils.clamp(radial / env, 0, 1);
-    const height = THREE.MathUtils.clamp((b.y - cb) / crownH, 0, 1);
-    const ao = THREE.MathUtils.clamp(0.2 + 0.6 * outer * outer + 0.2 * height, 0, 1);
-    let side = perp(dir);
+    const outward = V(b.x, 0, b.z).normalize();
+    const info = aoAt(b);
+    const side = perp(dir);
     const phase = r() * Math.PI * 2;
     for (let k = 0; k < perShoot; k++) {
       const t = (k + 0.5) / perShoot;
       const base = a.clone().lerp(b, 0.25).addScaledVector(dir, t * shootLen);
-      let az;
-      if (sp.arrange === 'opposite') az = phase + Math.floor(k / 2) * (Math.PI / 2) + (k % 2) * Math.PI;
-      else az = phase + k * GOLDEN;
+      const az = sp.arrange === 'opposite' ? phase + Math.floor(k / 2) * (Math.PI / 2) + (k % 2) * Math.PI : phase + k * GOLDEN;
       const around = side.clone().applyAxisAngle(dir, az);
-      // Petiole angle: leaves stand out from the twig at 40–70°.
       const pet = THREE.MathUtils.degToRad(hanging ? 25 : 45 + 25 * r());
       const tip = dir.clone().multiplyScalar(Math.cos(pet)).addScaledVector(around, Math.sin(pet));
       if (hanging) tip.lerp(V(0, -1, 0), 0.5);
-      // Sun leaves hold their blades flat to the light; shade leaves less so.
       tip.y -= 0.25 * r();
       tip.normalize();
-      const face = UP.clone().multiplyScalar(0.9).addScaledVector(outward, 0.45 + 0.4 * outer).addScaledVector(randUnit(r), 0.55);
-      face.addScaledVector(tip, -face.dot(tip)).normalize();
-      if (face.lengthSq() < 1e-4) face.copy(perp(tip));
-      const x = V().crossVectors(tip, face).normalize();
-      m.makeBasis(x, tip, face);
-      q.setFromRotationMatrix(m);
-      const o = out.count++;
-      out.pos[o * 3] = base.x + around.x * 0.02;
-      out.pos[o * 3 + 1] = base.y + around.y * 0.02;
-      out.pos[o * 3 + 2] = base.z + around.z * 0.02;
-      q.toArray(out.quat, o * 4);
-      out.scale[o] = len * scale * (0.75 + 0.45 * r()) * (hanging ? 0.9 : 1);
-      out.rand[o] = r();
-      out.ao[o] = ao;
-      // Fall: outer, sunlit and upper leaves turn and drop first.
-      out.order[o] = THREE.MathUtils.clamp(0.55 * (1 - outer) + 0.25 * (1 - height) + 0.3 * r(), 0, 1);
+      base.addScaledVector(around, 0.02);
+      push(base, tip, orientFace(tip, outward, info.outer), len * scale * (0.75 + 0.45 * r()) * (hanging ? 0.9 : 1), info);
     }
   }
+
+  // ---- coverage pass
+  const goal = THREE.MathUtils.clamp(0.3 + 0.68 * p.dens, 0.5, 0.97);
+  const foot = Math.sqrt(leafArea / Math.PI); // footprint radius per unit leaf length
+  const meanLen = len * scale;
+  const cell = THREE.MathUtils.clamp(meanLen * foot * 0.5, 0.05, 0.4);
+  const budget = Math.round(S.length * 0.9);
+  let added = 0;
+  const twigGrid = new Grid(D * 4);
+  shoots.forEach((i, k) => twigGrid.add(k, nodes.pos[i]));
+  const twigNodes = shoots.map((i) => nodes.pos[i]);
+  const dirs = [V(0, -1, 0)];
+  const el = THREE.MathUtils.degToRad(40);
+  for (let k = 0; k < 3; k++) {
+    const az = (k / 3) * Math.PI * 2 + 0.4;
+    dirs.push(V(Math.cos(az) * Math.cos(el), -Math.sin(el), Math.sin(az) * Math.cos(el)).normalize());
+  }
+  // Fill only near real twigs, so the crown keeps its clumps and scalloped
+  // edge instead of rounding out to the smooth envelope. A voxel grid marks
+  // everything within reach of a shoot.
+  const reach = D * 1.3 + meanLen * 0.9;
+  const vs = reach / 1.5;
+  let vx0 = Infinity, vy0 = Infinity, vz0 = Infinity, vx1 = -Infinity, vy1 = -Infinity, vz1 = -Infinity;
+  for (const t of twigNodes) {
+    vx0 = Math.min(vx0, t.x); vy0 = Math.min(vy0, t.y); vz0 = Math.min(vz0, t.z);
+    vx1 = Math.max(vx1, t.x); vy1 = Math.max(vy1, t.y); vz1 = Math.max(vz1, t.z);
+  }
+  vx0 -= reach; vy0 -= reach; vz0 -= reach;
+  const VX = Math.ceil((vx1 + reach - vx0) / vs) + 1;
+  const VY = Math.ceil((vy1 + reach - vy0) / vs) + 1;
+  const VZ = Math.ceil((vz1 + reach - vz0) / vs) + 1;
+  const vox = new Uint8Array(VX * VY * VZ);
+  const vr = Math.ceil(reach / vs);
+  for (const t of twigNodes) {
+    const ix = Math.floor((t.x - vx0) / vs), iy = Math.floor((t.y - vy0) / vs), iz = Math.floor((t.z - vz0) / vs);
+    for (let z = Math.max(0, iz - vr); z <= Math.min(VZ - 1, iz + vr); z++)
+      for (let y = Math.max(0, iy - vr); y <= Math.min(VY - 1, iy + vr); y++)
+        for (let x = Math.max(0, ix - vr); x <= Math.min(VX - 1, ix + vr); x++) {
+          const dx = vx0 + (x + 0.5) * vs - t.x, dy = vy0 + (y + 0.5) * vs - t.y, dz = vz0 + (z + 0.5) * vs - t.z;
+          if (dx * dx + dy * dy + dz * dz <= reach * reach) vox[(z * VY + y) * VX + x] = 1;
+        }
+  }
+  const inside = (pt) => {
+    const x = Math.floor((pt.x - vx0) / vs), y = Math.floor((pt.y - vy0) / vs), z = Math.floor((pt.z - vz0) / vs);
+    if (x < 0 || y < 0 || z < 0 || x >= VX || y >= VY || z >= VZ) return false;
+    return vox[(z * VY + y) * VX + x] === 1;
+  };
+  const tipV = V();
+  const nV = V();
+  const cV = V();
+  // Drafts (slider drags) skip the pass; the full build follows shortly.
+  for (const d of p.noFill ? [] : dirs) {
+    const u = perp(d);
+    const v = V().crossVectors(d, u).normalize();
+    // Grid bounds from the crown volume's projection.
+    const R = Math.max(...Array.from({ length: 16 }, (_, i) => envelope(cb + ((i + 0.5) / 16) * crownH)));
+    const mid = V(0, cb + crownH / 2, 0);
+    const ou = mid.dot(u);
+    const ov = mid.dot(v);
+    const ext = R + crownH * 0.6 + 2;
+    const N = Math.min(1600, Math.ceil((2 * ext) / cell));
+    const cs = (2 * ext) / N;
+    const cov = new Uint8Array(N * N);
+    const sil = new Uint8Array(N * N);
+    const toCell = (pt) => [Math.floor((pt.dot(u) - ou + ext) / cs), Math.floor((pt.dot(v) - ov + ext) / cs)];
+    // Silhouette: the twig-reach voxels projected on a 4× coarser grid (the
+    // crown's outline doesn't need leaf resolution).
+    const C = 4;
+    const NC = Math.ceil(N / C);
+    const silC = new Uint8Array(NC * NC);
+    const csC = cs * C;
+    const sr = (vs * 0.62) / csC;
+    const vc = V();
+    for (let z = 0; z < VZ; z++)
+      for (let y = 0; y < VY; y++)
+        for (let x = 0; x < VX; x++) {
+          if (!vox[(z * VY + y) * VX + x]) continue;
+          vc.set(vx0 + (x + 0.5) * vs, vy0 + (y + 0.5) * vs, vz0 + (z + 0.5) * vs);
+          const fu = (vc.dot(u) - ou + ext) / csC;
+          const fv = (vc.dot(v) - ov + ext) / csC;
+          for (let j = Math.max(0, Math.floor(fv - sr)); j <= Math.min(NC - 1, Math.ceil(fv + sr)); j++)
+            for (let i = Math.max(0, Math.floor(fu - sr)); i <= Math.min(NC - 1, Math.ceil(fu + sr)); i++)
+              if ((i + 0.5 - fu) ** 2 + (j + 0.5 - fv) ** 2 <= sr * sr) silC[j * NC + i] = 1;
+        }
+    for (let y = 0; y < N; y++) {
+      const row = Math.floor(y / C) * NC;
+      for (let x = 0; x < N; x++) if (silC[row + Math.floor(x / C)]) sil[y * N + x] = 1;
+    }
+    const stamp = (i) => {
+      q.fromArray(Q, i * 4);
+      tipV.set(0, 1, 0).applyQuaternion(q);
+      nV.set(0, 0, 1).applyQuaternion(q);
+      cV.fromArray(P, i * 3).addScaledVector(tipV, S[i] * 0.6);
+      const w = S[i] * foot * Math.max(0.3, Math.abs(nV.dot(d)));
+      // Mark only cells whose centres the leaf's footprint actually covers.
+      const fu = (cV.dot(u) - ou + ext) / cs;
+      const fv = (cV.dot(v) - ov + ext) / cs;
+      const wr = w / cs;
+      let fresh = 0;
+      for (let y = Math.floor(fv - wr); y <= Math.ceil(fv + wr); y++)
+        for (let x = Math.floor(fu - wr); x <= Math.ceil(fu + wr); x++) {
+          if ((x + 0.5 - fu) ** 2 + (y + 0.5 - fv) ** 2 > wr * wr) continue;
+          if (x < 0 || y < 0 || x >= N || y >= N) continue;
+          const k = y * N + x;
+          if (!cov[k]) {
+            cov[k] = 1;
+            if (sil[k]) fresh++;
+          }
+        }
+      return fresh;
+    };
+    for (let i = 0; i < S.length; i++) stamp(i);
+    const gaps = [];
+    let silN = 0;
+    let covN = 0;
+    for (let k = 0; k < N * N; k++) {
+      if (!sil[k]) continue;
+      silN++;
+      if (cov[k]) covN++;
+      else gaps.push(k);
+    }
+    // Shuffle so fills spread over the crown rather than sweeping it.
+    for (let k = gaps.length - 1; k > 0; k--) {
+      const j = Math.floor(r() * (k + 1));
+      [gaps[k], gaps[j]] = [gaps[j], gaps[k]];
+    }
+    for (const gk of gaps) {
+      if (covN / Math.max(1, silN) >= goal || added >= budget) break;
+      if (cov[gk]) continue;
+      // March along the light from outside the crown to where it enters.
+      const ci = gk % N;
+      const cj = Math.floor(gk / N);
+      const origin = V().addScaledVector(u, (ci + 0.5) * cs - ext + ou).addScaledVector(v, (cj + 0.5) * cs - ext + ov);
+      // origin lies on the plane through the crown centre; step back along -d.
+      origin.add(d.clone().multiplyScalar(mid.dot(d)));
+      const start = origin.clone().addScaledVector(d, -(R + crownH));
+      let hit = null;
+      const step = Math.max(0.35, meanLen * 0.4);
+      const pt = V();
+      for (let s2 = 0; s2 < ((R + crownH) * 2) / step; s2++) {
+        pt.copy(start).addScaledVector(d, s2 * step);
+        if (inside(pt)) {
+          hit = pt.clone().addScaledVector(d, meanLen * 0.2);
+          break;
+        }
+      }
+      if (!hit) {
+        cov[gk] = 1;
+        continue;
+      }
+      // A short twig from the nearest shoot carries a small cluster into the gap.
+      let best = twigNodes[0];
+      let bd = Infinity;
+      twigGrid.near(hit, (k) => {
+        const dd = twigNodes[k].distanceToSquared(hit);
+        if (dd < bd) {
+          bd = dd;
+          best = twigNodes[k];
+        }
+      });
+      if (bd < (D * 4) ** 2 && chains) chains.push({ pts: [best, hit.clone()], rs: [0.03, 0.012] });
+      const outward = V(hit.x, 0, hit.z).normalize();
+      const info = aoAt(hit);
+      const n = 3;
+      for (let k = 0; k < n; k++) {
+        const tip = randUnit(r).addScaledVector(d, -0.3);
+        tip.addScaledVector(d, -tip.dot(d) * 0.6).normalize();
+        const base = hit.clone().addScaledVector(randUnit(r), meanLen * 0.25);
+        push(base, tip, orientFace(tip, outward, info.outer), len * scale * (0.8 + 0.4 * r()), info);
+        covN += stamp(S.length - 1);
+        added++;
+      }
+      if (!cov[gk]) {
+        // The cluster landed beside this cell; count it covered so we move on.
+        cov[gk] = 1;
+        covN++;
+      }
+    }
+  }
+
+  const out = {
+    count: S.length,
+    pos: new Float32Array(P),
+    quat: new Float32Array(Q),
+    scale: new Float32Array(S),
+    rand: new Float32Array(RND),
+    ao: new Float32Array(AO),
+    order: new Float32Array(ORD),
+    length: len * scale,
+    filled: added,
+  };
   return out;
 }
 function emptyLeaves() {
@@ -515,7 +727,7 @@ export function growConifer(p) {
   const { H, R, cb, fn, sp, shoot, variant, dens } = p;
   const r = rng(hash(`con|${p.key}|${H.toFixed(1)}|${R.toFixed(1)}|${cb.toFixed(2)}|${variant}`));
   const crownH = Math.max(0.5, H - cb);
-  const envelope = (y) => R * fn(THREE.MathUtils.clamp((y - cb) / crownH, 0, 1));
+  const envelope = envelopeLUT(fn, R, cb, crownH);
   const chains = [];
   const shoots = [];
   const cones = [];
@@ -611,7 +823,9 @@ export function growConifer(p) {
       const lenSec = (b.len * 0.45 * (1 - t * 0.7) + scaleSeg * 0.6) * (0.8 + 0.4 * r());
       let dir2;
       if (s === nSec) dir2 = along.clone();
-      else if (pendulous && t > 0.25) dir2 = V(along.x * 0.15, -1, along.z * 0.15).addScaledVector(side, sign * 0.1).normalize();
+      // Norway spruce: most branchlets hang in curtains, the rest lie flat
+      // along the limb so the crown still closes over from above.
+      else if (pendulous && t > 0.25 && r() < 0.6) dir2 = V(along.x * 0.15, -1, along.z * 0.15).addScaledVector(side, sign * 0.1).normalize();
       else dir2 = along.clone().multiplyScalar(0.55).addScaledVector(side, sign * 0.8).addScaledVector(UP, flat ? 0.5 : 0.05).normalize();
       const end = at.clone().addScaledVector(dir2, lenSec);
       if (lenSec > 0.4 && s !== nSec) chains.push({ pts: [at, end], rs: [0.022, 0.01] });

@@ -875,7 +875,7 @@ function buildTreeSimple(grp, t, crown){
   grp.add(wire);
 }
 
-function buildTree(t){
+function buildTree(t, draft = false){
   const grp = new THREE.Group();
   const {cb, top, R, fn} = treeCrown(t);
   const bare = !t.evergreen && !leafOn();
@@ -884,7 +884,7 @@ function buildTree(t){
   if(S.simple){ buildTreeSimple(grp, t, {cb, top, R, fn}); return grp; }
 
   const sh = SHAPES[t.shape] || SHAPES.round;
-  grp.add(trees.build(t, {bare, season:seasonNow(), crownBase:crownBaseFt(t)/Math.max(1, t.height), profile:sh.r}));
+  grp.add(trees.build(t, {bare, draft, season:seasonNow(), crownBase:crownBaseFt(t)/Math.max(1, t.height), profile:sh.r}));
 
   return grp;
 }
@@ -1484,17 +1484,17 @@ function disposeTree(root){
     if(n.material?.userData?.uniforms) n.material.dispose();
   });
 }
-function buildFor(o){
-  return o.type === "tree" ? buildTree(o)
+function buildFor(o, draft){
+  return o.type === "tree" ? buildTree(o, draft)
        : o.type === "bed" ? buildBed(o)
        : o.type === "deck" ? buildDeck(o)
        : isPaved(o) ? buildPaved(o)
        : buildStructure(o);
 }
-function rebuildObject(o){
+function rebuildObject(o, draft = false){
   const old = meshes.get(o.id);
   if(old){ objGroup.remove(old); disposeTree(old); meshes.delete(o.id); }
-  const m = buildFor(o);
+  const m = buildFor(o, draft);
   m.position.set(o.x, 0, o.y);
   m.rotation.y = -(o.rot||0)*DEG;
   m.traverse(n=>{ n.userData.id = o.id; });
@@ -1518,13 +1518,24 @@ function placeObject(o){
   markShadows();
 }
 let pendingRebuild = null, rebuildQueued = false;
+/* While something is being dragged or slid, trees regrow as quick drafts
+   (a fifth of the leaves, no coverage pass); the full tree follows once
+   the changes stop. */
+let fullRebuildTimer = 0;
 function queueRebuild(o){
   pendingRebuild = o;
+  clearTimeout(fullRebuildTimer);
+  if(o.type === "tree"){
+    fullRebuildTimer = setTimeout(()=>{
+      if(!S.objects.includes(o)) return;
+      rebuildObject(o); updateSelection(); markDirty();
+    }, 400);
+  }
   if(rebuildQueued) return;
   rebuildQueued = true;
   requestAnimationFrame(()=>{
     rebuildQueued = false;
-    if(pendingRebuild){ rebuildObject(pendingRebuild); updateSelection(); pendingRebuild = null; }
+    if(pendingRebuild){ rebuildObject(pendingRebuild, pendingRebuild.type === "tree"); updateSelection(); pendingRebuild = null; }
   });
 }
 
@@ -4177,7 +4188,7 @@ async function boot(){
 }
 window.applyImportedBoundary = applyImportedBoundary;   // hook for the property-image importer
 /* development-only hook for automated screenshots */
-if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, get photo(){ return photo; }, rebuildAll, fromPreset, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute };
+if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, get photo(){ return photo; }, get scene(){ return scene; }, rebuildAll, fromPreset, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute };
 initLocationUI();
 initPrefsUI();
 if(document.readyState === "complete") boot();

@@ -321,16 +321,17 @@ export class TreeLibrary {
 
   #target(sp, shell, dens) {
     if (sp.conifer) return Math.round(THREE.MathUtils.clamp(shell * (this.high ? 5 : 2.6) * (0.55 + 0.5 * dens), 500, this.high ? 26000 : 13000));
-    return Math.round(THREE.MathUtils.clamp(shell * (this.high ? 22 : 11) * (0.5 + 0.6 * dens), 1500, this.high ? 90000 : 42000));
+    // Base leaves on the shoots; the coverage pass adds what it takes to close the crown.
+    return Math.round(THREE.MathUtils.clamp(shell * (this.high ? 18 : 9) * (0.5 + 0.6 * dens), 1500, this.high ? 70000 : 32000));
   }
 
-  #grow(t, key, profile, crownBase) {
+  #grow(t, key, profile, crownBase, draft) {
     const sp = SPECIES[key];
     const H = Math.max(2, t.height);
     const R = Math.max(0.5, t.spread / 2);
     const dens = Math.round(THREE.MathUtils.clamp(t.density ?? 0.85, 0.1, 1) * 20) / 20;
     const variant = (t.id ?? 0) % 4;
-    const ck = [key, t.shape, H.toFixed(1), R.toFixed(1), dens, crownBase.toFixed(3), this.high, variant].join('|');
+    const ck = [key, t.shape, H.toFixed(1), R.toFixed(1), dens, crownBase.toFixed(3), this.high, variant, !!draft].join('|');
     let g = this.cache.get(ck);
     if (g) return g;
     const cb = H * crownBase;
@@ -338,8 +339,9 @@ export class TreeLibrary {
     let shell = 0;
     for (let i = 0; i < 16; i++) shell += 2 * Math.PI * Math.max(0.3, R * profile(THREE.MathUtils.clamp((i + 0.5) / 16, 0, 1)));
     shell = (shell * crownH) / 16;
-    const target = this.#target(sp, shell, dens);
-    const p = { key, H, R, cb, fn: profile, dens, sp, shape: t.shape, variant, target };
+    // Drafts (while a slider is moving) grow a fifth of the leaves and skip the coverage pass.
+    const target = Math.round(this.#target(sp, shell, dens) * (draft ? 0.2 : 1));
+    const p = { key, H, R, cb, fn: profile, dens, sp, shape: t.shape, variant, target, noFill: !!draft };
     if (sp.conifer) {
       const shoot = SHOOT[sp.shoot];
       const area = shoot.length * shoot.length * 0.55;
@@ -348,6 +350,7 @@ export class TreeLibrary {
       g = { conifer: true, ...growConifer(p) };
     } else {
       p.leaf = LEAF[sp.leaf];
+      p.leafArea = leafCard(sp.leaf, this.high).area;
       g = { conifer: false, ...growBroadleaf(p) };
     }
     // Bark mesh, built once per growth.
@@ -370,10 +373,10 @@ export class TreeLibrary {
    * height fraction u; crownBase the fraction of height where the crown starts.
    * season: { grow, fall, drop, day } — see app.js seasonNow().
    */
-  build(t, { bare = false, season = {}, crownBase = 0.25, profile = (u) => Math.sin(Math.PI * u) } = {}) {
+  build(t, { bare = false, draft = false, season = {}, crownBase = 0.25, profile = (u) => Math.sin(Math.PI * u) } = {}) {
     const key = speciesFor(t);
     const sp = SPECIES[key];
-    const g = this.#grow(t, key, profile, crownBase);
+    const g = this.#grow(t, key, profile, crownBase, draft);
     const grp = new THREE.Group();
     const inner = new THREE.Group();
     inner.rotation.y = ((t.id ?? 0) * 2.399963) % (Math.PI * 2);

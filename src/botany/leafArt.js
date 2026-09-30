@@ -271,7 +271,12 @@ export function leafCard(key, high = false) {
   map.colorSpace = THREE.SRGBColorSpace;
   map.anisotropy = 8;
   map.generateMipmaps = true;
-  const out = { map, aspect, luma: lumaOf(g, W, H) };
+  // Opaque share of the card, times its aspect: the leaf's real area per
+  // length², which growth uses to decide how many leaves close the crown.
+  const px = g.getImageData(0, 0, W, H).data;
+  let solid = 0;
+  for (let i = 3; i < px.length; i += 4) if (px[i] > 127) solid++;
+  const out = { map, aspect, luma: lumaOf(g, W, H), area: (solid / (W * H)) * aspect };
   cache.set(ck, out);
   return out;
 }
