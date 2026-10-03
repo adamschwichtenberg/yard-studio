@@ -186,9 +186,9 @@ body.navmin #dockfly{display:none}
 #top .seg{flex-shrink:0}
 #top .seg.tools{background:none;padding:0;gap:2px}
 #top .seg.tools button{height:44px;width:44px;padding:0;border-radius:10px}
-#top .seg.tools button[aria-pressed="true"]{background:var(--text);color:var(--panel-solid);font-weight:600;width:auto;padding:0 12px}
+#top .seg.tools button[aria-pressed="true"]{background:var(--text);color:var(--panel-solid);font-weight:600}
 #top .seg.tools .lbl-t{display:none}
-#top .seg.tools button[aria-pressed="true"] .lbl-t{display:inline}
+/* tool labels live in the tooltips; the bar needs the room */
 #top .ibtn{width:44px;height:44px}
 .addwrap{position:relative;flex:none}
 .addbtn{height:44px;padding:0 14px;display:flex;align-items:center;gap:8px;border:1px solid rgba(212,168,90,.45);border-radius:10px;
@@ -250,6 +250,16 @@ body.inspoff #layers{max-width:calc(100vw - var(--leftX) - var(--sunW) - 40px)}
 #seasons{flex:1;justify-content:space-between;background:none;padding:0;gap:4px}
 #seasons button{flex:1;height:26px;border:1px solid var(--line-2);border-radius:99px;font-size:11px;color:var(--faint)}
 #seasons button:hover{color:var(--text);border-color:var(--line-3)}
+/* Looking ahead: the year planted trees are shown at. */
+#yearsahead{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11.5px;color:var(--faint)}
+#yearsahead .k{color:var(--label);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;margin-right:2px;white-space:nowrap}
+#yearsahead .ibtn.sm{width:24px;height:24px;min-width:24px;border-radius:7px;font-size:14px;line-height:1;padding:0}
+#yearsahead #yrlbl{min-width:38px;text-align:center;color:var(--text-2);white-space:nowrap}
+#yearsahead #yrlbl b{color:var(--brass-2);font-weight:500}
+#yearsahead #yearset{margin-left:auto;background:none;padding:0;gap:3px}
+#yearsahead #yearset button{height:24px;padding:0 7px;border:1px solid var(--line-2);border-radius:99px;font-size:10.5px;color:var(--faint)}
+#yearsahead #yearset button[aria-pressed="true"]{color:var(--text);border-color:var(--brass-line);background:var(--brass-dim)}
+#yearsahead.muted #yrlbl{color:var(--faint)}
 .readout{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 8px;padding-top:10px;border-top:1px solid var(--line-2)}
 .readout .r{display:flex;flex-direction:column;gap:2px;min-width:0}
 .readout .v{font-size:15px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -597,6 +607,7 @@ body.photo #gl{pointer-events:none}
   #tabs{flex-direction:row;justify-content:space-around;width:100%}
   #tabs .grow{display:none}
   #tabs button{width:56px}
+  #modeseg{flex-direction:row;padding:0 6px 0 0;margin:0 4px 0 0;border-bottom:0;border-right:1px solid var(--line-2)}
   #dockfly{width:auto;height:52vh;border-radius:18px 18px 0 0;border-bottom:0;margin:0 var(--gut)}
   #projhead{display:none}
   #top{top:var(--gut);left:var(--gut);right:70px;max-width:none;overflow-x:auto;scrollbar-width:none}
@@ -724,3 +735,126 @@ body.photo #gl{pointer-events:none}
   #pii-dialog .pii-footer button { flex:1; }
 }
 /* PROPERTY_IMPORT_CSS_END */
+
+/* ---------- tree growth in the inspector ---------- */
+.growbox{display:flex;flex-direction:column;gap:8px;margin:2px 0 6px}
+.growbox .grow-rate{margin:0;font-size:12.5px;color:var(--text-2)}
+.growbox .grow-rate b{color:var(--text);font-weight:500}
+.growbox .grow-rate em{font-style:normal;color:var(--leaf-2)}
+.growfig{margin:0;padding:10px 10px 8px;border-radius:12px;background:var(--raised-2)}
+.growchart{width:100%;height:auto;display:block}
+.growchart text{font-family:var(--mono);font-size:9px;fill:var(--faint)}
+.growfig figcaption{display:flex;gap:12px;margin-top:4px;font-size:11px;color:var(--faint)}
+.growfig .lg::before{content:"";display:inline-block;width:12px;height:2px;margin-right:5px;vertical-align:middle;background:var(--leaf-2)}
+.growfig .lg.w::before{background:var(--sky)}
+.growfig .lg.n::before{width:2px;height:10px;background:var(--brass)}
+.growtable{display:grid;grid-template-columns:1fr;gap:2px;font-size:12px}
+.growtable div{display:flex;justify-content:space-between;gap:8px;padding:4px 2px;border-bottom:1px solid var(--line-2)}
+.growtable div:last-child{border-bottom:0}
+.growtable span{color:var(--dim)}
+.growtable b{font-family:var(--mono);font-weight:400;color:var(--text);font-variant-numeric:tabular-nums}
+.growfields .inp.wide input[type=date]{color-scheme:dark;min-width:0}
+
+/* the + just past a fence's last post extends it */
+.sh-add.ext{background:var(--brass);color:#14100a;border-color:var(--brass)}
+
+/* ---------- Build / Observe ---------- */
+/* Build / Observe sits at the top of the rail */
+#modeseg{display:flex;flex-direction:column;gap:4px;padding-bottom:8px;margin-bottom:6px;border-bottom:1px solid var(--line-2)}
+#modeseg button[aria-pressed="true"]{background:var(--text);color:var(--panel-solid)}
+#modeseg button[aria-pressed="true"] span{color:var(--panel-solid);font-weight:600}
+body.observe #tabs button[data-tab="prop"], body.observe #tabs #railPlants, body.observe #tabs button[data-tab="objs"]{opacity:.35;pointer-events:none}
+#top .seg.obs{display:none;background:none;padding:0;gap:3px}
+#top .seg.obs button{height:38px;padding:0 12px;border:1px solid var(--line-2);border-radius:10px;font-size:12.5px;color:var(--text-2)}
+#top .seg.obs button[aria-pressed="true"]{border-color:var(--brass-line);background:var(--brass-dim);color:var(--brass-2)}
+body.observe #top .bld{display:none}
+body.observe #top .seg.obs{display:flex}
+body.observe #top > .div:not(.bld){display:none}
+body.flying #top .notfly{display:none}
+#lockbtn[aria-pressed="true"]{background:var(--brass-dim);color:var(--brass-2);border-color:var(--brass-line)}
+body.observe #inspector, body.observe #shapeEdit, body.observe #addmenu{display:none !important}
+body.flying #labels, body.flying #treeCenter, body.flying #layers{display:none}
+#obshud{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--gut) + 66px);z-index:6;display:flex;flex-direction:column;gap:6px;
+  padding:10px 14px;max-width:min(560px, calc(100vw - 32px));text-align:center}
+#obshud[hidden]{display:none}
+#obshud .t{display:flex;gap:10px;align-items:baseline;justify-content:center;flex-wrap:wrap}
+#obshud .t b{font-weight:400;color:var(--text);font-size:13px}
+#obshud .keys{display:flex;gap:4px 12px;flex-wrap:wrap;justify-content:center;font-size:11.5px;color:var(--faint)}
+#obshud kbd{font-family:var(--mono);font-size:10.5px;padding:1px 5px;border-radius:5px;border:1px solid var(--line-3);color:var(--text-2);background:var(--well)}
+#obspad{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom, 0px));z-index:6;display:grid;
+  grid-template-columns:repeat(3,54px);grid-template-rows:repeat(2,54px) 44px;gap:6px;touch-action:none;user-select:none}
+#obspad[hidden]{display:none}
+#obspad button{border-radius:14px;border:1px solid var(--line-3);background:rgba(16,21,19,.82);color:var(--text);font-size:18px;
+  backdrop-filter:blur(8px);touch-action:none}
+#obspad button:active{background:var(--brass-dim);border-color:var(--brass-line)}
+#obspad [data-k="w"]{grid-column:2;grid-row:1}
+#obspad [data-k="a"]{grid-column:1;grid-row:2} #obspad [data-k="s"]{grid-column:2;grid-row:2} #obspad [data-k="d"]{grid-column:3;grid-row:2}
+#obspad .v{grid-row:3;font-size:16px} #obspad [data-k=" "]{grid-column:1} #obspad [data-k="q"]{grid-column:3}
+body:not(.drone) #obspad .v{visibility:hidden}
+@media (pointer:fine){ #obspad{display:none !important} }
+@media (max-width:760px){
+  #top .seg.obs button{padding:0 8px}
+}
+
+/* ---------- welcome & guided tour ---------- */
+#welcome{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:16px;background:rgba(6,9,8,.66);backdrop-filter:blur(3px)}
+#welcome[hidden]{display:none}
+#welcome section{width:min(640px,100%);max-height:calc(100% - 8px);overflow:auto;box-sizing:border-box;padding:30px 32px 24px;display:flex;flex-direction:column;gap:14px;border-radius:22px}
+#welcome h1{margin:0;font-family:var(--serif);font-weight:400;font-size:38px;line-height:1.05;text-wrap:balance}
+#welcome .lede{margin:0;color:var(--text-2);font-size:14.5px;max-width:52ch}
+.wsteps{list-style:none;margin:6px 0 2px;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:10px;counter-reset:w}
+.wsteps li{counter-increment:w;display:flex;flex-direction:column;gap:4px;padding:14px 14px 14px 46px;position:relative;border-radius:14px;background:var(--raised-2);border:1px solid var(--line-2);min-width:0}
+.wsteps li::before{content:counter(w);position:absolute;left:14px;top:13px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--mono);font-size:12px;color:#14100a;background:var(--brass)}
+.wsteps b{font-family:var(--serif);font-weight:400;font-size:18px;color:var(--text)}
+.wsteps em{font-style:normal;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.wsteps span{font-size:12.5px;color:var(--dim);line-height:1.45}
+.wbtns{display:flex;gap:8px;flex-wrap:wrap}
+.wbtns .btn{height:44px}
+#welcome .hint{margin:0}
+@media (max-width:620px){ .wsteps{grid-template-columns:1fr} #welcome h1{font-size:30px} #welcome section{padding:22px 18px} }
+
+#coach{position:fixed;z-index:30;left:50%;transform:translateX(-50%);top:calc(var(--gut) + 68px);width:min(400px, calc(100vw - 32px));
+  box-sizing:border-box;padding:14px 16px 12px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--brass-line);border-radius:18px;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+#coach[hidden]{display:none}
+#coach .hd{display:flex;align-items:center;gap:8px}
+#coach .hd .count{margin-left:auto;font-size:11px;color:var(--faint)}
+#coach .x{border:0;background:none;color:var(--faint);font-size:20px;line-height:1;width:28px;height:28px;border-radius:8px;cursor:pointer}
+#coach .x:hover{color:var(--text);background:var(--raised-2)}
+#coach .dots{display:flex;gap:5px}
+#coach .dots i{height:3px;flex:1;border-radius:2px;background:var(--line-3)}
+#coach .dots i.past{background:var(--brass-line)}
+#coach .dots i.on{background:var(--brass)}
+#coach h3{margin:4px 0 0;font-family:var(--serif);font-weight:400;font-size:22px;line-height:1.15}
+#coach .bd{font-size:13px;color:var(--text-2);line-height:1.5}
+#coach .bd p{margin:0 0 6px}
+#coach .bd b{color:var(--text);font-weight:500}
+#coach .ft{display:flex;align-items:center;gap:8px;margin-top:2px}
+#coach .ft .grow{flex:1}
+#coach .ft .btn{height:36px;min-height:36px}
+#coachring{position:fixed;z-index:29;pointer-events:none;border-radius:14px;border:2px solid var(--brass);
+  box-shadow:0 0 0 4px rgba(212,168,90,.22), 0 0 26px rgba(212,168,90,.45);transition:left .25s,top .25s,width .25s,height .25s;animation:coachpulse 1.8s ease-in-out infinite}
+#coachring[hidden]{display:none}
+@keyframes coachpulse{50%{box-shadow:0 0 0 8px rgba(212,168,90,.08), 0 0 34px rgba(212,168,90,.55)}}
+@media (prefers-reduced-motion: reduce){ #coachring{animation:none;transition:none} }
+#coachtip{position:fixed;z-index:31;box-sizing:border-box;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;line-height:1.45;color:var(--text-2);
+  background:#1E2622;border:1px solid var(--brass-line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+#coachtip[hidden]{display:none}
+#coachtip b{color:var(--text);font-weight:500}
+#coachtip .ok{align-self:flex-end;border:0;background:none;color:var(--brass-2);font:inherit;font-size:12px;cursor:pointer;padding:2px 0}
+body.photo #coach, body.photo #coachring, body.photo #coachtip{display:none}
+body.observe #coach{top:calc(var(--gut) + 150px)}
+@media (max-width:760px){ #coach{top:auto;bottom:calc(12px + env(safe-area-inset-bottom, 0px))} body.observe #coach{top:auto} }
+/* with a sidebar pane open the toolbar has less room: Add to yard goes icon-only */
+@media (min-width:1021px){
+  body:not(.navmin) #top .addbtn span{display:none}
+  body:not(.navmin) #top .addbtn{width:44px;padding:0;justify-content:center}
+}
+/* phones: Build / Observe sit in the bottom tab bar like the other tabs */
+@media (max-width:1020px){
+  #modeseg{flex-direction:row;gap:2px;padding:0 4px 0 0;margin:0 2px 0 0;border-bottom:0;border-right:1px solid var(--line-2)}
+  #tabs button, #modeseg button{width:42px;min-width:0}
+  #tabs button span{font-size:9.5px}
+  body.flying #sunpanel{display:none}
+  #obshud{top:calc(var(--gut) + 64px)}
+}

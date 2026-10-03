@@ -262,6 +262,28 @@ const PHENO = {
   buroak: { out: 7, drop: 0 }, swampoak: { out: 7, drop: 0 }, locust: { out: 7, drop: -7 },
   willow: { out: -10, drop: 12 }, aspen: { out: 0, drop: -5 }, poplar: { out: 0, drop: -5 }, columnaraspen: { out: 0, drop: -5 },
 };
+/*
+ * Height growth of a young, established tree on a decent site, in feet per
+ * year. Classes follow the Arbor Day Foundation's: slow ≤ 1 ft, medium
+ * 1–2 ft, fast ≥ 2 ft; the figures within each class come from the extension
+ * and arboretum fact sheets in docs/botany.md. Growth slows as a tree nears
+ * its mature height (see growth in app.js).
+ */
+const GROWTH = {
+  maple: 2.5, norwaymaple: 1.2, sugarmaple: 1.2, redmaple: 1.8, silvermaple: 3, boxelder: 2.5, jmaple: 0.9,
+  linden: 1.7, littleleaf: 1.3, birch: 1.6, riverbirch: 2.2, alder: 2.5, aspen: 2.5, poplar: 4, columnaraspen: 2.5,
+  hackberry: 1.7, hackberrycol: 1.6, elm: 2.2, siberianelm: 3, buroak: 1, whiteoak: 1.5, swampoak: 1.5,
+  pinoak: 2, redoak: 2, willow: 3, crabapple: 1.2, apple: 1.2, hydrangea: 1.5, locust: 2.2, ash: 2,
+  coffeetree: 1.4, buckeye: 1, treelilac: 1.2, serviceberry: 1.2, chokecherry: 2, plum: 1.4, hawthorn: 1,
+  mtnash: 1.4, pagoda: 1, dogwood: 1, ironwood: 0.9, bluebeech: 0.9, ginkgo: 1.1, magnolia: 1.3, redbud: 1.6,
+  sweetgum: 1.7, tulip: 2.5, blackgum: 1, broadleaf: 1.5,
+  spruce: 1, bluespruce: 1, norway: 2, weepingspruce: 0.7, fir: 1, pine: 0.5, redpine: 1.5, whitepine: 2.2,
+  scotchpine: 1.5, tamarack: 2, arborvitae: 0.9, juniper: 1,
+};
+export function growthRate(key) {
+  return GROWTH[key] ?? 1.5;
+}
+
 export function phenology(key) {
   return SPECIES[key]?.pheno || PHENO[key] || { out: 0, drop: 0 };
 }

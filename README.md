@@ -19,6 +19,15 @@ Inspired by three pieces of web work: Lusion's *Of the Oak* (a procedurally grow
   - Crabapples (Prairifire, Snowdrift) and Honeycrisp apple blossom for two weeks at leaf-out; Honeycrisp's apples ripen red in September. Redbud, magnolia, plums and serviceberry flower on bare wood. Lilac plumes open in June. Hydrangea panicles go lime, then white, then pink.
   - Prairifire's maroon spring leaves settle to a dark red-bronzed green, and Canada Red chokecherry turns deep red through June; ginkgo turns gold and drops nearly all at once.
   - Lindens carry their June bracts; acorns, pods, crabapple fruit and alder cones hang into winter; spruces carry their cones.
+- **Trees grow over time.** Give a tree a planting date and its height at planting (new trees go in today at nursery size), then use **Trees in** on the sun card to see the yard 5, 10 or 20 years on.
+  - Each species grows at its own rate, from the Arbor Day Foundation's classes (slow ≤ 12 in a year, medium 13–24 in, fast ≥ 25 in) and extension fact sheets; cultivars can differ (Autumn Blaze ~3 ft a year, Black Hills spruce ~1 ft).
+  - Newly planted trees spend about a growing season per inch of trunk caliper establishing ("sleep, creep, leap"), then grow at full speed, slowing as they near mature height.
+  - Broadleaves grow up before they grow out and fill in last, so young trees cast lighter shade; conifers keep their shape.
+  - The tree's panel charts height and crown width over the years and lists its size at +5, +10 and +20 years.
+- **Fences anywhere.** **Add to yard → Fence** draws a fence you reshape like a driveway: drag posts, add bends, extend past the end. **Make sides reshapeable** (Lot) turns the property-line fence into such fences. Property-line sides can also run part way.
+- **Build and Observe.** **Observe** (rail, or **O**) locks the layout and lets you look around, **Walk** the yard at eye height (W A S D, Shift to run, drag to look), or fly a **Drone** from the ground up to 200 ft (Space/E up, Q/C down, scroll for speed). Buildings, decks, fences and tree trunks are solid, and walkers stay inside the property line. In Build, the lock button (**L**) keeps items from being dragged or reshaped by accident.
+- **Guided start.** First launch offers a four-step guide (map your lot, add buildings and hardscape, plant trees, observe) that points at each control and moves on as you do it, with one-off tips as you open panels. **Guide** in the rail brings it back.
+- **Schematic view** marks every tree's centre with a dot.
 - **Diorama stage** (Display → Stage).
   - **Diorama:** the lot is cut from the earth, its edge showing turf over a scanned soil profile, on a plinth in a studio. The sky still lights it. Tilt-shift grows as you pull back.
   - **Landscape:** keeps the open-country view.

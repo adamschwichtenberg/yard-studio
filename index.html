@@ -37,6 +37,9 @@
   <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.6 2.9l8.2 5.1-8.2 5.1z"/></symbol>
   <symbol id="i-pause" viewBox="0 0 16 16"><path d="M5 3h2.1v10H5zM8.9 3H11v10H8.9z"/></symbol>
   <symbol id="i-chev" viewBox="0 0 16 16"><path d="M3.6 6l4.4 4.3L12.4 6"/></symbol>
+  <symbol id="i-help" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><path d="M6.2 6.3a1.9 1.9 0 1 1 2.6 1.8c-.6.3-.8.7-.8 1.3v.3"/><circle cx="8" cy="11.6" r=".4"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 16 16"><rect x="3.2" y="7.2" width="9.6" height="6.6" rx="1.4"/><path d="M5.4 7.2V5.2a2.6 2.6 0 0 1 5.2 0v2"/></symbol>
+  <symbol id="i-fence" viewBox="0 0 16 16"><path d="M3 13.5V4.5l1-2 1 2v9M7.5 13.5V4.5l1-2 1 2v9M12 13.5V4.5l1-2 1 2v9M1.5 7h13M1.5 11h13"/></symbol>
   <symbol id="i-line" viewBox="0 0 16 16"><path d="M2 12.4L14 3.6"/><circle cx="2.6" cy="12" r="1.5"/><circle cx="13.4" cy="4" r="1.5"/></symbol>
   <symbol id="i-grid" viewBox="0 0 16 16"><rect x="2.2" y="2.2" width="11.6" height="11.6" rx="1.2"/><path d="M6.1 2.2v11.6M9.9 2.2v11.6M2.2 6.1h11.6M2.2 9.9h11.6"/></symbol>
   <symbol id="i-undo" viewBox="0 0 16 16"><path d="M2.6 4.2v3.6h3.6"/><path d="M3.1 7.5A5.3 5.3 0 1 1 4.4 12"/></symbol>
@@ -96,6 +99,15 @@
         <button data-jump="09-21">Sep 21</button><button data-jump="12-21">Dec 21</button>
       </div>
     </div>
+    <div id="yearsahead" title="Trees with a planting date grow to their size in this year">
+      <span class="k">Trees in</span>
+      <button class="ibtn sm" data-ystep="-1" aria-label="One year earlier">−</button>
+      <span id="yrlbl" class="num">—</span>
+      <button class="ibtn sm" data-ystep="1" aria-label="One year later">+</button>
+      <div class="seg tiny" id="yearset">
+        <button data-yset="0">Now</button><button data-yset="5">+5</button><button data-yset="10">+10</button><button data-yset="20">+20</button>
+      </div>
+    </div>
     <div class="readout">
       <div class="r"><span class="v hot num" id="rEl">—</span><span class="k">Sun height</span></div>
       <div class="r"><span class="v num" id="rAz">—</span><span class="k">Bearing</span></div>
@@ -118,30 +130,36 @@
 <div id="compass" class="panel" title="Drag to spin the view · double-click for north up"><svg viewBox="0 0 100 100" id="compsvg"></svg></div>
 
 <div id="top" class="panel" role="toolbar" aria-label="Tools and views">
-  <div class="seg tools" role="group" aria-label="Tools">
+  <div class="seg obs" id="obsmodes" role="group" aria-label="How to look">
+    <button data-obs="orbit" title="Orbit around the yard">Look around</button>
+    <button data-obs="walk" title="Walk the yard at eye height">Walk</button>
+    <button data-obs="drone" title="Fly a drone, up to 200 ft">Drone</button>
+  </div>
+  <div class="seg tools bld" role="group" aria-label="Tools">
     <button data-tool="select" aria-pressed="true" title="Select and move"><svg class="ic fill"><use href="#i-cursor"/></svg><span class="lbl-t">Select</span></button>
     <button data-tool="pan" title="Pan the view"><svg class="ic"><use href="#i-pan"/></svg><span class="lbl-t">Pan</span></button>
     <button data-tool="measure" title="Measure"><svg class="ic"><use href="#i-ruler"/></svg><span class="lbl-t">Measure</span></button>
   </div>
-  <div class="div"></div>
-  <div class="addwrap">
+  <div class="div bld"></div>
+  <div class="addwrap bld">
     <button class="addbtn" id="addbtn" aria-haspopup="true" aria-expanded="false"><svg class="ic"><use href="#i-plus"/></svg><span>Add to yard</span></button>
   </div>
-  <div class="div"></div>
-  <div class="seg views" role="group" aria-label="View">
+  <div class="div bld"></div>
+  <div class="seg views notfly" role="group" aria-label="View">
     <button id="vplan" title="Plan: straight down (1)">Plan</button>
     <button id="v3d" aria-pressed="true" title="Tilted (2)">3D</button>
     <button id="veye" title="Eye level (3)">Eye level</button>
   </div>
-  <div class="seg icons ghost" role="group" aria-label="Framing">
+  <div class="seg icons ghost notfly" role="group" aria-label="Framing">
     <button id="vfit" title="Frame the whole lot (0)"><svg class="ic"><use href="#i-fit"/></svg></button>
     <button id="vfocus" title="Centre on the selection (F)"><svg class="ic"><use href="#i-focus"/></svg></button>
     <button id="vsimple" title="Simple schematic view (G)"><svg class="ic"><use href="#i-grid"/></svg></button>
     <button id="vphoto" title="Photo: a path-traced still of this view (P)"><svg class="ic"><use href="#i-camera"/></svg></button>
   </div>
-  <div class="div"></div>
-  <button class="ibtn" id="undoBtn" title="Undo (Ctrl+Z)" disabled><svg class="ic"><use href="#i-undo"/></svg></button>
-  <button class="ibtn" id="redoBtn" title="Redo (Ctrl+Shift+Z)" disabled><svg class="ic"><use href="#i-redo"/></svg></button>
+  <div class="div bld"></div>
+  <button class="ibtn bld" id="lockbtn" aria-pressed="false" title="Lock items in place (L)"><svg class="ic"><use href="#i-lock"/></svg></button>
+  <button class="ibtn bld" id="undoBtn" title="Undo (Ctrl+Z)" disabled><svg class="ic"><use href="#i-undo"/></svg></button>
+  <button class="ibtn bld" id="redoBtn" title="Redo (Ctrl+Shift+Z)" disabled><svg class="ic"><use href="#i-redo"/></svg></button>
   <button class="btn" id="sheetbtn" style="display:none">Edit</button>
 </div>
 
@@ -152,6 +170,17 @@
   <button data-tool="deck" role="menuitem"><svg class="ic"><use href="#i-deck"/></svg><span><b>Deck or patio</b><i>Raised decks cast shade</i></span></button>
   <button data-tool="driveway" role="menuitem"><svg class="ic"><use href="#i-driveway"/></svg><span><b>Driveway</b><i>Editable outline</i></span></button>
   <button data-tool="sidewalk" role="menuitem"><svg class="ic"><use href="#i-sidewalk"/></svg><span><b>Sidewalk</b><i>Editable outline</i></span></button>
+  <button data-tool="fence" role="menuitem"><svg class="ic"><use href="#i-fence"/></svg><span><b>Fence</b><i>Anywhere in the yard, with bends</i></span></button>
+</div>
+
+<div id="obshud" class="panel" hidden aria-live="polite">
+  <div class="t"><span class="eyebrow" id="obstitle">Observe</span><b id="obsread">—</b></div>
+  <div class="keys" id="obskeys"></div>
+</div>
+<div id="obspad" hidden aria-label="Move">
+  <button data-k="w" aria-label="Forward">▲</button>
+  <button data-k="a" aria-label="Left">◀</button><button data-k="s" aria-label="Back">▼</button><button data-k="d" aria-label="Right">▶</button>
+  <button data-k=" " class="v" aria-label="Up">⤒</button><button data-k="q" class="v" aria-label="Down">⤓</button>
 </div>
 
 <div id="photohud" class="panel" hidden>
@@ -256,12 +285,17 @@
       <div class="name"><b>Yard Shade Studio</b><span id="brandsub">Sun and shade planner</span></div>
     </div>
     <div id="tabs" role="tablist">
+      <div id="modeseg" role="group" aria-label="Mode">
+        <button data-mode="build" aria-pressed="true" title="Build: arrange the yard"><svg class="ic fill"><use href="#i-cursor"/></svg><span>Build</span></button>
+        <button data-mode="observe" aria-pressed="false" title="Observe: walk the yard or fly a drone over it (O)"><svg class="ic"><use href="#i-eye"/></svg><span>Observe</span></button>
+      </div>
       <button data-tab="prop" title="Lot &amp; fence"><svg class="ic"><use href="#i-lot"/></svg><span>Lot</span></button>
       <button id="railPlants" title="Species library"><svg class="ic"><use href="#i-leaf"/></svg><span>Plants</span></button>
       <button data-tab="site" title="Location &amp; sun"><svg class="ic"><use href="#i-sun"/></svg><span>Sun</span></button>
       <button data-tab="objs" title="Everything in the yard"><svg class="ic"><use href="#i-list"/></svg><span>Items</span><b class="count num" id="objcount"></b></button>
       <button data-tab="view" title="Display"><svg class="ic"><use href="#i-display"/></svg><span>Display</span></button>
       <div class="grow"></div>
+      <button id="railGuide" title="Guided tour"><svg class="ic"><use href="#i-help"/></svg><span>Guide</span></button>
       <button data-tab="file" title="Plan file"><svg class="ic"><use href="#i-file"/></svg><span>File</span></button>
     </div>
   </div>
@@ -303,6 +337,8 @@
         <div>
           <h4>Fence by side</h4>
           <div class="edgelist" id="fenceedges"></div>
+          <p class="hint">Need a fence that leaves the property line, bends, or stops short? Draw one, or turn these sides into fences you can reshape.</p>
+          <div class="btnrow"><button class="btn" id="fencedraw">Draw a fence</button><button class="btn" id="fenceconvert">Make sides reshapeable</button></div>
         </div>
         <div>
           <h4>Orientation</h4>
@@ -434,6 +470,26 @@
 </nav>
 
 <div id="toast" class="panel"></div>
+<div id="welcome" hidden>
+  <section class="panel" role="dialog" aria-modal="true" aria-labelledby="wtitle">
+    <span class="eyebrow">Welcome to Yard Shade Studio</span>
+    <h1 id="wtitle">Plan your yard around the sun</h1>
+    <p class="lede">See where the shade falls at any hour, on any date, and years from now as your trees grow.</p>
+    <ol class="wsteps">
+      <li><b>Map your lot</b><span>Shape your property line or import a survey or aerial photo, then point north and set your location.</span></li>
+      <li><b>Add buildings and hardscape</b><em>Optional</em><span>House, garage, decks, driveways, walks and fences: anything that casts shade or takes up room.</span></li>
+      <li><b>Plant your trees</b><span>Choose from 79 hardy species, set when each one goes in, and look ahead to see how big it gets.</span></li>
+      <li><b>Observe</b><span>Move the sun through any day, read the hours of sun on your beds, then walk the yard or fly a drone over it.</span></li>
+    </ol>
+    <div class="wbtns">
+      <button class="btn solid" data-w="blank">Start a new yard, guided</button>
+      <button class="btn" data-w="sample">Tour the sample yard</button>
+      <button class="btn ghost" data-w="skip">Skip, I'll explore</button>
+    </div>
+    <p class="hint">You can reopen this any time from <b>Guide</b> in the sidebar.</p>
+  </section>
+</div>
+
 <div id="modal"><div id="modalbox" class="panel">
   <h3 id="modaltitle"></h3><p id="modalmsg"></p>
   <div id="modalbtns"></div>
