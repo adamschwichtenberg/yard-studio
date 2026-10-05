@@ -451,12 +451,19 @@
       <div class="cols">
         <div>
           <h4>Plan file</h4>
+          <div class="planwhere" id="planwhere"></div>
           <div class="btnrow" style="margin-top:0">
-            <button class="btn" id="savebtn">Save</button><button class="btn" id="loadbtn">Open</button>
-            <button class="btn danger" id="resetbtn">Start over</button>
+            <button class="btn solid" id="newplanbtn">New plan</button><button class="btn" id="loadbtn">Open</button>
+            <button class="btn" id="savenowbtn">Save now</button>
+          </div>
+          <div class="btnrow">
+            <button class="btn" id="savebtn">Download a copy</button><button class="btn" id="saveasbtn">Save as…</button>
           </div>
           <div class="btnrow"><button class="btn" data-import-property>Import property image</button></div>
           <p class="hint">Detect and review an outline, name its sides, then enter one known length to scale the whole property.</p>
+          <h4>Recent plans</h4>
+          <div class="recentplans" id="recentplans"><p class="hint">Plans you name and save show up here.</p></div>
+          <div class="btnrow"><button class="btn ghost" id="resetbtn">Open the sample yard</button></div>
         </div>
         <div>
           <h4>Changes</h4>
@@ -495,6 +502,19 @@
     </div>
     <p class="hint">You can reopen this any time from <b>Guide</b> in the sidebar.</p>
   </section>
+</div>
+
+<div id="plandlg" hidden>
+  <form class="panel" id="plandlgbox" role="dialog" aria-modal="true" aria-labelledby="plandlgtitle">
+    <h3 id="plandlgtitle">Name your plan</h3>
+    <p class="lede" id="plandlgmsg">Give it a name and choose where it's kept. It saves itself every 10 minutes.</p>
+    <label class="pdname"><span>Plan name</span><input id="plandlgname" type="text" maxlength="40" required spellcheck="false" placeholder="Back yard, 2026"></label>
+    <div class="pdwhere" id="plandlgwhere">
+      <label class="pdopt" id="pdopt-file"><input type="radio" name="pdwhere" value="file"><span><b>A file on this computer</b><i>Pick a .json file; autosave writes to it directly.</i></span></label>
+      <label class="pdopt"><input type="radio" name="pdwhere" value="browser"><span><b>In this browser</b><i>Kept on this device under Recent plans. Download a copy any time.</i></span></label>
+    </div>
+    <div class="pdbtns"><button type="button" class="btn" id="plandlgcancel">Cancel</button><button type="submit" class="btn solid" id="plandlgok">Create plan</button></div>
+  </form>
 </div>
 
 <div id="modal"><div id="modalbox" class="panel">

@@ -13,6 +13,7 @@ import { PhotoMode } from "./photo.js";
 import { Observer } from "./observe.js";
 import { Tour } from "./tour.js";
 import DEFAULT_PLAN from "./defaultPlan.json";
+import { store, newPlanId, canUseFiles, pickSaveFile, pickOpenFile, filePermission, writeFile, readFile, fileName } from "./planstore.js";
 
 const DEG = Math.PI/180;
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
@@ -648,8 +649,8 @@ function fallAmount(t){
   return clamp((24 - left)/21, 0, 1);
 }
 /* Flowering windows, in days after leaf-out (so they follow the leaf season
-   and the hemisphere). Crabapples bloom as the leaves emerge and are over in
-   about two weeks; panicle hydrangeas flower from midsummer into fall. */
+   and the hemisphere). Panicle hydrangeas flower from midsummer into fall.
+   Crabapples keep calendar dates instead (20 April to mid May, see species.js). */
 const BLOOM_WINDOWS = {crabapple:{from:0, to:16}, hydrangea:{from:62, to:150}};
 function bloomState(kind){
   const w = BLOOM_WINDOWS[kind];
@@ -677,6 +678,7 @@ function seasonNow(t){
     fall: fallAmount(t),
     drop: on ? clamp((10 - toDrop)/10, 0, 1)*.92 : 0,
     day,
+    md: seasonMD(),
     sinceDrop: -toDrop
   };
 }
@@ -732,17 +734,32 @@ function defaultPlantH(o){
   if(H <= 12) return clamp(Math.round(H*.4), 2, 4);
   return H < 35 ? 6 : 10;
 }
+/* Crown width at planting: young broadleaves are narrow for their height;
+   columns and narrow evergreens start close to their final proportions. */
+function defaultPlantW(o){
+  const H = Math.max(2, o.height), W = Math.max(1, o.spread), a = W/H;
+  const h0 = clamp(o.plantH ?? defaultPlantH(o), 1, H);
+  const r = o.evergreen ? a*.95 : Math.max(a*.5, Math.min(a, .25));
+  return Math.round(clamp(Math.max(h0*r, Math.min(1.5, W*.35, h0*.3)), .6, W)*2)/2;
+}
 function growthAt(o, age){
   const H = Math.max(2, o.height), W = Math.max(1, o.spread), D = o.density ?? .85;
   const h0 = clamp(o.plantH ?? defaultPlantH(o), 1, H);
-  const w0 = clamp(h0*(W/H)*(o.evergreen ? .95 : .5), .6, W);
+  const w0 = clamp(o.plantW ?? defaultPlantW(o), .5, W);
   const g = treeGrowthRate(o);
   const est = clamp(h0/5.5, .5, 4);               // seasons to establish ≈ caliper inches
   const teff = age < est ? age*(.3 + .35*age/est) : est*.65 + (age - est);
   const rem = H - h0;
   const h = rem <= .01 ? H : H - rem*Math.exp(-g*teff/rem);
   const f = rem <= .01 ? 1 : clamp((h - h0)/rem, 0, 1);
-  const w = w0 + (W - w0)*Math.pow(f, o.evergreen ? 1 : 1.35);
+  /* Width: spreading trees widen as they gain height. Narrow ones (a column
+     of birch, a Spartan juniper) fill out on their own clock once they
+     settle in: a Parkland Pillar birch is about 3 ft wide at 7 years and
+     5 ft by 10. Shapes in between blend the two. */
+  const fo = Math.pow(f, o.evergreen ? 1 : 1.35);
+  const fn = 1 - Math.exp(-Math.pow(teff/(10.5/Math.sqrt(g)), 3));
+  const k = clamp((W/H - .2)/.25, 0, 1);
+  const w = w0 + (W - w0)*(fn*(1 - k) + fo*k);
   const d = D*(o.evergreen ? .78 + .22*f : .5 + .5*Math.pow(f, 1.6));
   const cbM = crownBaseFt(o);
   const cb = Math.min(cbM, Math.max(cbM*h/H, o.evergreen ? 0 : Math.min(4.5, h*.35)));
@@ -753,7 +770,7 @@ const growCache = new WeakMap();
 /* The tree as it stands on the plan's date. */
 function grown(o){
   if(!o || o.type !== "tree" || !o.planted) return o;
-  const key = [o.planted, o.plantH, o.gr, o.height, o.spread, o.density, o.crownBase, o.shape, o.name, o.evergreen, S.date, S.leafOut, S.lat >= 0].join("|");
+  const key = [o.planted, o.plantH, o.plantW, o.gr, o.height, o.spread, o.density, o.crownBase, o.shape, o.name, o.evergreen, S.date, S.leafOut, S.lat >= 0].join("|");
   const c = growCache.get(o);
   if(c && c.key === key) return c.t;
   const t = {...o, ...growthAt(o, seasonsBetween(plantYear(o), S.date))};
@@ -3300,6 +3317,7 @@ function growthHTML(o){
     <div class="growfields">
       <div class="field"><span class="lab">Year planted</span><span class="inp"><input type="number" inputmode="numeric" data-grow="planted" min="1900" max="2100" step="1" value="${plantYear(o)}"></span></div>
       <div class="field"><span class="lab">Height at planting</span><span class="inp"><input type="number" inputmode="decimal" data-grow="plantH" min="${dl(1, 1)}" max="${dl(Math.max(2, o.height), 1)}" step="${dstep(.5)}" value="${dl(o.plantH ?? defaultPlantH(o), 1)}"><span class="u">${lu()}</span></span></div>
+      <div class="field"><span class="lab">Width at planting</span><span class="inp"><input type="number" inputmode="decimal" data-grow="plantW" min="${dl(.5, 1)}" max="${dl(Math.max(1, o.spread), 1)}" step="${dstep(.5)}" value="${dl(o.plantW ?? defaultPlantW(o), 1)}"><span class="u">${lu()}</span></span></div>
       <div class="field"><span class="lab">Growth when young</span><span class="inp"><input type="number" inputmode="numeric" data-grow="gr" min="1" max="${metric() ? 150 : 60}" step="1" value="${rateDl(g)}"><span class="u">${rateU()}/yr</span></span></div>
       <p class="grow-def">${growDefHTML(o)}</p>
     </div></details>
@@ -3309,7 +3327,7 @@ function growthHTML(o){
 /* the planting fields stay folded away until asked for */
 let growOpen = false;
 function growSumHTML(o){
-  return `<span class="gs-t">Edit planting</span><span class="gs-v">${plantYear(o)} · ${uS(o.plantH ?? defaultPlantH(o))} · ${rateDl(treeGrowthRate(o))} ${rateU()}/yr</span><svg class="ic"><use href="#i-chev"/></svg>`;
+  return `<span class="gs-t">Edit planting</span><span class="gs-v">${plantYear(o)} · ${uS(o.plantH ?? defaultPlantH(o))} × ${uS(o.plantW ?? defaultPlantW(o))} · ${rateDl(treeGrowthRate(o))} ${rateU()}/yr</span><svg class="ic"><use href="#i-chev"/></svg>`;
 }
 function growDefHTML(o){
   const g0 = defaultGrowthRate(o);
@@ -3674,6 +3692,9 @@ props.addEventListener("input", e=>{
     } else if(gk === "plantH"){
       if(v <= 0) return;
       o.plantH = rnd(clamp(fromDl(v), .5, Math.max(1, o.height)), 2);
+    } else if(gk === "plantW"){
+      if(v <= 0) return;
+      o.plantW = rnd(clamp(fromDl(v), .5, Math.max(1, o.spread)), 2);
     } else if(gk === "gr"){
       if(v <= 0) return;
       o.gr = rnd(clamp(v/(metric() ? 30.48 : 12), .05, 6), 3);
@@ -3780,7 +3801,7 @@ props.addEventListener("click", e=>{
     const gb = props.querySelector(".growbox"); if(gb) gb.innerHTML = growthHTML(o);
   }
   if(act === "established" && o.type === "tree"){
-    delete o.planted; delete o.plantH; delete o.gr;
+    delete o.planted; delete o.plantH; delete o.plantW; delete o.gr;
     panelFor = null; queueRebuild(o); drawPanel(); updateSelection(); drawList(); scheduleCompute(); syncYears();
   }
   if(act === "dup"){
@@ -3799,9 +3820,15 @@ props.addEventListener("change", e=>{
     /* tidy the finished value in place, so focus can move on to the next box */
     const o = selected();
     if(!o) return;
-    e.target.value = gk === "planted" ? plantYear(o) : gk === "plantH" ? dl(o.plantH ?? defaultPlantH(o), 1) : rateDl(treeGrowthRate(o));
+    e.target.value = gk === "planted" ? plantYear(o) : gk === "plantH" ? dl(o.plantH ?? defaultPlantH(o), 1)
+      : gk === "plantW" ? dl(o.plantW ?? defaultPlantW(o), 1) : rateDl(treeGrowthRate(o));
     const gd = props.querySelector(".grow-def");
     if(gd) gd.innerHTML = growDefHTML(o);
+    /* an unset width follows the height */
+    const wi = props.querySelector('[data-grow="plantW"]');
+    if(gk === "plantH" && wi && o.plantW == null) wi.value = dl(defaultPlantW(o), 1);
+    const gs = props.querySelector(".growedit > summary");
+    if(gs) gs.innerHTML = growSumHTML(o);
     scheduleHist();
     return;
   }
@@ -4148,9 +4175,28 @@ function syncProject(){
   if(document.activeElement !== nm) nm.value = S.title || "Backyard";
   nm.style.setProperty("--nameW", Math.max(5, nm.value.length + 1) + "ch");
   const clean = savedKey === saveKey(S), st = $("projstatus");
-  st.classList.toggle("saved", clean && everSaved);
-  st.querySelector("span").textContent = clean ? (everSaved ? "Saved to file" : "No changes yet") : "Unsaved changes";
-  st.title = clean && everSaved ? "Saved. Click to save another copy." : "Save the plan to a file";
+  const saveTo = plan?.handle ? plan.handle.name : "this browser";
+  let text, title;
+  if(!plan){
+    text = clean ? (everSaved ? "Copy downloaded" : "Sample yard · Save") : "Not saved · Save";
+    title = "Name this plan and choose saveTo it's kept";
+  } else if(fileState === "needs-permission"){
+    text = "Reconnect file"; title = `Click to let the page write to ${saveTo} again`;
+  } else if(fileState === "error"){
+    text = "File save failed"; title = `Couldn't write ${saveTo}. Click to try again, or use Download a copy.`;
+  } else if(clean){
+    text = lastSaved ? `Saved ${clock(lastSaved)}` : "Saved"; title = `Saved to ${saveTo}. Autosaves every 10 minutes.`;
+  } else {
+    text = `Autosave ${clock(nextAutosave)}`; title = `Unsaved changes. Saves to ${saveTo} at ${clock(nextAutosave)}; click to save now.`;
+  }
+  st.classList.toggle("saved", !!plan && clean && fileState === "ok");
+  st.classList.toggle("warn", !!plan && fileState !== "ok");
+  st.querySelector("span").textContent = text;
+  st.title = title;
+  const pw = $("planwhere");
+  if(pw) pw.innerHTML = plan
+    ? `<b>${escapeHTML(S.title || "Backyard")}</b><span>${plan.handle ? `Saving to <em>${escapeHTML(plan.handle.name)}</em> on this computer` : "Saving in this browser"} · ${lastSaved ? "last saved " + clock(lastSaved) : "not saved yet"}. Autosaves every 10 minutes.</span>`
+    : `<b>Not saved</b><span>The sample yard isn't kept anywhere. Use <em>Save as…</em> to name it, or <em>New plan</em> to start your own.</span>`;
 }
 $("projname").addEventListener("input", e=>{
   S.title = e.target.value.trim().slice(0,40) || "Backyard";
@@ -4158,7 +4204,7 @@ $("projname").addEventListener("input", e=>{
   scheduleHist(); syncSunH();
 });
 $("projname").addEventListener("keydown", e=>{ if(e.key === "Enter") e.target.blur(); e.stopPropagation(); });
-$("projstatus").addEventListener("click", ()=>savePlan());
+$("projstatus").addEventListener("click", ()=>$("savenowbtn").click());
 
 /* ---------- species library ---------- */
 let libMode = "place", pendingPreset = null;
@@ -4678,13 +4724,228 @@ async function offerFile(filename, data){
   return "saved";
 }
 downloadsCapability();
+/* Download a copy of the plan as a .json file. */
 async function savePlan(){
-  const res = await offerFile("yard-plan.json", JSON.stringify(S,null,2));
+  const res = await offerFile(fileName(S.title), JSON.stringify(S,null,2));
   if(res !== "saved") return false;
   savedMark = JSON.stringify(S);
-  markSaved(true);
-  toast("Plan saved");
+  if(!plan) markSaved(true);
+  toast("Copy downloaded");
   return true;
+}
+
+/* ---------- named plans and autosave ----------
+   A plan you create or open is "the current plan": it keeps a copy in this
+   browser and, where the browser allows, writes to a .json file you chose.
+   Changes save every 10 minutes (and on Save now). Between autosaves a
+   recovery copy is kept each minute in this browser, so closing the tab or
+   a crash loses at most a minute. The sample yard has no plan until you
+   name it. */
+const AUTOSAVE_MS = 10*60*1000;
+let plan = null;                 // {id, handle} or null for the unnamed sample yard
+let fileState = "ok";            // "ok" | "needs-permission" | "error"
+let lastSaved = 0, nextAutosave = Date.now() + AUTOSAVE_MS, recoveryKey = null;
+const planDirty = ()=>savedKey !== saveKey(S);
+const clock = t=>new Date(t).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+
+/* Save the current plan: its file (when it has one) and its browser copy.
+   `fromClick` lets the browser ask for file permission again after a reload. */
+async function persistPlan(fromClick, opts = {}){
+  if(!plan) return false;
+  const json = JSON.stringify(S, null, 2), key = saveKey(S);
+  let ok = true;
+  if(plan.handle && opts.file !== false){
+    try{
+      if(await filePermission(plan.handle, fromClick) === "granted"){ await writeFile(plan.handle, json); fileState = "ok"; }
+      else { fileState = "needs-permission"; ok = false; }
+    }catch(err){ console.warn("plan file", err); fileState = "error"; ok = false; }
+  }
+  try{
+    const rec = {id:plan.id, name:S.title || "Backyard", updated:Date.now(), data:json,
+                 handle:plan.handle || null, file:plan.handle?.name || null};
+    /* a browser that can't store the file handle still keeps the plan */
+    try{ await store.putPlan(rec); }
+    catch(err){ if(err?.name !== "DataCloneError") throw err; await store.putPlan({...rec, handle:null}); }
+    await store.setMeta("last", plan.id);
+    await store.delMeta("recovery");
+    recoveryKey = key;
+  }catch(err){
+    console.warn("browser copy", err);
+    if(!plan.handle){ toast("This browser won't let the page keep plans. Use Download a copy."); ok = false; }
+  }
+  if(ok || plan.handle && fileState === "ok"){ savedKey = key; everSaved = true; lastSaved = Date.now(); savedMark = JSON.stringify(S); }
+  syncProject(); drawRecent();
+  return ok;
+}
+/* A minute-by-minute safety copy in this browser, separate from autosave. */
+async function keepRecovery(){
+  const key = saveKey(S);
+  if(!planDirty() || key === recoveryKey) return;
+  recoveryKey = key;
+  try{ await store.setMeta("recovery", {planId:plan?.id ?? null, updated:Date.now(), data:JSON.stringify(S)}); }catch{ /* storage off */ }
+}
+function autosaveTick(){
+  const now = Date.now();
+  if(now >= nextAutosave){
+    nextAutosave = now + AUTOSAVE_MS;
+    if(plan && planDirty()) persistPlan(false);
+  }
+  keepRecovery();
+  syncProject();
+}
+setInterval(autosaveTick, 60*1000);
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "hidden") keepRecovery(); });
+
+/* Make `data` the current plan. */
+async function switchTo(data, p, message){
+  if(plan && planDirty()) await persistPlan(false);
+  loadState(data, true);
+  plan = p; fileState = "ok";
+  hist.stack = []; hist.i = -1;
+  await persistPlan(false, {file:false});
+  pushHist();
+  nextAutosave = Date.now() + AUTOSAVE_MS;
+  if(message) toast(message);
+}
+
+/* ---------- the name-your-plan dialog ---------- */
+let dlg = null;   // {mode:"new"|"saveas", tour}
+function openPlanDialog(mode, opts = {}){
+  dlg = {mode, ...opts};
+  const files = canUseFiles();
+  $("pdopt-file").hidden = !files;
+  document.querySelector(`#plandlg input[value="${files ? "file" : "browser"}"]`).checked = true;
+  $("plandlgtitle").textContent = mode === "new" ? "Name your new plan" : "Save this plan";
+  $("plandlgmsg").textContent = (mode === "new" ? "Start from an empty lot. " : "")
+    + (files ? "Choose a file to keep it in, or keep it in this browser." : "It's kept in this browser, and you can download a copy any time.")
+    + " It saves itself every 10 minutes.";
+  $("plandlgok").textContent = mode === "new" ? "Create plan" : "Save plan";
+  $("plandlgname").value = mode === "new" ? "" : (S.title && S.title !== "Backyard" ? S.title : "");
+  $("plandlg").hidden = false;
+  setTimeout(()=>$("plandlgname").focus(), 30);
+}
+function closePlanDialog(){ $("plandlg").hidden = true; dlg = null; }
+$("plandlgcancel").addEventListener("click", closePlanDialog);
+$("plandlg").addEventListener("pointerdown", e=>{ if(e.target.id === "plandlg") closePlanDialog(); });
+$("plandlg").addEventListener("keydown", e=>{ e.stopPropagation(); if(e.key === "Escape") closePlanDialog(); });
+$("plandlgbox").addEventListener("submit", async e=>{
+  e.preventDefault();
+  if(!dlg) return;
+  const name = $("plandlgname").value.trim().slice(0, 40);
+  if(!name){ $("plandlgname").focus(); return; }
+  const where = document.querySelector('#plandlg input[name="pdwhere"]:checked')?.value;
+  let handle = null;
+  if(where === "file" && canUseFiles()){
+    /* the picker has to open straight from the click */
+    try{ handle = await pickSaveFile(name); if(!handle) return; }
+    catch(err){ console.warn(err); toast("Files can't be written from here, so it's kept in this browser"); }
+  }
+  const {mode, tour:withTour} = dlg;
+  closePlanDialog();
+  if(plan && planDirty()) await persistPlan(false);
+  if(mode === "new") startBlankYard();
+  S.title = name;
+  plan = {id:newPlanId(), handle}; fileState = "ok";
+  hist.stack = []; hist.i = -1; pushHist();
+  nextAutosave = Date.now() + AUTOSAVE_MS;
+  const ok = await persistPlan(true);
+  syncProject();
+  if(ok) toast(handle ? `Saved to ${handle.name}. Autosaves every 10 minutes.` : `“${name}” saved in this browser. Autosaves every 10 minutes.`);
+  if(mode === "new" && withTour){ if(obsMode) exitObserve(); tour.start(0); }
+});
+
+/* ---------- recent plans ---------- */
+async function drawRecent(){
+  const host = $("recentplans");
+  if(!host) return;
+  let list = [];
+  try{ list = await store.listPlans(); }catch{ host.innerHTML = `<p class="hint">This browser isn't keeping plans for this page.</p>`; return; }
+  if(!list.length){ host.innerHTML = `<p class="hint">Plans you name and save show up here.</p>`; return; }
+  host.innerHTML = list.slice(0, 12).map(r=>`<div class="rp${plan?.id === r.id ? " on" : ""}">
+      <button class="rpopen" data-open="${r.id}"><b>${escapeHTML(r.name)}</b>
+        <span>${r.file ? escapeHTML(r.file) + " · on this computer" : "In this browser"} · ${new Date(r.updated).toLocaleDateString([], {month:"short", day:"numeric"})} ${clock(r.updated)}</span></button>
+      <button class="ibtn rpdel" data-forget="${r.id}" title="Remove from this list" aria-label="Remove ${escapeHTML(r.name)} from this list"><svg class="ic"><use href="#i-close"/></svg></button>
+    </div>`).join("");
+}
+$("recentplans").addEventListener("click", async e=>{
+  const op = e.target.closest("[data-open]"), fg = e.target.closest("[data-forget]");
+  if(op){
+    const rec = await store.getPlan(op.dataset.open).catch(()=>null);
+    if(!rec) return;
+    if(plan?.id === rec.id){ toast(`“${rec.name}” is already open`); return; }
+    let data = JSON.parse(rec.data), from = "this browser";
+    if(rec.handle){
+      try{ if(await filePermission(rec.handle, true) === "granted"){ data = JSON.parse(await readFile(rec.handle)); from = rec.handle.name; } }
+      catch{ /* file moved or unreadable: the browser copy will do */ }
+    }
+    await switchTo(data, {id:rec.id, handle:rec.handle || null}, `Opened “${rec.name}” from ${from}`);
+  }
+  if(fg){
+    const id = fg.dataset.forget;
+    const rec = await store.getPlan(id).catch(()=>null);
+    if(!rec) return;
+    askUser("Remove from Recent plans?", rec.file
+        ? `“${rec.name}” leaves this list. The file ${rec.file} on your computer is not deleted.`
+        : `“${rec.name}” is only kept in this browser, so this deletes it. Download a copy first if you want to keep it.`,
+      [{label:"Cancel"}, {label:"Remove", kind:"danger", run:async ()=>{
+        await store.delPlan(id).catch(()=>{});
+        if(plan?.id === id){ plan = null; everSaved = false; await store.delMeta("last").catch(()=>{}); syncProject(); }
+        drawRecent();
+      }}]);
+  }
+});
+
+/* ---------- opening ---------- */
+async function openPlan(){
+  if(!canUseFiles() || !window.showOpenFilePicker){ $("fileinput").click(); return; }
+  let h;
+  try{ h = await pickOpenFile(); }catch{ $("fileinput").click(); return; }
+  if(!h) return;
+  let data;
+  try{ data = JSON.parse(await readFile(h)); if(!data.objects) throw new Error("not a plan"); }
+  catch{ toast("That file isn't a yard plan"); return; }
+  /* the same file opened before keeps its place in Recent plans */
+  let id = newPlanId();
+  try{ for(const r of await store.listPlans()) if(r.handle && await r.handle.isSameEntry?.(h)){ id = r.id; break; } }catch{ /* first time */ }
+  if(!data.title) data.title = h.name.replace(/\.json$/i, "");
+  await switchTo(data, {id, handle:h}, `Opened ${h.name}. Autosave writes back to it.`);
+}
+/* Pick up the last plan after a reload. */
+async function resumeLastPlan(){
+  let rec = null, rcv = null;
+  try{
+    const id = await store.getMeta("last");
+    rec = id ? await store.getPlan(id) : null;
+    rcv = await store.getMeta("recovery");
+  }catch{ return false; }
+  if(rec){
+    loadState(JSON.parse(rec.data), true);
+    plan = {id:rec.id, handle:rec.handle || null};
+    savedKey = saveKey(S); everSaved = true; lastSaved = rec.updated; savedMark = JSON.stringify(S);
+    let msg = `Welcome back to “${rec.name}”`;
+    if(rcv && rcv.planId === rec.id && rcv.updated > rec.updated){
+      loadState(JSON.parse(rcv.data), true);
+      msg = `Picked up “${rec.name}” with your changes from ${clock(rcv.updated)}`;
+    }
+    if(plan.handle){
+      try{ fileState = await filePermission(plan.handle, false) === "granted" ? "ok" : "needs-permission"; }catch{ fileState = "needs-permission"; }
+    }
+    hist.stack = []; hist.i = -1; pushHist();
+    toast(msg);
+    syncProject(); drawRecent();
+    return true;
+  }
+  if(rcv && !rcv.planId){
+    askUser("Pick up where you left off?", `You had unsaved changes to the sample yard from ${clock(rcv.updated)}.`, [
+      {label:"Discard", run:()=>store.delMeta("recovery").catch(()=>{})},
+      {label:"Restore", kind:"solid", run:()=>{
+        loadState(JSON.parse(rcv.data), true);
+        hist.stack = []; hist.i = -1; pushHist();
+        toast("Restored. Name the plan to keep it.");
+      }}]);
+  }
+  drawRecent();
+  return false;
 }
 /* Rebuild everything from a plain object. Shared by Open, Start over and Undo. */
 function loadState(data, frame){
@@ -4792,41 +5053,49 @@ $("pii-dialog").addEventListener("close", ()=>{
     toast("Unscaled draft kept. Save the plan to keep it after closing this tab.");
   }
 });
-$("loadbtn").addEventListener("click", ()=>$("fileinput").click());
+$("loadbtn").addEventListener("click", ()=>guardSample(openPlan, "Open another plan?"));
 $("fileinput").addEventListener("change", e=>{
   const f = e.target.files[0];
   if(!f) return;
   const rd = new FileReader();
-  rd.onload = ()=>{
-    try{
-      const data = JSON.parse(rd.result);
-      if(!data.objects) throw new Error("not a plan");
-      loadState(data, true);
-      savedMark = JSON.stringify(S);
-      markSaved(true);
-      pushHist();
-      toast("Plan opened");
-    }catch(err){ toast("That file isn't a yard plan"); }
+  rd.onload = async ()=>{
+    let data;
+    try{ data = JSON.parse(rd.result); if(!data.objects) throw new Error("not a plan"); }
+    catch(err){ toast("That file isn't a yard plan"); return; }
+    if(!data.title) data.title = f.name.replace(/\.json$/i, "");
+    await switchTo(data, {id:newPlanId(), handle:null}, "Opened. It's kept in this browser and autosaves; Download a copy to update the file.");
   };
   rd.readAsText(f);
   e.target.value = "";
 });
-function doReset(){
+async function doReset(){
+  if(plan && planDirty()) await persistPlan(false);
+  const was = plan;
+  plan = null;
   loadState(freshState(), true);
   savedMark = JSON.stringify(S);
   everSaved = false; markSaved(false);
-  pushHist();
-  toast("Back to the starting yard");
+  hist.stack = []; hist.i = -1; pushHist();
+  store.delMeta("last").catch(()=>{});
+  drawRecent();
+  toast(was ? "Your plan is saved. This is the sample yard." : "Back to the sample yard");
 }
-$("resetbtn").addEventListener("click", ()=>{
-  const dirtyPlan = savedMark !== JSON.stringify(S);
-  askUser("Start over?",
-    dirtyPlan
-      ? "This wipes the current plan and drops you back on the starting yard. Anything you have not saved to a file will be lost — Undo can bring it back, but only while this tab stays open."
-      : "This wipes the current plan and drops you back on the starting yard.",
-    [ {label:"Cancel"},
-      {label:"Save a copy first", run:async ()=>{ if(await savePlan()) doReset(); }},
-      {label:"Start over", kind:"danger", run:doReset} ]);
+/* Leaving unsaved sample-yard edits: offer to name them first. */
+function guardSample(then, verb){
+  if(plan || !planDirty() || !S.objects.length){ then(); return; }
+  askUser(verb, "Your changes to this yard haven't been saved.", [
+    {label:"Keep editing"},
+    {label:"Save them first", run:()=>openPlanDialog("saveas")},
+    {label:"Continue", kind:"danger", run:then} ]);
+}
+$("resetbtn").addEventListener("click", ()=>guardSample(doReset, "Open the sample yard?"));
+$("newplanbtn").addEventListener("click", ()=>guardSample(()=>openPlanDialog("new"), "Start a new plan?"));
+$("saveasbtn").addEventListener("click", ()=>openPlanDialog("saveas"));
+$("savenowbtn").addEventListener("click", async ()=>{
+  if(!plan){ openPlanDialog("saveas"); return; }
+  nextAutosave = Date.now() + AUTOSAVE_MS;
+  if(await persistPlan(true)) toast(plan.handle ? `Saved to ${plan.handle.name}` : "Saved in this browser");
+  else if(fileState === "needs-permission") toast("The browser needs your OK to write the file. Try Save now again.");
 });
 function syncInputs(){
   syncYears();
@@ -5087,6 +5356,7 @@ async function boot(){
   savedMark = JSON.stringify(S);
   markSaved(false);
   pushHist();
+  await resumeLastPlan();
   if(window.innerWidth <= 1020) $("sunpanel").classList.add("min");
   loop();
   const b = yardBounds(), span = Math.max(b.w, b.h);
@@ -5188,6 +5458,7 @@ function startBlankYard(){
   st.fence.on = false; st.fence.sides = [false,false,false,false];
   st.title = "My yard";
   loadState(st, true);
+  plan = null;
   savedKey = saveKey(S); everSaved = false; markSaved(false);
   pushHist();
   setView("vplan", true);
@@ -5196,19 +5467,9 @@ $("welcome").addEventListener("click", e=>{
   const b = e.target.closest("[data-w]");
   if(!b) return;
   const w = b.dataset.w;
-  const go = ()=>{
-    showWelcome(false);
-    if(w === "blank") startBlankYard();
-    if(w === "blank" || w === "sample"){ if(obsMode) exitObserve(); tour.start(0); }
-  };
-  if(w === "blank" && savedKey !== saveKey(S) && S.objects.length && localStorage.getItem?.(WELCOME_KEY)){
-    askUser("Start a new yard?", "Your current plan has unsaved changes.", [
-      {label:"Keep editing", run:()=>{}},
-      {label:"Save a copy first", run:async ()=>{ if(await savePlan()) go(); }},
-      {label:"Start new", kind:"danger", run:go} ]);
-    return;
-  }
-  go();
+  showWelcome(false);
+  if(w === "blank"){ guardSample(()=>openPlanDialog("new", {tour:true}), "Start a new yard?"); return; }
+  if(w === "sample"){ if(obsMode) exitObserve(); tour.start(0); }
 });
 $("railGuide").addEventListener("click", ()=>{ if(tour.active) tour.end(false); showWelcome(true); });
 document.addEventListener("keydown", e=>{ if(e.key === "Escape" && !$("welcome").hidden){ showWelcome(false); e.stopPropagation(); } }, true);
@@ -5220,7 +5481,7 @@ function maybeWelcome(){
 
 window.applyImportedBoundary = applyImportedBoundary;   // hook for the property-image importer
 /* development-only hook for automated screenshots */
-if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, get photo(){ return photo; }, get scene(){ return scene; }, rebuildAll, fromPreset, grown, select, worldPoly, project, get observer(){ return observer; }, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute };
+if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, get photo(){ return photo; }, get scene(){ return scene; }, rebuildAll, fromPreset, grown, select, worldPoly, project, get observer(){ return observer; }, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute, autosaveNow(){ nextAutosave = 0; autosaveTick(); }, get plan(){ return plan; } };
 initLocationUI();
 initPrefsUI();
 if(document.readyState === "complete") boot();

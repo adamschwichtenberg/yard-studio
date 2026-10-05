@@ -21,6 +21,7 @@ Inspired by three pieces of web work: Lusion's *Of the Oak* (a procedurally grow
   - Lindens carry their June bracts; acorns, pods, crabapple fruit and alder cones hang into winter; spruces carry their cones.
 - **Trees grow over time.** Give a tree the year it was planted, its height at planting and (optionally) your own growth rate; new trees go in this year at nursery size, then use **Trees in** on the sun card to see the yard 5, 10 or 20 years on.
   - Each species grows at its own rate, from the Arbor Day Foundation's classes (slow ≤ 12 in a year, medium 13–24 in, fast ≥ 25 in) and extension fact sheets; cultivars can differ (Autumn Blaze ~3 ft a year, Black Hills spruce ~1 ft).
+  - Height and width at planting both fill in from the species and can be changed to match the tree as it stands. Narrow trees (columnar birch, Spartan juniper) fill out to their mature width earlier, on their own clock: a Parkland Pillar birch is about 3 ft wide at 7 years and 5 ft by 10.
   - The planting year is a settling-in year; the first growing season is the next spring. Change the growth rate per tree if yours runs faster or slower than the species typical ("Use typical" puts it back).
   - Newly planted trees spend about a growing season per inch of trunk caliper establishing ("sleep, creep, leap"), then grow at full speed, slowing as they near mature height.
   - Broadleaves grow up before they grow out and fill in last, so young trees cast lighter shade; conifers keep their shape.
@@ -30,6 +31,8 @@ Inspired by three pieces of web work: Lusion's *Of the Oak* (a procedurally grow
 - **Guided start.** First launch offers a four-step guide (map your lot, add buildings and hardscape, plant trees, observe) that points at each control and moves on as you do it, with one-off tips as you open panels. **Guide** in the rail brings it back.
 - **Schematic view** marks every tree's centre with a dot.
 - **Diorama stage** (Display → Stage).
+- **Plans save themselves.** New plan asks for a name and where to keep it: a .json file on your computer (Chrome and Edge, where the page can write files) or this browser. Changes autosave every 10 minutes, a recovery copy is kept each minute, and the last plan reopens on your next visit. File → Recent plans switches between them.
+- **Crabapples** leaf out with the other deciduous trees and bloom on calendar dates: 20 April, fading from 15 May.
 - **Opens on a real lot**: a Fargo, ND yard with its house, shed, deck, driveway and 29 young trees planted this year. Start a blank yard from the welcome screen.
   - **Diorama:** the lot is cut from the earth, its edge showing turf over a scanned soil profile, on a plinth in a studio. The sky still lights it. Tilt-shift grows as you pull back.
   - **Landscape:** keeps the open-country view.

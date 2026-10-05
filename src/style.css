@@ -893,10 +893,45 @@ body.observe #coach{top:calc(var(--gut) + 150px)}
 .growedit > summary:hover{background:rgba(242,201,76,.08)}
 .growedit > summary:focus-visible{outline:2px solid #F2C94C;outline-offset:2px}
 .growedit .gs-t{color:#F2D27A;font-size:13px;font-weight:500;white-space:nowrap}
-.growedit .gs-v{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--text-2);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.growedit .gs-v{margin-left:auto;font-family:var(--mono);font-size:11.5px;line-height:1.4;color:var(--text-2);font-variant-numeric:tabular-nums;text-align:right;min-width:0}
 .growedit > summary .ic{width:14px;height:14px;flex:none;stroke:#F2C94C;transition:transform .2s}
 .growedit[open] > summary .ic{transform:rotate(180deg)}
 .growedit .growfields{border:0;background:none;padding:0 12px 10px;border-radius:0}
 
 /* phones: no floating Observe hint card over the sun card */
 @media (max-width:1020px){ #obshud{display:none !important} }
+
+/* ---------- plan files and autosave ---------- */
+#projstatus.warn{color:#F2C94C}
+#projstatus.warn::before{background:#F2C94C}
+.planwhere{display:flex;flex-direction:column;gap:3px;margin:0 0 10px;padding:10px 12px;border-radius:12px;background:var(--raised-2);font-size:12.5px}
+.planwhere b{font-weight:500;color:var(--text)}
+.planwhere span{color:var(--dim);line-height:1.5}
+.planwhere em{font-style:normal;color:var(--text-2)}
+.recentplans{display:flex;flex-direction:column;gap:2px}
+.recentplans .rp{display:flex;align-items:center;gap:4px;border-radius:10px}
+.recentplans .rp.on{background:var(--brass-dim)}
+.recentplans .rpopen{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:7px 10px;border:0;background:none;border-radius:10px;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.recentplans .rpopen:hover{background:var(--ghost)}
+.recentplans .rpopen b{font-weight:500;font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recentplans .rpopen span{font-size:11.5px;color:var(--faint);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recentplans .rpdel{flex:none;width:30px;height:30px;opacity:.55}
+.recentplans .rpdel:hover{opacity:1}
+#plandlg{position:fixed;inset:0;z-index:31;display:grid;place-items:center;padding:16px;background:rgba(6,9,8,.62);
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+#plandlg[hidden]{display:none}
+#plandlgbox{position:static;width:min(460px,100%);padding:22px 22px 16px;display:flex;flex-direction:column;gap:12px}
+#plandlgbox h3{margin:0;font-family:var(--serif);font-weight:400;font-size:26px;line-height:1.1}
+#plandlgbox .lede{margin:0;color:var(--dim);font-size:13px;line-height:1.55}
+.pdname{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--faint)}
+.pdname input{height:42px;padding:0 12px;border-radius:10px;border:1px solid var(--line-3);background:var(--well);color:var(--text);font:inherit;font-size:15px}
+.pdname input:focus{outline:none;border-color:var(--brass-line)}
+.pdwhere{display:flex;flex-direction:column;gap:6px}
+.pdopt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;border:1px solid var(--line-2);cursor:pointer}
+.pdopt[hidden]{display:none}
+.pdopt:has(input:checked){border-color:var(--brass-line);background:var(--brass-dim)}
+.pdopt input{margin-top:3px;accent-color:var(--brass)}
+.pdopt span{display:flex;flex-direction:column;gap:2px}
+.pdopt b{font-weight:500;font-size:13px;color:var(--text)}
+.pdopt i{font-style:normal;font-size:12px;color:var(--dim);line-height:1.45}
+.pdbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}

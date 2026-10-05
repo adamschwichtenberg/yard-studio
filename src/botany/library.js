@@ -271,6 +271,12 @@ function windowPhase(d, from, to) {
   return x / Math.max(1, len);
 }
 
+/** Day of the year for "MM-DD". */
+function mdDayOf(md) {
+  const [m, d] = md.split('-').map(Number);
+  return Date.UTC(2001, m - 1, d) / 86400000 - Date.UTC(2001, 0, 1) / 86400000;
+}
+
 /* ------------------------------------------------------------ library */
 
 const DEFAULT_LEAF = 0x46702c;
@@ -627,7 +633,15 @@ function writeOrnament(mesh, season) {
   const day = season.day ?? 60;
   let amount = 1;
   let phase = 0.5;
-  if (orn.from != null) {
+  if (orn.md) {
+    // calendar dates rather than days after leaf-out
+    const ph = season.md ? windowPhase(mdDayOf(season.md), mdDayOf(orn.md[0]), mdDayOf(orn.md[1])) : -1;
+    if (ph < 0) amount = 0;
+    else {
+      phase = ph;
+      amount = THREE.MathUtils.clamp(Math.min(ph / (orn.open ?? 0.15), (1 - ph) / (orn.fade ?? 0.12)), 0, 1);
+    }
+  } else if (orn.from != null) {
     const ph = windowPhase(day, orn.from, orn.to);
     if (ph < 0) amount = 0;
     else {
