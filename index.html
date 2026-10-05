@@ -99,7 +99,7 @@
         <button data-jump="09-21">Sep 21</button><button data-jump="12-21">Dec 21</button>
       </div>
     </div>
-    <div id="yearsahead" title="Trees with a planting date grow to their size in this year">
+    <div id="yearsahead" title="Trees with a planting year grow to their size in this year">
       <span class="k">Trees in</span>
       <button class="ibtn sm" data-ystep="-1" aria-label="One year earlier">−</button>
       <span id="yrlbl" class="num">—</span>
@@ -111,7 +111,7 @@
     <div class="readout">
       <div class="r"><span class="v hot num" id="rEl">—</span><span class="k">Sun height</span></div>
       <div class="r"><span class="v num" id="rAz">—</span><span class="k">Bearing</span></div>
-      <div class="r"><span class="v num" id="rShad">—</span><span class="k">Shadow of 10 ft</span></div>
+      <div class="r"><span class="v num" id="rShad">—</span><span class="k" id="rShadK">Shadow of 10 ft</span></div>
       <div class="r wide"><span class="k">Daylight</span><span class="v num" id="rDay">—</span></div>
       <div class="r wide"><span class="k">Solar noon</span><span class="v num" id="rNoon">—</span></div>
     </div>
@@ -160,8 +160,9 @@
   <button class="ibtn bld" id="lockbtn" aria-pressed="false" title="Lock items in place (L)"><svg class="ic"><use href="#i-lock"/></svg></button>
   <button class="ibtn bld" id="undoBtn" title="Undo (Ctrl+Z)" disabled><svg class="ic"><use href="#i-undo"/></svg></button>
   <button class="ibtn bld" id="redoBtn" title="Redo (Ctrl+Shift+Z)" disabled><svg class="ic"><use href="#i-redo"/></svg></button>
-  <button class="btn" id="sheetbtn" style="display:none">Edit</button>
 </div>
+
+<button class="btn" id="sheetbtn" aria-label="Edit the selected item"><svg class="ic"><use href="#i-chev"/></svg><span id="sheetlbl">Edit</span></button>
 
 <div id="addmenu" class="panel" role="menu" aria-label="Add to the yard" hidden>
   <button data-lib role="menuitem"><svg class="ic"><use href="#i-tree"/></svg><span><b>Tree</b><i>Browse the species library</i></span></button>
@@ -210,7 +211,7 @@
     <h2 id="seltitle">Nothing selected</h2>
     <div id="selsub"></div>
     <div id="seltags"></div>
-    <button class="btn" id="closesheet" style="display:none;padding:5px 10px">Done</button>
+    <button class="btn" id="closesheet" style="display:none;padding:5px 10px">Hide</button>
   </div>
   <div id="inspbody"><div id="props"></div></div>
 </div>
@@ -317,9 +318,9 @@
         <div>
           <h4>Overall size</h4>
           <div class="field"><label for="yardw">Width across</label>
-            <span class="inp"><input type="number" id="yardw" min="10" max="900" value="110"><span class="u">ft</span></span></div>
+            <span class="inp"><input type="number" id="yardw" min="10" max="900" value="110"><span class="u lu">ft</span></span></div>
           <div class="field"><label for="yardh">Depth</label>
-            <span class="inp"><input type="number" id="yardh" min="10" max="900" value="90"><span class="u">ft</span></span></div>
+            <span class="inp"><input type="number" id="yardh" min="10" max="900" value="90"><span class="u lu">ft</span></span></div>
           <p class="hint">These stretch the whole outline, whatever shape it is.</p>
           <div class="btnrow"><button class="btn" id="rectBoundary">Make it a rectangle</button></div>
         </div>
@@ -328,7 +329,7 @@
           <div class="fencetiles" id="fencetiles"></div>
           <select id="fencestyle" hidden aria-hidden="true" tabindex="-1"></select>
           <div class="field" style="margin-top:12px"><label for="fenceh">Fence height</label>
-            <span class="inp"><input type="number" id="fenceh" min="0" max="12" step="0.5" value="5"><span class="u">ft</span></span></div>
+            <span class="inp"><input type="number" id="fenceh" min="0" max="12" step="0.5" value="5"><span class="u lu">ft</span></span></div>
           <div class="field"><label for="fenced">Sun it blocks</label>
             <span class="inp"><input type="number" id="fenced" min="0" max="1" step="0.05" value="0.5"><span class="u">×</span></span></div>
           <div class="sliderow"><input type="range" id="fenced2" min="0" max="1" step="0.05" value="0.5"></div>
@@ -405,6 +406,12 @@
             <button data-stage="landscape">Landscape</button>
           </div>
           <p class="hint">Diorama shows the lot as a model cut from the earth, on a studio plinth. Landscape sets it in open country under the sky photo.</p>
+          <h4>Units</h4>
+          <div class="seg tiny qseg" id="runits" role="group" aria-label="Units">
+            <button data-units="imperial">Feet &amp; inches</button>
+            <button data-units="metric">Metres</button>
+          </div>
+          <p class="hint">Plans are saved the same either way, so you can switch any time.</p>
           <div class="field" style="margin-top:10px"><label for="rsunpath">Sun path over the yard</label><input type="checkbox" class="sw" id="rsunpath" checked></div>
           <h4>Render quality</h4>
           <div class="seg tiny qseg" id="rquality" role="group" aria-label="Render quality">
@@ -430,7 +437,7 @@
           <h4>Grid &amp; schematic</h4>
           <div class="field"><label for="showgrid">Show grid</label><input type="checkbox" class="sw" id="showgrid" checked></div>
           <div class="field"><label for="grid">Grid size</label>
-            <span class="inp"><input type="number" id="grid" min="1" max="50" value="5"><span class="u">ft</span></span></div>
+            <span class="inp"><input type="number" id="grid" min="1" max="50" value="5"><span class="u lu">ft</span></span></div>
           <div class="field"><label for="snap">Snap to grid</label><input type="checkbox" class="sw" id="snap" checked></div>
           <div class="field"><label for="simpleview">Simple schematic view</label><input type="checkbox" class="sw" id="simpleview"></div>
           <div class="btnrow"><button class="btn" id="gridReferenceButton">Square grid to a side</button></div>

@@ -19,8 +19,9 @@ Inspired by three pieces of web work: Lusion's *Of the Oak* (a procedurally grow
   - Crabapples (Prairifire, Snowdrift) and Honeycrisp apple blossom for two weeks at leaf-out; Honeycrisp's apples ripen red in September. Redbud, magnolia, plums and serviceberry flower on bare wood. Lilac plumes open in June. Hydrangea panicles go lime, then white, then pink.
   - Prairifire's maroon spring leaves settle to a dark red-bronzed green, and Canada Red chokecherry turns deep red through June; ginkgo turns gold and drops nearly all at once.
   - Lindens carry their June bracts; acorns, pods, crabapple fruit and alder cones hang into winter; spruces carry their cones.
-- **Trees grow over time.** Give a tree a planting date and its height at planting (new trees go in today at nursery size), then use **Trees in** on the sun card to see the yard 5, 10 or 20 years on.
+- **Trees grow over time.** Give a tree the year it was planted, its height at planting and (optionally) your own growth rate; new trees go in this year at nursery size, then use **Trees in** on the sun card to see the yard 5, 10 or 20 years on.
   - Each species grows at its own rate, from the Arbor Day Foundation's classes (slow ≤ 12 in a year, medium 13–24 in, fast ≥ 25 in) and extension fact sheets; cultivars can differ (Autumn Blaze ~3 ft a year, Black Hills spruce ~1 ft).
+  - The planting year is a settling-in year; the first growing season is the next spring. Change the growth rate per tree if yours runs faster or slower than the species typical ("Use typical" puts it back).
   - Newly planted trees spend about a growing season per inch of trunk caliper establishing ("sleep, creep, leap"), then grow at full speed, slowing as they near mature height.
   - Broadleaves grow up before they grow out and fill in last, so young trees cast lighter shade; conifers keep their shape.
   - The tree's panel charts height and crown width over the years and lists its size at +5, +10 and +20 years.
@@ -29,6 +30,7 @@ Inspired by three pieces of web work: Lusion's *Of the Oak* (a procedurally grow
 - **Guided start.** First launch offers a four-step guide (map your lot, add buildings and hardscape, plant trees, observe) that points at each control and moves on as you do it, with one-off tips as you open panels. **Guide** in the rail brings it back.
 - **Schematic view** marks every tree's centre with a dot.
 - **Diorama stage** (Display → Stage).
+- **Opens on a real lot**: a Fargo, ND yard with its house, shed, deck, driveway and 29 young trees planted this year. Start a blank yard from the welcome screen.
   - **Diorama:** the lot is cut from the earth, its edge showing turf over a scanned soil profile, on a plinth in a studio. The sky still lights it. Tilt-shift grows as you pull back.
   - **Landscape:** keeps the open-country view.
 - **Sun path.** Today's sun path arcs over the yard with hour beads and the sun riding it.
@@ -117,7 +119,7 @@ Flowering follows the leaf-out date and the hemisphere, so blossoms appear and d
 ![August: crabapple blossoms gone, hydrangea panicles out](docs/trees-summer-hydrangea.png)
 ![Bed insights](docs/bed-insights.png)
 
-All units are feet.
+Plans are stored in feet. Display → Units switches everything on screen to metres (and growth rates to cm a year); the choice is saved in this browser.
 
 ## Location, clock and sun angles
 

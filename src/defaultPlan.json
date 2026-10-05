@@ -1,0 +1,928 @@
+{
+  "lat": 46.8772,
+  "lon": -96.7898,
+  "tz": -6,
+  "autoDST": true,
+  "place": "Fargo, ND",
+  "tzMode": "zone",
+  "tzZone": "America/Chicago",
+  "date": "2026-09-09",
+  "minutes": 1012,
+  "north": 180,
+  "grid": 1,
+  "snap": true,
+  "showGrid": false,
+  "simple": false,
+  "gridFrame": {
+    "edgeIndex": 3,
+    "axis": "x",
+    "angle": -1.3312847783616917,
+    "origin": {
+      "x": 0,
+      "y": -73.87457909084557
+    },
+    "modified": false
+  },
+  "yard": {
+    "w": 139.96221014991653,
+    "h": 151.00180786319572
+  },
+  "boundary": [
+    {
+      "x": 13.60196367022446,
+      "y": 75.50090393159786
+    },
+    {
+      "x": 66.62990320621384,
+      "y": -58.84339194865053
+    },
+    {
+      "x": 69.38971544825168,
+      "y": -68.20708192969383
+    },
+    {
+      "x": 69.98110507495826,
+      "y": -75.50090393159786
+    },
+    {
+      "x": -69.98110507495826,
+      "y": -72.2482542500933
+    },
+    {
+      "x": -66.62989869426909,
+      "y": 66.92573658944946
+    },
+    {
+      "x": -25.922573373370913,
+      "y": 66.72860028978309
+    },
+    {
+      "x": -12.320611959118839,
+      "y": 68.30564556757288
+    },
+    {
+      "x": 1.1827815093856089,
+      "y": 70.96690439789481
+    }
+  ],
+  "boundaryLabels": [
+    "",
+    "",
+    "",
+    "south",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "boundaryImage": {
+    "source": {
+      "name": "property outline.jpg",
+      "size": 99353,
+      "lastModified": 1790992466186,
+      "type": "image/jpeg",
+      "width": 790,
+      "height": 837,
+      "processingWidth": 790,
+      "processingHeight": 837,
+      "imageToProcessingScale": 1,
+      "feetPerProcessingPixel": 0.20411677246479612,
+      "center": {
+        "x": 0,
+        "y": 0
+      },
+      "method": "local-contour-or-manual",
+      "coordinateSpace": "feet-x-right-y-down",
+      "calibratedAt": "2026-10-03T01:56:22.461Z"
+    },
+    "reference": {
+      "edgeIndex": 3,
+      "lengthFeet": 140
+    },
+    "geometryEdited": false
+  },
+  "boundaryImageDraft": null,
+  "fence": {
+    "on": true,
+    "style": "picket",
+    "height": 5,
+    "density": 0.5,
+    "sides": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "spans": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "heat": false,
+  "leafSeason": true,
+  "fullSun": 6,
+  "leafOut": "05-05",
+  "leafDrop": "10-12",
+  "objects": [
+    {
+      "id": 12,
+      "type": "driveway",
+      "name": "Driveway",
+      "x": -32.202567096189554,
+      "y": 46.90619202945905,
+      "rot": -1.3312847783616917,
+      "poly": [
+        {
+          "x": -10.000000000000004,
+          "y": -5.000000000000019
+        },
+        {
+          "x": 30.999999999999996,
+          "y": -4.000000000000009
+        },
+        {
+          "x": 24.999999999999993,
+          "y": 24.99999999999997
+        },
+        {
+          "x": 9.999999999999993,
+          "y": 19.999999999999993
+        },
+        {
+          "x": -5.000000000000011,
+          "y": 19.999999999999982
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "structure",
+      "name": "Shed",
+      "x": -17.996545217063883,
+      "y": 12.566871384318105,
+      "rot": -1.3312847783616917,
+      "height": 28,
+      "poly": [
+        {
+          "x": -13.999999999999996,
+          "y": -20.000000000000004
+        },
+        {
+          "x": -7.999999999999998,
+          "y": -20.000000000000004
+        },
+        {
+          "x": -7.999999999999997,
+          "y": -29.999999999999996
+        },
+        {
+          "x": 8.000000000000002,
+          "y": -29.999999999999996
+        },
+        {
+          "x": 8.000000000000002,
+          "y": -20
+        },
+        {
+          "x": 26,
+          "y": -20.000000000000004
+        },
+        {
+          "x": 26.000000000000004,
+          "y": 22
+        },
+        {
+          "x": 10.000000000000004,
+          "y": 22.000000000000004
+        },
+        {
+          "x": 10,
+          "y": 30
+        },
+        {
+          "x": -24,
+          "y": 29.999999999999996
+        },
+        {
+          "x": -23.999999999999996,
+          "y": -3.999999999999992
+        },
+        {
+          "x": -13.999999999999995,
+          "y": -3.9999999999999987
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "sidewalk",
+      "name": "Sidewalk",
+      "x": -5.395720834791623,
+      "y": 38.28105472517365,
+      "rot": -1.3312847783616917,
+      "poly": [
+        {
+          "x": -2,
+          "y": -4
+        },
+        {
+          "x": 4,
+          "y": -3.999999999999989
+        },
+        {
+          "x": 4.000000000000001,
+          "y": 4.000000000000006
+        },
+        {
+          "x": -2,
+          "y": 4
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "deck",
+      "name": "Deck",
+      "x": -0.6984002723970033,
+      "y": -17.84322860685745,
+      "rot": -1.3312847783616917,
+      "height": 2.5,
+      "poly": [
+        {
+          "x": -26,
+          "y": -10
+        },
+        {
+          "x": 10,
+          "y": -10
+        },
+        {
+          "x": 10,
+          "y": 10
+        },
+        {
+          "x": -10,
+          "y": 10
+        },
+        {
+          "x": -9.999999999999998,
+          "y": -2.7755575615628914e-16
+        },
+        {
+          "x": -26,
+          "y": 6.661338147750939e-16
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "tree",
+      "name": "Columnar Norway Spruce",
+      "x": -64.86628865240753,
+      "y": -67.36576994765002,
+      "shape": "columnar",
+      "height": 30,
+      "spread": 6,
+      "evergreen": true,
+      "density": 0.92,
+      "note": "Very narrow column that keeps its lower branches. Hardy to zone 3.",
+      "leaf": 2507297,
+      "planted": "2026-10-05",
+      "plantH": 5
+    },
+    {
+      "id": 19,
+      "type": "tree",
+      "name": "Spartan Juniper",
+      "x": -57.868178144911695,
+      "y": -67.52840243172525,
+      "shape": "columnar",
+      "height": 18,
+      "spread": 5,
+      "evergreen": true,
+      "density": 0.95,
+      "note": "Narrow columnar evergreen. Thin but solid shadow, year round. Rated zone 4, marginal in 4a.",
+      "leaf": 3824694,
+      "planted": "2026-10-05",
+      "plantH": 6.5
+    },
+    {
+      "id": 20,
+      "type": "tree",
+      "name": "Spartan Juniper",
+      "x": -64.68042295632156,
+      "y": -59.367929367654796,
+      "shape": "columnar",
+      "height": 18,
+      "spread": 5,
+      "evergreen": true,
+      "density": 0.95,
+      "note": "Narrow columnar evergreen. Thin but solid shadow, year round. Rated zone 4, marginal in 4a.",
+      "leaf": 3824694,
+      "planted": "2026-10-05",
+      "plantH": 6.5
+    },
+    {
+      "id": 21,
+      "type": "tree",
+      "name": "Redmond Linden",
+      "x": -34.78145362938242,
+      "y": -64.06384601797481,
+      "shape": "linden",
+      "height": 39,
+      "spread": 27,
+      "evergreen": false,
+      "density": 0.9,
+      "note": "American linden. Broad pyramidal, very dense. Handles wind and alkaline soil.",
+      "leaf": 4155946,
+      "fall": 12098106,
+      "crownBase": 7,
+      "planted": "2026-10-05",
+      "plantH": 14
+    },
+    {
+      "id": 22,
+      "type": "tree",
+      "name": "Prairie Horizon Alder",
+      "x": -6.789011599399109,
+      "y": -64.71437595427571,
+      "shape": "oval",
+      "height": 30,
+      "spread": 23,
+      "evergreen": false,
+      "density": 0.55,
+      "note": "Manchurian alder. Open canopy, so the shade underneath stays dappled. Very hardy and fast.",
+      "leaf": 3101732,
+      "fall": 7236140,
+      "planted": "2026-10-05",
+      "plantH": 12
+    },
+    {
+      "id": 23,
+      "type": "tree",
+      "name": "Greenspire Linden",
+      "x": 21.203430430584202,
+      "y": -65.36490589057661,
+      "shape": "linden",
+      "height": 33,
+      "spread": 25,
+      "evergreen": false,
+      "density": 0.88,
+      "note": "Littleleaf linden. Tight pyramidal form, dense shade, narrower than Redmond.",
+      "leaf": 4155946,
+      "fall": 12099648,
+      "planted": "2026-10-05",
+      "plantH": 15
+    },
+    {
+      "id": 24,
+      "type": "tree",
+      "name": "Tannenbaum Mugo Pine",
+      "x": 53.10185990252215,
+      "y": -70.10728896491811,
+      "shape": "pyramidal",
+      "height": 12,
+      "spread": 7,
+      "evergreen": true,
+      "density": 0.9,
+      "note": "Compact pyramidal mugo. Slow, stays small, casts dense shade low to the ground.",
+      "leaf": 3034402,
+      "planted": "2026-10-05",
+      "plantH": 5
+    },
+    {
+      "id": 25,
+      "type": "tree",
+      "name": "Tannenbaum Mugo Pine",
+      "x": 59.2628728215938,
+      "y": -63.24857772948677,
+      "shape": "pyramidal",
+      "height": 12,
+      "spread": 7,
+      "evergreen": true,
+      "density": 0.9,
+      "note": "Compact pyramidal mugo. Slow, stays small, casts dense shade low to the ground.",
+      "leaf": 3034402,
+      "planted": "2026-10-05",
+      "plantH": 6
+    },
+    {
+      "id": 26,
+      "type": "tree",
+      "name": "Moonglow Juniper",
+      "x": 61.099700482517385,
+      "y": -70.2931546610041,
+      "shape": "pyramidal",
+      "height": 20,
+      "spread": 5,
+      "evergreen": true,
+      "density": 0.92,
+      "note": "Broad pyramidal blue-green evergreen. Dense year-round shade in a compact footprint.",
+      "leaf": 8032922,
+      "planted": "2026-10-05",
+      "plantH": 8
+    },
+    {
+      "id": 27,
+      "type": "tree",
+      "name": "Sienna Glen Maple",
+      "x": 30.804362639320942,
+      "y": 3.4306034157962983,
+      "shape": "oval",
+      "height": 39,
+      "spread": 29,
+      "evergreen": false,
+      "density": 0.82,
+      "note": "Freeman maple. Upright oval that broadens with age, fast growth, hardy to zone 3.",
+      "leaf": 4616236,
+      "fall": 11882794,
+      "crownBase": 5,
+      "planted": "2026-10-05",
+      "plantH": 17
+    },
+    {
+      "id": 28,
+      "type": "tree",
+      "name": "Sienna Glen Maple",
+      "x": 50.6834999852926,
+      "y": -45.04433751640077,
+      "shape": "oval",
+      "height": 41,
+      "spread": 27,
+      "evergreen": false,
+      "density": 0.82,
+      "note": "Freeman maple. Upright oval that broadens with age, fast growth, hardy to zone 3.",
+      "leaf": 4616236,
+      "fall": 11882794,
+      "crownBase": 10,
+      "planted": "2026-10-05",
+      "plantH": 17
+    },
+    {
+      "id": 29,
+      "type": "tree",
+      "name": "Matador Maple",
+      "x": 41.267029560567224,
+      "y": -19.81875358380821,
+      "shape": "oval",
+      "height": 37,
+      "spread": 27,
+      "evergreen": false,
+      "density": 0.9,
+      "note": "Freeman maple, tighter and more uniform than Sienna Glen. Heavy shade underneath.",
+      "leaf": 4352298,
+      "fall": 11740702,
+      "planted": "2026-10-05",
+      "plantH": 17
+    },
+    {
+      "id": 30,
+      "type": "tree",
+      "name": "Pinky Winky hydrangea",
+      "x": 10.623895493246891,
+      "y": -4.102572923984013,
+      "shape": "round",
+      "height": 8,
+      "spread": 6,
+      "evergreen": false,
+      "density": 0.75,
+      "note": "Tree-form panicle hydrangea. White cones that turn pink from the base up. Its shadow only matters to a bed right beside it.",
+      "leaf": 4880944,
+      "fall": 9071152,
+      "bloom": [
+        15658716,
+        15918818,
+        13656190
+      ],
+      "planted": "2026-10-05",
+      "plantH": 6
+    },
+    {
+      "id": 31,
+      "type": "tree",
+      "name": "Parkland Pillar Birch",
+      "x": 14.158151543029579,
+      "y": -24.190107222015072,
+      "shape": "fastigiate",
+      "height": 40,
+      "spread": 6,
+      "evergreen": false,
+      "density": 0.86,
+      "note": "Columnar white-barked birch. A dense, narrow column of small leaves: solid shade in a tiny footprint. Bronze birch borer resistant.",
+      "leaf": 5143086,
+      "fall": 13674032,
+      "planted": "2026-10-05",
+      "plantH": 10
+    },
+    {
+      "id": 32,
+      "type": "tree",
+      "name": "Parkland Pillar Birch",
+      "x": 14.320784027104803,
+      "y": -17.19199671451925,
+      "shape": "fastigiate",
+      "height": 40,
+      "spread": 6,
+      "evergreen": false,
+      "density": 0.86,
+      "note": "Columnar white-barked birch. A dense, narrow column of small leaves: solid shade in a tiny footprint. Bronze birch borer resistant.",
+      "leaf": 5143086,
+      "fall": 13674032,
+      "planted": "2026-10-05",
+      "plantH": 10
+    },
+    {
+      "id": 33,
+      "type": "tree",
+      "name": "Parkland Pillar Birch",
+      "x": 14.48341651118003,
+      "y": -10.193886207023418,
+      "shape": "fastigiate",
+      "height": 40,
+      "spread": 6,
+      "evergreen": false,
+      "density": 0.86,
+      "note": "Columnar white-barked birch. A dense, narrow column of small leaves: solid shade in a tiny footprint. Bronze birch borer resistant.",
+      "leaf": 5143086,
+      "fall": 13674032,
+      "planted": "2026-10-05",
+      "plantH": 10
+    },
+    {
+      "id": 34,
+      "type": "tree",
+      "name": "Parkland Pillar Birch",
+      "x": -29.71380558689047,
+      "y": -18.16919553104521,
+      "shape": "fastigiate",
+      "height": 40,
+      "spread": 6,
+      "evergreen": false,
+      "density": 0.86,
+      "note": "Columnar white-barked birch. A dense, narrow column of small leaves: solid shade in a tiny footprint. Bronze birch borer resistant.",
+      "leaf": 5143086,
+      "fall": 13674032,
+      "planted": "2026-10-05",
+      "plantH": 10
+    },
+    {
+      "id": 35,
+      "type": "tree",
+      "name": "Parkland Pillar Birch",
+      "x": -29.853204858954946,
+      "y": -24.167575966041632,
+      "shape": "fastigiate",
+      "height": 40,
+      "spread": 6,
+      "evergreen": false,
+      "density": 0.86,
+      "note": "Columnar white-barked birch. A dense, narrow column of small leaves: solid shade in a tiny footprint. Bronze birch borer resistant.",
+      "leaf": 5143086,
+      "fall": 13674032,
+      "planted": "2026-10-05",
+      "plantH": 10
+    },
+    {
+      "id": 36,
+      "type": "tree",
+      "name": "Limelight Hydrangea tree",
+      "x": -27.993143986020616,
+      "y": -30.212422825059548,
+      "shape": "round",
+      "height": 8,
+      "spread": 8,
+      "evergreen": false,
+      "density": 0.78,
+      "note": "Tree-form panicle hydrangea. Lime-green cones from midsummer turn white, then blush pink in fall.",
+      "leaf": 4616236,
+      "fall": 9071152,
+      "bloom": [
+        12769416,
+        15790304,
+        14195360
+      ],
+      "planted": "2026-10-05",
+      "plantH": 5.5
+    },
+    {
+      "id": 37,
+      "type": "tree",
+      "name": "Ivory Silk Japanese Tree Lilac",
+      "x": -54.010762995090474,
+      "y": 55.415163273690695,
+      "shape": "round",
+      "height": 21,
+      "spread": 19,
+      "evergreen": false,
+      "density": 0.8,
+      "note": "The boulevard lilac. Big cream flower plumes in June, after the shrub lilacs, and glossy cherry-like bark.",
+      "leaf": 4087848,
+      "fall": 9075258,
+      "bloom": [
+        14209192,
+        16183512,
+        14209200
+      ],
+      "planted": "2026-10-05",
+      "plantH": 7
+    },
+    {
+      "id": 38,
+      "type": "tree",
+      "name": "Columnar Mugo Pine",
+      "x": -44.26902760221464,
+      "y": 44.185800356089786,
+      "shape": "columnar",
+      "height": 12,
+      "spread": 5,
+      "evergreen": true,
+      "density": 0.9,
+      "note": "Narrow upright mugo. Slow-growing evergreen screen without a wide shadow.",
+      "leaf": 3034402,
+      "planted": "2026-10-05",
+      "plantH": 4.5
+    },
+    {
+      "id": 39,
+      "type": "tree",
+      "name": "Columnar Mugo Pine",
+      "x": 10.972393673408089,
+      "y": 10.893378163507052,
+      "shape": "columnar",
+      "height": 12,
+      "spread": 5,
+      "evergreen": true,
+      "density": 0.9,
+      "note": "Narrow upright mugo. Slow-growing evergreen screen without a wide shadow.",
+      "leaf": 3034402,
+      "planted": "2026-10-05",
+      "plantH": 4.5
+    },
+    {
+      "id": 40,
+      "type": "tree",
+      "name": "Pinky Winky hydrangea",
+      "x": 10.55349390117735,
+      "y": 35.9098631880029,
+      "shape": "round",
+      "height": 8,
+      "spread": 6,
+      "evergreen": false,
+      "density": 0.75,
+      "note": "Tree-form panicle hydrangea. White cones that turn pink from the base up. Its shadow only matters to a bed right beside it.",
+      "leaf": 4880944,
+      "fall": 9071152,
+      "bloom": [
+        15658716,
+        15918818,
+        13656190
+      ],
+      "planted": "2026-08-05",
+      "plantH": 3.5
+    },
+    {
+      "id": 41,
+      "type": "tree",
+      "name": "Canada Red Chokecherry",
+      "x": -52.499902258354645,
+      "y": 77.38599165666685,
+      "shape": "round",
+      "height": 25,
+      "spread": 20,
+      "evergreen": false,
+      "density": 0.75,
+      "note": "Leaves open green and turn deep purple by early summer. White flower spikes in May, dark fruit in August. Suckers; watch for black knot.",
+      "leaf": 4880944,
+      "fall": 9054762,
+      "bloom": [
+        14737620,
+        16448242,
+        15261912
+      ],
+      "leaf2": 3540495,
+      "planted": "2026-10-05",
+      "plantH": 8
+    },
+    {
+      "id": 42,
+      "type": "tree",
+      "name": "Prairie Expedition elm",
+      "x": 80.5127696761995,
+      "y": -52.739444384219,
+      "shape": "vase",
+      "height": 50,
+      "spread": 40,
+      "evergreen": false,
+      "density": 0.7,
+      "note": "Vase shape with a high crown, so shade lands well out from the trunk.",
+      "leaf": 4155946,
+      "fall": 11573818,
+      "planted": "2026-10-05",
+      "plantH": 9
+    },
+    {
+      "id": 43,
+      "type": "sidewalk",
+      "name": "Sidewalk",
+      "x": 73.2358606245747,
+      "y": -64.57357277013662,
+      "rot": -1.3312847783616917,
+      "poly": [
+        {
+          "x": -3.0000000000000004,
+          "y": -12.000000000000005
+        },
+        {
+          "x": 2.5,
+          "y": -11.999999999999998
+        },
+        {
+          "x": 2.2500000000000155,
+          "y": -7.999999999999998
+        },
+        {
+          "x": -0.9999999999999986,
+          "y": 2.999999999999996
+        },
+        {
+          "x": -57.999999999999986,
+          "y": 141.00000000000003
+        },
+        {
+          "x": -63,
+          "y": 139.00000000000003
+        },
+        {
+          "x": -4.999999999999992,
+          "y": 0.9999999999999957
+        },
+        {
+          "x": -3.999999999999998,
+          "y": -3.000000000000006
+        },
+        {
+          "x": -2.999999999999995,
+          "y": -11.000000000000005
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "type": "sidewalk",
+      "name": "Sidewalk",
+      "x": -24.46099380434984,
+      "y": 78.73492186536475,
+      "rot": -1.3312847783616917,
+      "poly": [
+        {
+          "x": -42,
+          "y": -8.000000000000014
+        },
+        {
+          "x": -41.99999999999999,
+          "y": -13.00000000000001
+        },
+        {
+          "x": 2.9999999999999956,
+          "y": -12.000000000000007
+        },
+        {
+          "x": 25.999999999999996,
+          "y": -7.00000000000001
+        },
+        {
+          "x": 43,
+          "y": 1.4765966227514582e-14
+        },
+        {
+          "x": 41,
+          "y": 4.999999999999993
+        },
+        {
+          "x": 24.999999999999996,
+          "y": -2.0000000000000084
+        },
+        {
+          "x": 11.999999999999998,
+          "y": -5.0000000000000275
+        },
+        {
+          "x": -2.0816681711721685e-15,
+          "y": -7.000000000000024
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "type": "tree",
+      "name": "Snowdrift Crabapple",
+      "x": 51.240395117513216,
+      "y": 21.960810553070047,
+      "shape": "round",
+      "height": 20,
+      "spread": 20,
+      "evergreen": false,
+      "density": 0.72,
+      "note": "Red buds open to pure white blossoms for about two weeks in spring, over fresh, light green leaves. Orange-red fruit hangs into winter.",
+      "leaf": 5933626,
+      "fall": 11042858,
+      "bloom": [
+        13127770,
+        16777215,
+        16052974
+      ],
+      "fruit": [
+        14702110,
+        13122074
+      ],
+      "planted": "2026-10-05",
+      "plantH": 8
+    },
+    {
+      "id": 46,
+      "type": "tree",
+      "name": "Snowdrift Crabapple",
+      "x": 70.1430356029962,
+      "y": -25.491167094616877,
+      "shape": "round",
+      "height": 20,
+      "spread": 20,
+      "evergreen": false,
+      "density": 0.72,
+      "note": "Red buds open to pure white blossoms for about two weeks in spring, over fresh, light green leaves. Orange-red fruit hangs into winter.",
+      "leaf": 5933626,
+      "fall": 11042858,
+      "bloom": [
+        13127770,
+        16777215,
+        16052974
+      ],
+      "fruit": [
+        14702110,
+        13122074
+      ],
+      "planted": "2026-10-05",
+      "plantH": 8
+    },
+    {
+      "id": 47,
+      "type": "tree",
+      "name": "Prairifire Crabapple",
+      "x": 60.70333196626008,
+      "y": -1.2653132345237168,
+      "shape": "round",
+      "height": 20,
+      "spread": 20,
+      "evergreen": false,
+      "density": 0.72,
+      "note": "Deep pink-red blossoms for about two weeks in spring, then reddish-purple leaves maturing to dark green. Disease resistant.",
+      "leaf": 6957620,
+      "fall": 9062954,
+      "bloom": [
+        10229832,
+        14168174,
+        14705294
+      ],
+      "leaf2": 3358762,
+      "planted": "2026-10-05",
+      "plantH": 8
+    },
+    {
+      "id": 48,
+      "type": "tree",
+      "name": "Prairifire Crabapple",
+      "x": 40.847427832299175,
+      "y": 48.20935777017276,
+      "shape": "round",
+      "height": 20,
+      "spread": 20,
+      "evergreen": false,
+      "density": 0.72,
+      "note": "Deep pink-red blossoms for about two weeks in spring, then reddish-purple leaves maturing to dark green. Disease resistant.",
+      "leaf": 6957620,
+      "fall": 9062954,
+      "bloom": [
+        10229832,
+        14168174,
+        14705294
+      ],
+      "leaf2": 3358762,
+      "planted": "2026-10-05",
+      "plantH": 8
+    }
+  ],
+  "sel": null
+}

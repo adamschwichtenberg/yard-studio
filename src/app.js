@@ -12,6 +12,7 @@ import { lawnDetail } from "./scene/ground.js";
 import { PhotoMode } from "./photo.js";
 import { Observer } from "./observe.js";
 import { Tour } from "./tour.js";
+import DEFAULT_PLAN from "./defaultPlan.json";
 
 const DEG = Math.PI/180;
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
@@ -328,33 +329,31 @@ function isoToday(){
   const d = new Date();
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 }
-function freshState(){
+/* The settings every plan starts from; a loaded file fills in the rest. */
+function baseState(){
   return {
     lat:46.8772, lon:-96.7898, tz:-6, autoDST:true,
     place:"Fargo, ND", tzMode:"zone", tzZone:"America/Chicago",
     date: isoToday(), minutes: 13*60,
     north:0, grid:5, snap:true, showGrid:true, simple:false, gridFrame:null,
-    yard:{w:160, h:130},
-    boundary: rectPoly(160, 130),
+    yard:{w:120, h:90},
+    boundary: rectPoly(120, 90),
     boundaryLabels:[], boundaryImage:null, boundaryImageDraft:null,
     fence:{on:true, style:"picket", height:5, density:.5, sides:[true,true,true,true]},
     heat:false, leafSeason:true, fullSun:6,
     leafOut:"05-05", leafDrop:"10-12",
-    objects:[
-      {id:nid(), type:"structure", name:"House", x:0, y:-46, rot:0, height:22, poly:rectPoly(44,26)},
-      {id:nid(), type:"deck", name:"Patio", x:0, y:-26, rot:0, height:0.5, surface:"concrete", poly:rectPoly(24,12)},
-      fromPreset("Sienna Glen Maple", -48, 12),
-      fromPreset("Black Hills spruce", 60, -26),
-      fromPreset("Redmond Linden", -52, -38),
-      fromPreset("Colorado Blue Spruce", -64, 50),
-      fromPreset("Parkland Pillar Birch", 30, -46),
-      fromPreset("Northern Red Oak", 46, 36),
-      fromPreset("Prairifire Crabapple", 18, 6),
-      {id:nid(), type:"bed", name:"Vegetable bed", x:-2, y:30, w:16, h:8, rot:0},
-      {id:nid(), type:"bed", name:"Perennial bed", x:-28, y:54, w:20, h:6, rot:0}
-    ],
+    objects:[],
     sel:null
   };
+}
+/* The yard that opens first: a real Fargo lot, planted this year. */
+function freshState(){
+  const d = JSON.parse(JSON.stringify(DEFAULT_PLAN));
+  for(const o of d.objects){
+    o.id = nid();
+    if(o.type === "tree" && o.planted != null) o.planted = +String(o.planted).slice(0,4);
+  }
+  return Object.assign(baseState(), d, {date:isoToday(), sel:null});
 }
 let S = freshState();
 
@@ -370,6 +369,23 @@ const prefs = Object.assign({sky:"hdri", quality:"balanced", treeDetail:"standar
   try{ return JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"); }catch{ return {}; }
 })());
 function savePrefs(){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }catch{ /* private mode */ } }
+/* ---------- display units: the plan is always stored in feet ---------- */
+const metric = ()=>prefs.units === "metric";
+const LK = ()=>metric() ? .3048 : 1;           // feet → display length
+const lu = ()=>metric() ? "m" : "ft";
+const rnd = (v, dp)=>{ const k = 10**dp; return Math.round(v*k)/k; };
+/* a length as a bare number in display units */
+function dl(ft, dp){ return rnd(ft*LK(), dp ?? (metric() ? 1 : 0)); }
+/* a length with its unit: "12 ft" / "3.7 m" */
+function uL(ft, dp){ return dl(ft, dp) + " " + lu(); }
+/* short form for tight spots: 12′ / 3.7 m */
+function uS(ft, dp){ return metric() ? dl(ft, dp ?? 1) + " m" : dl(ft, dp ?? 1) + "′"; }
+function uArea(sqft){ return metric() ? Math.round(sqft*.092903).toLocaleString() + " m²" : Math.round(sqft).toLocaleString() + " sq ft"; }
+/* display-unit input value → feet */
+const fromDl = v=>v/LK();
+const dstep = s=>metric() ? .1 : s;
+/* a length for an input box: tenths of a metre, or feet as stored */
+const dli = ft=>metric() ? rnd(ft*.3048, 1) : rnd(ft, 2);
 let tool = "select";
 let nodeEdit = false;
 
@@ -671,7 +687,7 @@ function bearingVec(az){
 
 /* ============================================================ tree growth
    A tree's height, width, density and canopy fields are its MATURE size. A
-   tree with a planting date and size grows toward that over the years:
+   tree with a planting year and size grows toward that over the years:
    - Establishment ("sleep, creep, leap"): about a growing season per inch of
      trunk caliper (Midwest rule of thumb), climbing from 30% to full speed.
    - Height then grows at the species' rate (ft/yr, Arbor Day classes) and
@@ -680,7 +696,7 @@ function bearingVec(az){
      last; conifers keep their shape and fill early.
    Growth happens in the spring flush (leaf-out to about ten weeks after),
    so a tree holds its size through summer, fall and winter.
-   Trees without a planting date are established and shown at full size. */
+   Trees without a planting year are established and shown at full size. */
 const todayISO = ()=>isoToday();
 function isoMD(iso){
   if(S.lat >= 0) return iso.slice(5);
@@ -691,14 +707,24 @@ function isoMD(iso){
 function flushDone(iso){
   return clamp((mdDay(isoMD(iso)) - mdDay(S.leafOut))/70, 0, 1);
 }
-/* Growing seasons between planting and `iso` (fractional during the flush). */
-function seasonsBetween(from, iso){
-  const y0 = +from.slice(0,4), y1 = +iso.slice(0,4);
-  return Math.max(0, (y1 - y0) + flushDone(iso) - flushDone(from));
+/* The year a tree went in. Older plans stored a full date. */
+function plantYear(o){
+  if(o.planted == null) return null;
+  return typeof o.planted === "number" ? o.planted : +String(o.planted).slice(0,4);
 }
-function treeGrowthRate(o){
+/* Growing seasons between the planting year and `iso` (fractional during the
+   flush). A tree spends its planting year settling in; its first growing
+   season is the next spring. */
+function seasonsBetween(y0, iso){
+  return Math.max(0, (+iso.slice(0,4) - y0 - 1) + flushDone(iso));
+}
+/* ft/yr for young trees: the species default, or the user's own figure */
+function defaultGrowthRate(o){
   const p = presetFor(o);
   return p?.gr ?? growthRate(speciesFor(o));
+}
+function treeGrowthRate(o){
+  return o.gr > 0 ? o.gr : defaultGrowthRate(o);
 }
 function defaultPlantH(o){
   const H = Math.max(2, o.height);
@@ -727,10 +753,10 @@ const growCache = new WeakMap();
 /* The tree as it stands on the plan's date. */
 function grown(o){
   if(!o || o.type !== "tree" || !o.planted) return o;
-  const key = [o.planted, o.plantH, o.height, o.spread, o.density, o.crownBase, o.shape, o.name, o.evergreen, S.date, S.leafOut, S.lat >= 0].join("|");
+  const key = [o.planted, o.plantH, o.gr, o.height, o.spread, o.density, o.crownBase, o.shape, o.name, o.evergreen, S.date, S.leafOut, S.lat >= 0].join("|");
   const c = growCache.get(o);
   if(c && c.key === key) return c.t;
-  const t = {...o, ...growthAt(o, seasonsBetween(o.planted, S.date))};
+  const t = {...o, ...growthAt(o, seasonsBetween(plantYear(o), S.date))};
   growCache.set(o, {key, t});
   return t;
 }
@@ -738,8 +764,8 @@ function grown(o){
 function nearMatureYear(o){
   if(!o.planted) return null;
   const H = Math.max(2, o.height), h0 = clamp(o.plantH ?? defaultPlantH(o), 1, H);
-  if(H - h0 < .5) return +o.planted.slice(0,4);
-  for(let a=0;a<=150;a++) if(growthAt(o, a).height >= h0 + .9*(H - h0)) return +o.planted.slice(0,4) + a;
+  if(H - h0 < .5) return plantYear(o);
+  for(let a=0;a<=150;a++) if(growthAt(o, a).height >= h0 + .9*(H - h0)) return plantYear(o) + a;
   return null;
 }
 /* Rebuild planted trees whose size changed with the date: a quick draft now,
@@ -2186,11 +2212,11 @@ function syncObsHud(){
   } else if(obsMode === "walk"){
     const sp = observer.speed();
     t.textContent = "Walking";
-    r.textContent = sp > .3 ? `${sp.toFixed(1)} ft/s${observer.blocked ? " · something's in the way" : ""}` : "Eye height 5½ ft";
+    r.textContent = sp > .3 ? `${dl(sp, 1)} ${lu()}/s${observer.blocked ? " · something's in the way" : ""}` : metric() ? "Eye height 1.7 m" : "Eye height 5½ ft";
     k.innerHTML = `<span><kbd>W A S D</kbd> walk</span><span><kbd>Shift</kbd> run</span><span><kbd>drag</kbd> look</span><span><kbd>Esc</kbd> stop</span>`;
   } else {
     t.textContent = "Drone";
-    r.textContent = `${Math.round(observer.altitude())} ft up · speed ×${observer.speedK.toFixed(1)}${observer.altitude() >= 199 ? " · 200 ft ceiling" : ""}`;
+    r.textContent = `${uL(observer.altitude())} up · speed ×${observer.speedK.toFixed(1)}${observer.altitude() >= 199 ? ` · ${uL(200)} ceiling` : ""}`;
     k.innerHTML = `<span><kbd>W A S D</kbd> fly</span><span><kbd>Space</kbd>/<kbd>E</kbd> up</span><span><kbd>Q</kbd>/<kbd>C</kbd> down</span><span><kbd>scroll</kbd> speed</span><span><kbd>Esc</kbd> stop</span>`;
   }
 }
@@ -2380,7 +2406,7 @@ function updateLabels(){
     if(p.z <= 1){
       const el = take("meas");
       const ft = Math.floor(d), inch = Math.round((d-ft)*12);
-      el.textContent = d.toFixed(1)+" ft · "+ft+"' "+inch+'"';
+      el.textContent = metric() ? (d*.3048).toFixed(2)+" m" : d.toFixed(1)+" ft · "+ft+"' "+inch+'"';
       el.style.left = p.x+"px"; el.style.top = (p.y-14)+"px";
     }
   }
@@ -2402,7 +2428,7 @@ function updateReadout(sp){
   document.getElementById("rAz").textContent = sp.el > 0 ? Math.round(sp.az)+"° "+compassName(sp.az) : "—";
   if(sp.el <= 0) document.getElementById("rEl").textContent = "Below";
   document.getElementById("rShad").textContent = sp.el > .5
-    ? (10/Math.tan(Math.max(1.2,sp.el)*DEG)).toFixed(1)+" ft" : "—";
+    ? (metric() ? (3/Math.tan(Math.max(1.2,sp.el)*DEG)).toFixed(1)+" m" : (10/Math.tan(Math.max(1.2,sp.el)*DEG)).toFixed(1)+" ft") : "—";
   const ed = dayEdges();
   document.getElementById("rDay").textContent = ed.polar === "day" ? "Sun up all day"
     : ed.polar === "night" ? "Sun below horizon all day"
@@ -2514,11 +2540,11 @@ function shapePoolSize(n){
       const k = +ln.dataset.i, w = worldPoly(o), j = (k+1)%w.length;
       const cur = Math.hypot(w[j].x-w[k].x, w[j].y-w[k].y);
       shEditingLen = k;
-      ln.innerHTML = `<input type="text" value="${cur.toFixed(1)}"> ft`;
+      ln.innerHTML = `<input type="text" value="${dli(cur)}"> ${lu()}`;
       const inp = ln.querySelector("input");
       inp.focus(); inp.select();
       const commit = ()=>{
-        const v = parseFloat(inp.value);
+        const v = fromDl(parseFloat(inp.value));
         shEditingLen = null;
         if(isFinite(v) && v > .5) setEdgeLength(o, k, v);
         markDirty();
@@ -2598,7 +2624,7 @@ function updateShapeEditor(){
       ad.style.left = (P[i].x + ex/el*30)+"px"; ad.style.top = (P[i].y + ey/el*30)+"px";
     }
     if(shEditingLen !== i) ln.textContent =
-      (o.type === "boundary" && S.boundaryLabels[i] ? S.boundaryLabels[i]+" · " : "") + len.toFixed(1)+" ft";
+      (o.type === "boundary" && S.boundaryLabels[i] ? S.boundaryLabels[i]+" · " : "") + uL(len, 1);
     hideCovered(nd,P[i].z>1 || P[i].z<-1);
     const clipped = P[i].z>1 || P[i].z<-1 || P[j].z>1 || P[j].z<-1;
     hideCovered(ad,clipped); hideCovered(ln,clipped);
@@ -2856,6 +2882,7 @@ canvas.addEventListener("pointerdown", e=>{
   if(hitObj){
     if(hitObj.id !== S.sel){ nodeEdit = false; activeNode = null; }
     select(hitObj.id);
+    tapSel = {x:e.clientX, y:e.clientY, t:performance.now()};
     const g = groundAt(e.clientX, e.clientY);
     if(g && !S.locked){ dragObj = hitObj; dragOff = {x:hitObj.x-g.x, y:hitObj.y-g.y}; mode = "drag"; return; }
     if(S.locked) lockGrab = {x:e.clientX, y:e.clientY};
@@ -2906,8 +2933,13 @@ canvas.addEventListener("pointermove", e=>{
   } else if(mode === "pan"){ panTo(panGrab, e.clientX, e.clientY); }
 });
 let lockGrab = null;
+/* on phones, a tap (not a drag) on an item opens its menu as a bottom sheet */
+let tapSel = null;
 function endPointer(e){
   lockGrab = null;
+  if(tapSel && e.type === "pointerup" && S.sel != null && isPhone()
+     && Math.hypot(e.clientX - tapSel.x, e.clientY - tapSel.y) < 10 && performance.now() - tapSel.t < 600) openSheet(true);
+  tapSel = null;
   if(mode === "pan" && e.type === "pointerup") panTo(panGrab, e.clientX, e.clientY);
   pointers.delete(e.pointerId);
   if(mode === "pinch" && pointers.size === 1){
@@ -2967,7 +2999,7 @@ function addObject(kind, p){
   if(kind === "tree"){
     /* A new tree goes in today at nursery size and grows from there. */
     o = fromPreset(pendingPreset || PRESETS[0].n, p.x, p.y);
-    o.planted = todayISO(); o.plantH = defaultPlantH(o);
+    o.planted = +todayISO().slice(0,4); o.plantH = defaultPlantH(o);
   }
   else if(kind === "bed") o = {id:nid(), type:"bed", name:"Garden bed", x:p.x, y:p.y, w:12, h:4, rot};
   else if(kind === "deck") o = {id:nid(), type:"deck", name:"Deck", x:p.x, y:p.y, rot, height:.5, poly:rectPoly(16,12)};
@@ -2985,7 +3017,7 @@ function addObject(kind, p){
   rebuildObject(o);
   if(o.type === "tree"){
     const ahead = yearsAhead();
-    toast(`Planted today at ${o.plantH} ft; grows toward ${o.height} ft.`
+    toast(`Planted this year at ${uL(o.plantH, 1)}; grows toward ${uL(o.height)}.`
       + (ahead > 0 ? ` Showing it ${ahead} yr${ahead === 1 ? "" : "s"} on.` : ` “Trees in” on the sun card looks ahead.`));
     syncYears();
   }
@@ -3009,8 +3041,13 @@ function removeSelected(){
   select(null);
   scheduleCompute();
 }
+const isPhone = ()=>matchMedia("(max-width:1020px)").matches;
 function select(id){
   S.sel = id;
+  document.body.classList.toggle("hassel", id != null);
+  if(id == null && document.getElementById("inspector")?.classList.contains("open")) openSheet(false);
+  const lbl = document.getElementById("sheetlbl");
+  if(lbl) lbl.textContent = id === BOUNDARY ? "Edit property line" : id != null ? "Edit " + (S.objects.find(o=>o.id === id)?.name || "item") : "Edit";
   if(id !== BOUNDARY && !S.objects.find(o=>o.id===id)){ nodeEdit = false; activeNode = null; }
   updateSelection();
   drawPanel();
@@ -3020,19 +3057,26 @@ function select(id){
 /* ============================================================ inspector ---- */
 const props = document.getElementById("props");
 let panelFor = "init";
+/* inputs without a unit hold lengths: show them in display units */
+function lenAttrs(attrs){
+  return attrs.replace(/\b(value|min|max|step)="(-?[\d.]+)"/g, (m, a, v)=>`${a}="${a === "step" ? dstep(+v) : dli(+v)}"`) + ' data-len="1"';
+}
 function slider(label, key, min, max, step, val, unit){
+  if(!unit){ min = dli(min); max = dli(max); step = dstep(step); val = dli(val); }
   return `<div class="field"><span class="lab">${label}</span>`
-    + `<span class="inp"><input type="number" data-key="${key}" min="${min}" max="${max}" step="${step}" value="${val}">`
-    + `<span class="u">${unit||"ft"}</span></span></div>`
-    + `<div class="sliderow"><input type="range" data-key="${key}" min="${min}" max="${max}" step="${step}" value="${val}"></div>`;
+    + `<span class="inp"><input type="number" data-key="${key}"${unit ? "" : ' data-len="1"'} min="${min}" max="${max}" step="${step}" value="${val}">`
+    + `<span class="u">${unit||lu()}</span></span></div>`
+    + `<div class="sliderow"><input type="range" data-key="${key}"${unit ? "" : ' data-len="1"'} min="${min}" max="${max}" step="${step}" value="${val}"></div>`;
 }
 function field(label, key, attrs, unit){
   return `<div class="field"><span class="lab">${label}</span>`
-    + `<span class="inp"><input type="number" data-key="${key}" ${attrs}><span class="u">${unit||"ft"}</span></span></div>`;
+    + `<span class="inp"><input type="number" data-key="${key}" ${unit ? attrs : lenAttrs(attrs)}><span class="u">${unit||lu()}</span></span></div>`;
 }
 function numRow(label, attr, val, unit, step){
+  const len = !unit || unit === "ft";
+  if(len){ val = dli(+val); step = dstep(step||1); attr += ' data-len="1"'; }
   return `<div class="field"><span class="lab">${label}</span>`
-    + `<span class="inp"><input type="number" ${attr} step="${step||1}" value="${val}"><span class="u">${unit||"ft"}</span></span></div>`;
+    + `<span class="inp"><input type="number" ${attr} step="${step||1}" value="${val}"><span class="u">${len ? lu() : unit}</span></span></div>`;
 }
 function readRow(label, val){
   return `<div class="field"><span class="lab">${label}</span><span class="val num">${val}</span></div>`;
@@ -3067,13 +3111,13 @@ function statHTML(st){
 function lineHTML(o){
   const L = lineDistances(o).slice(0,6);
   if(!L.length) return "";
-  const rows = L.map(e=>`<div>${escapeHTML(e.name)} line <b class="num">${e.d.toFixed(1)} ft</b></div>`).join("");
+  const rows = L.map(e=>`<div>${escapeHTML(e.name)} line <b class="num">${uL(e.d, 1)}</b></div>`).join("");
   const spill = L.filter(e=>e.over > .1);
   const note = !insideLot(o)
     ? `<div class="warn">This sits outside the property line.</div>`
     : spill.length
       ? `<div class="warn">Canopy reaches over the ${spill.map(e=>escapeHTML(e.name)).join(" and ")} line by `
-        + spill.map(e=>e.over.toFixed(1)+" ft").join(" and ")+`.</div>`
+        + spill.map(e=>uL(e.over, 1)).join(" and ")+`.</div>`
       : `<div class="sub">Stays inside every property line.</div>`;
   return `<div class="sub" style="margin-bottom:5px">Centre to the nearest lines</div>
           <div class="lines">${rows}</div>${note}`;
@@ -3097,25 +3141,25 @@ function outlineHTML(o){
       html += `<p class="hint">Tap a ${pt} to type its exact position.</p>`;
     }
   }
-  if(open) return html + readRow("Posts at bends", o.poly.length) + readRow("Length", Math.round(fenceLength(o))+" ft");
+  if(open) return html + readRow("Posts at bends", o.poly.length) + readRow("Length", uL(fenceLength(o)));
   html += readRow("Corners", o.poly.length)
-       +  readRow("Area", Math.round(polyArea(w))+" sq ft")
-       +  readRow("Perimeter", Math.round(polyPerimeter(w))+" ft");
+       +  readRow("Area", uArea(polyArea(w)))
+       +  readRow("Perimeter", uL(polyPerimeter(w)));
   return html;
 }
 function boundaryMeasurementsHTML(){
   const edges = boundaryEdges();
   return `<h4>Boundary names &amp; calculated lengths</h4>`
     + edges.map(e=>`<div class="field"><label for="boundary-label-${e.i}">Side ${e.i+1} (${e.direction})<br>
-        <span class="num">${e.len.toFixed(2)} ft</span></label>
+        <span class="num">${uL(e.len, 2)}</span></label>
         <span class="inp wide"><input id="boundary-label-${e.i}" data-boundary-label="${e.i}"
           type="text" maxlength="80" placeholder="e.g. Back" value="${escapeHTML(S.boundaryLabels[e.i] || "")}"></span></div>`).join("")
     + `<h4>Scale all sides from one measurement</h4>
        <label class="hint" for="boundary-scale-edge">Known side</label>
        <select id="boundary-scale-edge">${edges.map(e=>`<option value="${e.i}">
-         Side ${e.i+1}: ${escapeHTML(e.name)} (${e.len.toFixed(2)} ft)</option>`).join("")}</select>
+         Side ${e.i+1}: ${escapeHTML(e.name)} (${uL(e.len, 2)})</option>`).join("")}</select>
        <div class="field"><label for="boundary-scale-feet">Actual length</label>
-         <span class="inp"><input id="boundary-scale-feet" type="number" min="0.1" step="any" placeholder="140"><span class="u">ft</span></span></div>
+         <span class="inp"><input id="boundary-scale-feet" type="number" min="0.1" step="any" placeholder="${dl(140)}"><span class="u">${lu()}</span></span></div>
        <div class="btnrow"><button class="btn" data-act="scaleboundary">Scale whole boundary</button></div>
        <p class="hint">Keeps the shape and scales every boundary length proportionally. Existing objects stay at their current positions and sizes.</p>`;
 }
@@ -3155,11 +3199,12 @@ function shapeTiles(o){
 }
 /* refined slider: label, an editable value, and a thin brass track */
 function sl(label, key, min, max, step, val, unit, pct){
-  const shown = pct ? Math.round(val*100) : val;
-  const lo = pct ? min*100 : min, hi = pct ? max*100 : max, st = pct ? step*100 : step;
-  const d = pct ? ` data-pct="1"` : "";
+  const len = !unit && !pct;
+  const shown = pct ? Math.round(val*100) : len ? dli(+val) : val;
+  const lo = pct ? min*100 : len ? dli(min) : min, hi = pct ? max*100 : len ? dli(max) : max, st = pct ? step*100 : len ? dstep(step) : step;
+  const d = pct ? ` data-pct="1"` : len ? ` data-len="1"` : "";
   return `<div class="sl"><div class="slh"><label>${label}</label><span class="slv">`
-    + `<input type="number" data-key="${key}"${d} min="${lo}" max="${hi}" step="${st}" value="${shown}" aria-label="${label}"><i>${unit||"ft"}</i></span></div>`
+    + `<input type="number" data-key="${key}"${d} min="${lo}" max="${hi}" step="${st}" value="${shown}" aria-label="${label}"><i>${unit||lu()}</i></span></div>`
     + `<input type="range" data-key="${key}"${d} min="${lo}" max="${hi}" step="${st}" value="${shown}" aria-label="${label}"></div>`;
 }
 const PERSON = `<circle cx="3" cy="2" r="2"/><rect x="1.2" y="4.6" width="3.6" height="8" rx="1.4"/><rect x="1.4" y="12" width="1.4" height="7"/><rect x="3.2" y="12" width="1.4" height="7"/>`;
@@ -3172,26 +3217,26 @@ function elevationSVG(o){
   const tint = "#"+col.clone().lerp(new THREE.Color(0x93B87A), .55).getHexString();
   const px = clamp(cx + half + 16, 150, 286), ps = 6*k/19;
   const lblY = cbY + 16 < g - 4 ? cbY + 16 : cbY - 7;
-  return `<svg viewBox="0 0 360 214" data-k="${k}" role="img" aria-label="Elevation drawn to scale: ${H} ft tall, ${W} ft crown, canopy starts at ${cb} ft">
+  return `<svg viewBox="0 0 360 214" data-k="${k}" role="img" aria-label="Elevation drawn to scale: ${uL(H)} tall, ${uL(W)} crown, canopy starts at ${uL(cb, 1)}">
     <line x1="0" y1="${g}" x2="360" y2="${g}" stroke="#3A443F"/>
     <path d="${crownPath(sh.r, cx, top, cbY, half)}" fill="${tint}" fill-opacity=".2" stroke="${tint}" stroke-width="1.3"/>
     <rect x="${cx-3}" y="${(cbY-4).toFixed(1)}" width="6" height="${(g-cbY+4).toFixed(1)}" rx="2" fill="#8A7560"/>
     <g transform="translate(${px.toFixed(1)} ${(g-19*ps).toFixed(1)}) scale(${ps.toFixed(3)})" fill="rgba(236,231,218,.55)">${PERSON}</g>
-    <text x="${(px+14).toFixed(1)}" y="${g-3}" fill="#7C8074" font-family="Geist,sans-serif" font-size="9.5">6 ft</text>
+    <text x="${(px+14).toFixed(1)}" y="${g-3}" fill="#7C8074" font-family="Geist,sans-serif" font-size="9.5">${metric() ? "1.8 m" : "6 ft"}</text>
     <line x1="${(cx+half+26 > 330 ? 344 : 318)}" y1="${top.toFixed(1)}" x2="${(cx+half+26 > 330 ? 344 : 318)}" y2="${g}" stroke="rgba(236,231,218,.45)"/>
-    <text x="${(cx+half+26 > 330 ? 340 : 324)}" y="${((top+g)/2+4).toFixed(1)}" fill="#ECE7DA" font-family="Geist Mono,monospace" font-size="12" text-anchor="${cx+half+26 > 330 ? "end" : "start"}">${H} ft</text>
+    <text x="${(cx+half+26 > 330 ? 340 : 324)}" y="${((top+g)/2+4).toFixed(1)}" fill="#ECE7DA" font-family="Geist Mono,monospace" font-size="12" text-anchor="${cx+half+26 > 330 ? "end" : "start"}">${uL(H)}</text>
     <line x1="${(cx-half).toFixed(1)}" y1="202" x2="${(cx+half).toFixed(1)}" y2="202" stroke="rgba(236,231,218,.45)"/>
     <line x1="${(cx-half).toFixed(1)}" y1="196" x2="${(cx-half).toFixed(1)}" y2="208" stroke="rgba(236,231,218,.45)"/>
     <line x1="${(cx+half).toFixed(1)}" y1="196" x2="${(cx+half).toFixed(1)}" y2="208" stroke="rgba(236,231,218,.45)"/>
     <rect x="${cx-20}" y="195" width="40" height="14" fill="#141A17"/>
-    <text x="${cx}" y="206" text-anchor="middle" fill="#ECE7DA" font-family="Geist Mono,monospace" font-size="12">${W} ft</text>
+    <text x="${cx}" y="206" text-anchor="middle" fill="#ECE7DA" font-family="Geist Mono,monospace" font-size="12">${uL(W)}</text>
     <g class="cbh">
       <line x1="16" y1="${cbY.toFixed(1)}" x2="${cx+half+8 > 300 ? 344 : 300}" y2="${cbY.toFixed(1)}" stroke="transparent" stroke-width="16"/>
       <line x1="42" y1="${cbY.toFixed(1)}" x2="${cx+half+8 > 300 ? 344 : 300}" y2="${cbY.toFixed(1)}" stroke="#D4A85A" stroke-width="1.2" stroke-dasharray="5 4"/>
       <circle cx="42" cy="${cbY.toFixed(1)}" r="7" fill="#141A17" stroke="#D4A85A" stroke-width="1.6"/>
       <path d="M39 ${(cbY-1.5).toFixed(1)}l3-3 3 3M39 ${(cbY+1.5).toFixed(1)}l3 3 3-3" fill="none" stroke="#D4A85A" stroke-width="1.1"/>
     </g>
-    <text x="56" y="${lblY.toFixed(1)}" fill="#D4A85A" font-family="Geist,sans-serif" font-size="11">Canopy starts ${cb % 1 ? cb.toFixed(1) : cb} ft</text>
+    <text x="56" y="${lblY.toFixed(1)}" fill="#D4A85A" font-family="Geist,sans-serif" font-size="11">Canopy starts ${uL(cb, 1)}</text>
   </svg>`;
 }
 /* Mini plan: the lot, this item's footprint and its distance to the nearest lines. */
@@ -3218,7 +3263,7 @@ function clearanceHTML(o){
   const verdict = !inside
     ? `<div class="bad"><svg class="ic"><use href="#i-close"/></svg>Sits outside the property line</div>`
     : spill.length
-      ? `<div class="bad"><svg class="ic"><use href="#i-close"/></svg>${o.type === "tree" ? "Canopy" : "It"} reaches over the ${spill.map(e=>escapeHTML(e.name)).join(" and ")} line by ${spill.map(e=>e.over.toFixed(1)+" ft").join(" and ")}</div>`
+      ? `<div class="bad"><svg class="ic"><use href="#i-close"/></svg>${o.type === "tree" ? "Canopy" : "It"} reaches over the ${spill.map(e=>escapeHTML(e.name)).join(" and ")} line by ${spill.map(e=>uL(e.over, 1)).join(" and ")}</div>`
       : `<div class="ok"><svg class="ic"><use href="#i-check"/></svg>Stays inside every line</div>`;
   return `<div class="clear"><svg viewBox="0 0 132 108" role="img" aria-label="Plan: distance to the nearest property lines">
       <polygon points="${poly}" fill="rgba(147,184,122,.05)" stroke="rgba(236,231,218,.35)" stroke-dasharray="4 3"/>
@@ -3227,7 +3272,7 @@ function clearanceHTML(o){
       ${marks.join("")}
       <circle cx="${X(o.x).toFixed(1)}" cy="${Y(o.y).toFixed(1)}" r="2" fill="#ECE7DA"/>
     </svg><div class="cl">${verdict}
-      <div class="dl">${L.slice(0,4).map(e=>`<span>${escapeHTML(shortSide(e.name))} ${e.d.toFixed(1)} ft</span>`).join("")}</div></div></div>`;
+      <div class="dl">${L.slice(0,4).map(e=>`<span>${escapeHTML(shortSide(e.name))} ${uL(e.d, 1)}</span>`).join("")}</div></div></div>`;
 }
 function shortSide(n){ n = String(n); return n.length > 7 ? n.slice(0,6)+"…" : n; }
 function presetFor(o){ return o && o.type === "tree" ? PRESETS.find(p=>p.n === o.name) : null; }
@@ -3238,57 +3283,72 @@ function bloomLabel(o){
   if(p?.bt) return p.bt;
   return k === "crabapple" ? "Blooms in spring" : k === "hydrangea" ? "Blooms midsummer to fall" : "";
 }
-/* ---------- growth: planting date, size, and what to expect ---------- */
+/* ---------- growth: planting year, size, and what to expect ---------- */
 function growthClass(g){ return g <= 1 ? "slow" : g < 2.05 ? "medium" : "fast"; }
+/* growth rate in display units: in/yr or cm/yr */
+const rateU = ()=>metric() ? "cm" : "in";
+const rateDl = ftyr=>Math.round(ftyr*(metric() ? 30.48 : 12));
 function growthHTML(o){
-  const g = treeGrowthRate(o), inch = Math.round(g*12);
-  const rate = `<p class="grow-rate">Grows about <b>${inch} in</b> a year when young (<em>${growthClass(g)}</em>), slowing as it nears ${o.height} ft.</p>`;
+  const g = treeGrowthRate(o), g0 = defaultGrowthRate(o);
   if(!o.planted){
-    return `<p class="hint">Shown at its full ${o.height} × ${o.spread} ft. Give it a planting date and size to watch it grow year by year.</p>`
-      + rate
-      + `<div class="btnrow"><button class="btn" data-act="plant">Set planting date &amp; size</button></div>`;
+    return `<p class="hint">Shown at its full ${uL(o.height)} × ${uL(o.spread)}. Give it a planting year and size to watch it grow year by year.</p>`
+      + `<p class="grow-rate">Grows about <b>${rateDl(g)} ${rateU()}</b> a year when young (<em>${growthClass(g)}</em>).</p>`
+      + `<div class="btnrow"><button class="btn plant" data-act="plant"><svg class="ic"><use href="#i-plus"/></svg>Set planting year &amp; size</button></div>`;
   }
-  const y0 = +o.planted.slice(0,4), H = Math.max(2, o.height);
+  return `<div class="growfields">
+      <div class="field"><span class="lab">Year planted</span><span class="inp"><input type="number" inputmode="numeric" data-grow="planted" min="1900" max="2100" step="1" value="${plantYear(o)}"></span></div>
+      <div class="field"><span class="lab">Height at planting</span><span class="inp"><input type="number" inputmode="decimal" data-grow="plantH" min="${dl(1, 1)}" max="${dl(Math.max(2, o.height), 1)}" step="${dstep(.5)}" value="${dl(o.plantH ?? defaultPlantH(o), 1)}"><span class="u">${lu()}</span></span></div>
+      <div class="field"><span class="lab">Growth when young</span><span class="inp"><input type="number" inputmode="numeric" data-grow="gr" min="1" max="${metric() ? 150 : 60}" step="1" value="${rateDl(g)}"><span class="u">${rateU()}/yr</span></span></div>
+      <p class="grow-def">${growDefHTML(o)}</p>
+    </div>
+    <div class="growlive">${growthLiveHTML(o)}</div>
+    <div class="btnrow"><button class="btn ghost" data-act="established">Treat as full grown</button></div>`;
+}
+function growDefHTML(o){
+  const g0 = defaultGrowthRate(o);
+  return o.gr > 0 && Math.abs(o.gr - g0) > .01
+    ? `Your rate. Typical for ${escapeHTML(o.name)}: ${rateDl(g0)} ${rateU()}/yr. <button type="button" class="linkbtn" data-act="grdefault">Use typical</button>`
+    : `Typical for this species (<em>${growthClass(g0)}</em>). Change it if your tree grows faster or slower.`;
+}
+/* the chart and table: redrawn while typing without touching the inputs */
+function growthLiveHTML(o){
+  const y0 = plantYear(o), H = Math.max(2, o.height);
   const done = nearMatureYear(o) ?? y0 + 40;
   const y1 = Math.max(done + 3, y0 + 15), span = y1 - y0;
-  const W = 300, Hh = 104, padL = 26, padB = 16, padT = 8, X = y=>padL + (y - y0)/span*(W - padL - 6), Y = h=>Hh - padB - h/H*(Hh - padB - padT);
+  const W = 300, Hh = 104, padL = 30, padB = 16, padT = 8, X = y=>padL + (y - y0)/span*(W - padL - 6), Y = h=>Hh - padB - h/H*(Hh - padB - padT);
   let line = "", wline = "";
   for(let a=0;a<=span;a+=.5){
     const s = growthAt(o, a);
     line += (a ? "L" : "M") + X(y0 + a).toFixed(1) + " " + Y(s.height).toFixed(1);
     wline += (a ? "L" : "M") + X(y0 + a).toFixed(1) + " " + Y(Math.min(H, s.spread)).toFixed(1);
   }
-  const age = seasonsBetween(o.planted, S.date), now = grown(o);
+  const age = seasonsBetween(y0, S.date), now = grown(o), yNow = +S.date.slice(0,4);
   const ticks = [];
   for(let y = Math.ceil(y0/5)*5; y <= y1; y += span > 40 ? 10 : 5) ticks.push(y);
+  const xNow = clamp(yNow + flushDone(S.date) - 1, y0, y1);
   const svg = `<svg class="growchart" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Height over the years">
     <line x1="${padL}" y1="${Y(H)}" x2="${W-6}" y2="${Y(H)}" stroke="var(--line-3)" stroke-dasharray="3 3"/>
-    <text x="${padL-4}" y="${Y(H)+3}" text-anchor="end">${H}′</text>
+    <text x="${padL-4}" y="${Y(H)+3}" text-anchor="end">${uS(H, 0)}</text>
     <text x="${padL-4}" y="${Y(0)+3}" text-anchor="end">0</text>
     <line x1="${padL}" y1="${Y(0)}" x2="${W-6}" y2="${Y(0)}" stroke="var(--line-2)"/>
     ${ticks.map(y=>`<text x="${X(y)}" y="${Hh-3}" text-anchor="middle">${y}</text>`).join("")}
     <path d="${wline}" fill="none" stroke="var(--sky)" stroke-width="1.4" stroke-dasharray="4 3" opacity=".8"/>
     <path d="${line}" fill="none" stroke="var(--leaf-2)" stroke-width="2"/>
-    ${age >= 0 && y0 + age <= y1 ? `<line x1="${X(y0+age)}" y1="${padT}" x2="${X(y0+age)}" y2="${Y(0)}" stroke="var(--brass)" stroke-width="1.2"/>
-      <circle cx="${X(y0+age)}" cy="${Y(now.height)}" r="3.5" fill="var(--brass)"/>` : ""}
+    ${yNow >= y0 && yNow <= y1 ? `<line x1="${X(xNow)}" y1="${padT}" x2="${X(xNow)}" y2="${Y(0)}" stroke="var(--brass)" stroke-width="1.2"/>
+      <circle cx="${X(xNow)}" cy="${Y(now.height)}" r="3.5" fill="var(--brass)"/>` : ""}
   </svg>`;
-  const at = n=>{ const s = growthAt(o, seasonsBetween(o.planted, S.date) + n); return `${s.height}′ × ${s.spread}′`; };
-  const before = S.date < o.planted;
-  return `<div class="growfields">
-      <div class="field"><span class="lab">Planted</span><span class="inp wide"><input type="date" data-grow="planted" value="${o.planted}"></span></div>
-      <div class="field"><span class="lab">Height at planting</span><span class="inp"><input type="number" data-grow="plantH" min="1" max="${H}" step=".5" value="${o.plantH ?? defaultPlantH(o)}"><span class="u">ft</span></span></div>
-    </div>
-    ${rate}
-    <figure class="growfig">${svg}<figcaption><span class="lg h">Height</span><span class="lg w">Crown width</span><span class="lg n">${S.date.slice(0,4)}</span></figcaption></figure>
+  const at = n=>{ const s = growthAt(o, age + n); return `${uS(s.height)} × ${uS(s.spread)}`; };
+  const before = yNow < y0;
+  return `<p class="grow-rate">Grows about <b>${rateDl(treeGrowthRate(o))} ${rateU()}</b> a year when young, slowing as it nears ${uL(o.height)}.</p>
+    <figure class="growfig">${svg}<figcaption><span class="lg h">Height</span><span class="lg w">Crown width</span><span class="lg n">${yNow}</span></figcaption></figure>
     <div class="growtable">
-      <div><span>${before ? "Not planted yet in" : "In"} ${S.date.slice(0,4)}</span><b>${now.height}′ × ${now.spread}′</b></div>
+      <div><span>${before ? "Not planted yet in" : "In"} ${yNow}</span><b>${uS(now.height)} × ${uS(now.spread)}</b></div>
       <div><span>5 years on</span><b>${at(5)}</b></div>
       <div><span>10 years on</span><b>${at(10)}</b></div>
       <div><span>20 years on</span><b>${at(20)}</b></div>
       <div><span>Near full height</span><b>${done ? "about " + done : "—"}</b></div>
     </div>
-    <p class="hint">Use <b>Trees in</b> on the sun card to look ahead. Leaves fill in as the branches mature, so young trees cast lighter shade.</p>
-    <div class="btnrow"><button class="btn ghost" data-act="established">Treat as full grown</button></div>`;
+    <p class="hint">Use <b>Trees in</b> on the sun card to look ahead. Leaves fill in as the branches mature, so young trees cast lighter shade.</p>`;
 }
 function zoneLabel(p){ return p?.z ? `Zone ${p.z[0]}–${p.z[1]}` : ""; }
 function footHTML(o){
@@ -3315,13 +3375,13 @@ function inspectorHeader(o){
       t += `<span class="tagp${ok ? "" : " warn"}" title="USDA hardiness zones">${zoneLabel(p)}${ok ? "" : " · not hardy here"}</span>`;
     }
     if(p?.warn) t += `<span class="tagp warn">${escapeHTML(p.warn)}</span>`;
-    t += `<span class="tagp">${o.height} × ${o.spread} ft</span>`;
+    t += `<span class="tagp">${dl(o.height)} × ${uL(o.spread)}</span>`;
   } else if(o.type === "bed"){
     const st = bedStats.get(o.id);
     if(st) t += st.avg >= S.fullSun ? `<span class="tagp brass">Full sun</span>` : st.avg >= 4 ? `<span class="tagp sky">Part sun</span>` : `<span class="tagp">Shade</span>`;
-    t += `<span class="tagp">${o.w} × ${o.h} ft · ${Math.round(o.w*o.h)} sq ft</span>`;
+    t += `<span class="tagp">${dl(o.w)} × ${uL(o.h)} · ${uArea(o.w*o.h)}</span>`;
   } else if(o.type === "boundary"){
-    t += `<span class="tagp">${Math.round(polyArea(S.boundary)).toLocaleString()} sq ft</span><span class="tagp">${S.boundary.length} corners</span>`;
+    t += `<span class="tagp">${uArea(polyArea(S.boundary))}</span><span class="tagp">${S.boundary.length} corners</span>`;
   }
   tags.innerHTML = t;
 }
@@ -3440,8 +3500,8 @@ function drawPanel(){
       if(i.type === "checkbox") i.checked = !!o[i.dataset.key];
       else{
         const v = i.dataset.key === "crownBase" ? crownBaseFt(o) : o[i.dataset.key];
-        if(i.dataset.key === "crownBase") i.max = Math.max(1, o.height-1);
-        i.value = i.dataset.pct ? Math.round(v*100) : v;
+        if(i.dataset.key === "crownBase") i.max = dli(Math.max(1, o.height-1));
+        i.value = i.dataset.pct ? Math.round(v*100) : i.dataset.len ? dli(v) : v;
       }
     });
     props.querySelectorAll("[data-shape]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.shape === o.shape));
@@ -3597,26 +3657,28 @@ props.addEventListener("input", e=>{
   }
   const gk = e.target.dataset.grow;
   if(gk && o.type === "tree"){
+    /* Apply what's typed so far, but leave the box alone so typing isn't
+       interrupted; the change event tidies the value afterwards. */
+    const v = parseFloat(e.target.value);
+    if(!isFinite(v)) return;
     if(gk === "planted"){
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) return;
-      o.planted = e.target.value;
-    } else {
-      const v = parseFloat(e.target.value);
-      if(!isFinite(v)) return;
-      o.plantH = clamp(v, 1, Math.max(1, o.height));
+      if(!/^\d{4}$/.test(e.target.value.trim()) || v < 1900 || v > 2100) return;
+      o.planted = v;
+    } else if(gk === "plantH"){
+      if(v <= 0) return;
+      o.plantH = rnd(clamp(fromDl(v), .5, Math.max(1, o.height)), 2);
+    } else if(gk === "gr"){
+      if(v <= 0) return;
+      o.gr = rnd(clamp(v/(metric() ? 30.48 : 12), .05, 6), 3);
     }
     queueRebuild(o); updateSelection(); drawList(); scheduleCompute(); syncYears();
-    const gb = props.querySelector(".growbox");
-    if(gb){
-      const f = document.activeElement, sel = f?.dataset?.grow;
-      gb.innerHTML = growthHTML(o);
-      if(sel){ const n = gb.querySelector(`[data-grow="${sel}"]`); if(n){ n.focus({preventScroll:true}); } }
-    }
+    const gl = props.querySelector(".growlive");
+    if(gl) gl.innerHTML = growthLiveHTML(o);
     return;
   }
   const nd = e.target.dataset.node;
   if(nd && activeNode != null){
-    const v = parseFloat(e.target.value);
+    const v = fromDl(parseFloat(e.target.value));
     if(!isFinite(v)) return;
     const w = worldPoly(o);
     w[activeNode][nd] = v;
@@ -3628,14 +3690,14 @@ props.addEventListener("input", e=>{
   }
   const fitLot = e.target.dataset.fitlot;
   if(fitLot){
-    const v = Math.max(10, parseFloat(e.target.value)||10), b = yardBounds();
+    const v = Math.max(10, fromDl(parseFloat(e.target.value))||10), b = yardBounds();
     scalePolyTo(S.boundary, fitLot === "w" ? v : b.w, fitLot === "h" ? v : b.h);
     afterBoundaryChange(true); drawList(); syncLotFields();
     return;
   }
   const fit = e.target.dataset.fit;
   if(fit){
-    const v = Math.max(1, parseFloat(e.target.value)||1), b = bbox(o.poly);
+    const v = Math.max(1, fromDl(parseFloat(e.target.value))||1), b = bbox(o.poly);
     scalePolyTo(o.poly, fit === "w" ? v : b.w, fit === "h" ? v : b.h);
     queueRebuild(o); updateSelection(); drawList(); scheduleCompute();
     return;
@@ -3643,7 +3705,10 @@ props.addEventListener("input", e=>{
   const k = e.target.dataset.key;
   if(!k) return;
   if(e.target.type === "checkbox") o[k] = e.target.checked;
-  else if(e.target.type === "number" || e.target.type === "range") o[k] = (parseFloat(e.target.value)||0)/(e.target.dataset.pct ? 100 : 1);
+  else if(e.target.type === "number" || e.target.type === "range"){
+    const v = parseFloat(e.target.value)||0;
+    o[k] = e.target.dataset.pct ? v/100 : e.target.dataset.len ? rnd(fromDl(v), 2) : v;
+  }
   else o[k] = e.target.value;
   if(k === "style" && o.type === "fence"){ o.density = (FENCE_STYLES[o.style]||FENCE_STYLES.picket).dens; panelFor = null; }
   if(GEOKEYS.has(k)) queueRebuild(o); else placeObject(o);
@@ -3666,7 +3731,7 @@ props.addEventListener("click", e=>{
   const act = btn.dataset.act, o = selected();
   if(!o) return;
   if(act === "scaleboundary" && o.type === "boundary"){
-    const edge = +$("boundary-scale-edge").value, lengthFeet = +$("boundary-scale-feet").value;
+    const edge = +$("boundary-scale-edge").value, lengthFeet = fromDl(+$("boundary-scale-feet").value);
     scaleBoundaryFromEdge(edge, lengthFeet);
     return;
   }
@@ -3693,12 +3758,18 @@ props.addEventListener("click", e=>{
   if(act === "done"){ nodeEdit = false; activeNode = null; select(null); openSheet(false); markDirty(); }
   if(act === "species") openLibrary("replace");
   if(act === "plant" && o.type === "tree"){
-    o.planted = todayISO(); o.plantH = defaultPlantH(o);
+    o.planted = +todayISO().slice(0,4); o.plantH = defaultPlantH(o);
     panelFor = null; queueRebuild(o); drawPanel(); updateSelection(); drawList(); scheduleCompute(); syncYears();
-    toast(`Planted today at ${o.plantH} ft. Use “Trees in” on the sun card to see it grow.`);
+    toast(`Planted in ${o.planted} at ${uL(o.plantH, 1)}. Change the year and size below.`);
+    setTimeout(()=>props.querySelector('[data-grow="planted"]')?.focus({preventScroll:true}), 50);
+  }
+  if(act === "grdefault" && o.type === "tree"){
+    delete o.gr;
+    queueRebuild(o); updateSelection(); drawList(); scheduleCompute(); scheduleHist();
+    const gb = props.querySelector(".growbox"); if(gb) gb.innerHTML = growthHTML(o);
   }
   if(act === "established" && o.type === "tree"){
-    delete o.planted; delete o.plantH;
+    delete o.planted; delete o.plantH; delete o.gr;
     panelFor = null; queueRebuild(o); drawPanel(); updateSelection(); drawList(); scheduleCompute(); syncYears();
   }
   if(act === "dup"){
@@ -3709,6 +3780,17 @@ props.addEventListener("click", e=>{
   }
 });
 props.addEventListener("change", e=>{
+  const gk = e.target.dataset.grow;
+  if(gk){
+    /* tidy the finished value in place, so focus can move on to the next box */
+    const o = selected();
+    if(!o) return;
+    e.target.value = gk === "planted" ? plantYear(o) : gk === "plantH" ? dl(o.plantH ?? defaultPlantH(o), 1) : rateDl(treeGrowthRate(o));
+    const gd = props.querySelector(".grow-def");
+    if(gd) gd.innerHTML = growDefHTML(o);
+    scheduleHist();
+    return;
+  }
   if(!e.target.hasAttribute("data-boundary-label")) return;
   const k = +e.target.dataset.boundaryLabel;
   if(!S.boundary[k]) return;
@@ -3724,18 +3806,18 @@ function drawList(){
     const rows = [`<button data-id="${BOUNDARY}" aria-pressed="${S.sel===BOUNDARY}">
         <svg class="ic"><use href="#i-line"/></svg>
         <span class="tx"><span class="nm">Property line</span>
-        <span class="mt">${S.boundary.length} corners · ${Math.round(polyArea(S.boundary))} sq ft</span></span></button>`];
+        <span class="mt">${S.boundary.length} corners · ${uArea(polyArea(S.boundary))}</span></span></button>`];
     for(const o of S.objects){
       const nl = nearestLine(o);
       const near = `${nl.d.toFixed(0)}' to ${escapeHTML(nl.name)} line`;
       const st = o.type === "bed" ? bedStats.get(o.id) : null;
       const b = o.poly ? bbox(o.poly) : null;
       const gt = o.type === "tree" ? grown(o) : null;
-      const mt = o.type === "tree" ? (o.planted && gt.progress < .98 ? `${gt.height}' × ${gt.spread}' now · ${o.height}' mature` : `${o.height}' × ${o.spread}' · ${near}`)
+      const mt = o.type === "tree" ? (o.planted && gt.progress < .98 ? `${uS(gt.height)} × ${uS(gt.spread)} now · ${uS(o.height)} mature` : `${uS(o.height)} × ${uS(o.spread)} · ${near}`)
         : o.type === "bed" ? `${o.w}' × ${o.h}' · ${st ? st.avg.toFixed(1)+" h sun" : near}`
-        : o.type === "deck" ? `${Math.round(polyArea(o.poly))} sq ft · ${(o.height ?? .5).toFixed(1)}' high · ${near}`
-        : isPaved(o) ? `${Math.round(polyArea(o.poly))} sq ft · ${o.poly.length} corners · ${near}`
-        : o.type === "fence" ? `${Math.round(fenceLength(o))} ft · ${(FENCE_STYLES[o.style]||FENCE_STYLES.picket).label} · ${o.height ?? 5}' high`
+        : o.type === "deck" ? `${uArea(polyArea(o.poly))} · ${uS(o.height ?? .5)} high · ${near}`
+        : isPaved(o) ? `${uArea(polyArea(o.poly))} · ${o.poly.length} corners · ${near}`
+        : o.type === "fence" ? `${uL(fenceLength(o))} · ${(FENCE_STYLES[o.style]||FENCE_STYLES.picket).label} · ${uS(o.height ?? 5)} high`
         : `${b.w.toFixed(0)}' × ${b.h.toFixed(0)}' · ${o.height}' to peak`;
       const ic = o.type === "tree" ? "i-tree" : o.type === "bed" ? "i-bed"
                : o.type === "deck" ? "i-deck" : isPaved(o) ? "i-"+o.type : o.type === "fence" ? "i-fence" : "i-house";
@@ -3753,15 +3835,15 @@ function drawList(){
 function syncLotFields(){
   const set = (id,v)=>{ const n = document.getElementById(id); if(n) n.textContent = v; };
   set("bcount", S.boundary.length);
-  set("barea", Math.round(polyArea(S.boundary)).toLocaleString()+" sq ft");
-  set("bperim", Math.round(polyPerimeter(S.boundary)).toLocaleString()+" ft perimeter");
+  set("barea", uArea(polyArea(S.boundary)));
+  set("bperim", uL(polyPerimeter(S.boundary))+" perimeter");
   set("boundary-image-state", S.boundaryImageDraft
     ? "Unscaled image draft: saved with your plan. Import the same picture to resume and set a known length."
     : S.boundaryImage ? "Image-based outline. Names and measurements are saved with the plan; the image itself is not included." : "");
   const b = yardBounds();
   for(const [id,v] of [["yardw", b.w],["yardh", b.h]]){
     const n = document.getElementById(id);
-    if(n && document.activeElement !== n) n.value = Math.round(v);
+    if(n && document.activeElement !== n) n.value = dl(v);
   }
 }
 function drawFenceEdges(){
@@ -3773,14 +3855,14 @@ function drawFenceEdges(){
     const partial = a > .05 || b < e.len-.05;
     return `<div class="edgeitem ${sides[e.i]?"on":""}">
     <label class="edgerow ${sides[e.i]?"on":""}" data-edge="${e.i}">
-      <span class="w"><b>${escapeHTML(e.name)}</b> side · ${e.len.toFixed(1)} ft${partial && sides[e.i] ? ` · <em>${(b-a).toFixed(1)} ft fenced</em>` : ""}</span>
+      <span class="w"><b>${escapeHTML(e.name)}</b> side · ${uL(e.len, 1)}${partial && sides[e.i] ? ` · <em>${uL(b-a, 1)} fenced</em>` : ""}</span>
       <input type="checkbox" class="sw" data-edge="${e.i}" ${sides[e.i]?"checked":""}>
     </label>
     ${sides[e.i] ? `<div class="edgespan" data-span="${e.i}">
       <span>Runs from</span>
-      <span class="inp"><input type="number" data-spanend="a" min="0" max="${L}" step="1" value="${Math.round(a*10)/10}" aria-label="${escapeHTML(e.name)} fence starts at, feet from its first corner"><i>ft</i></span>
+      <span class="inp"><input type="number" data-spanend="a" min="0" max="${dl(L, 1)}" step="${dstep(1)}" value="${dl(a, 1)}" aria-label="${escapeHTML(e.name)} fence starts at, distance from its first corner"><i>${lu()}</i></span>
       <span>to</span>
-      <span class="inp"><input type="number" data-spanend="b" min="0" max="${L}" step="1" value="${Math.round(b*10)/10}" aria-label="${escapeHTML(e.name)} fence ends at, feet from its first corner"><i>ft</i></span>
+      <span class="inp"><input type="number" data-spanend="b" min="0" max="${dl(L, 1)}" step="${dstep(1)}" value="${dl(b, 1)}" aria-label="${escapeHTML(e.name)} fence ends at, distance from its first corner"><i>${lu()}</i></span>
       <span>from the ${compassName(vecBearing(e.A.x-e.B.x, e.A.y-e.B.y))} end</span>
       ${partial ? `<button class="linkbtn" data-spanreset="${e.i}">Whole side</button>` : ""}
     </div>` : ""}
@@ -3800,7 +3882,7 @@ document.getElementById("fenceedges").addEventListener("change", e=>{
     /* Part of a side: keep the two ends in order and on the side. */
     const i = +span.dataset.span, edge = boundaryEdges()[i];
     const cur = fenceSpanOf(edge);
-    const v = parseFloat(e.target.value);
+    const v = fromDl(parseFloat(e.target.value));
     let a = cur.a, b = cur.b;
     if(Number.isFinite(v)){ if(e.target.dataset.spanend === "a") a = v; else b = v; }
     a = clamp(a, 0, edge.len); b = clamp(b, 0, edge.len);
@@ -4047,7 +4129,7 @@ function markSaved(fromFile){ savedKey = saveKey(S); if(fromFile) everSaved = tr
 function syncProject(){
   const b = yardBounds();
   const where = S.place ? S.place.replace(/,\s*USA$/,"") : fmtCoord(S.lat,"N","S")+" "+fmtCoord(S.lon,"E","W");
-  $("projsub").textContent = `${where} · ${Math.round(b.w)} × ${Math.round(b.h)} ft lot`;
+  $("projsub").textContent = `${where} · ${dl(b.w)} × ${uL(b.h)} lot`;
   const nm = $("projname");
   if(document.activeElement !== nm) nm.value = S.title || "Backyard";
   nm.style.setProperty("--nameW", Math.max(5, nm.value.length + 1) + "ch");
@@ -4125,7 +4207,7 @@ function libMatches(p){
 function renderLibrary(){
   const cur = selected(), here = new Map();
   for(const o of S.objects) if(o.type === "tree") here.set(o.name, (here.get(o.name)||0) + 1);
-  $("libhval").textContent = `${lib.hmin}–${lib.hmax}${lib.hmax >= 60 ? "+" : ""} ft`;
+  $("libhval").textContent = `${dl(lib.hmin)}–${dl(lib.hmax)}${lib.hmax >= 60 ? "+" : ""} ${lu()}`;
   const zone = libZone();
   $("libzval").textContent = zone ? "Zone "+zone : "Not set";
   $("libzone").value = lib.zone;
@@ -4154,7 +4236,7 @@ function renderLibrary(){
         html += `<article class="lcard${isCur ? " cur" : ""}${cold ? " cold" : ""}">${libSilhouette(p)}
           <div class="nm"><h4>${escapeHTML(p.n)}</h4><span class="tg${count ? " here" : ""}">${count ? (count > 1 ? count+" in your yard" : "In your yard") : ""}</span></div>
           <div class="la">${escapeHTML(p.sci || "")}</div>
-          <div class="ft"><div class="mt"><span>${p.h} × ${p.w} ft</span><span class="sh">${shadeClass(p.d)}</span>${p.bloom ? `<span class="bl">Blooms</span>` : ""}${p.z ? `<span class="zn" title="${cold ? "Not hardy in zone "+zone : "USDA hardiness zones"}">Z${p.z[0]}–${p.z[1]}</span>` : ""}${p.warn ? `<span class="wn">${escapeHTML(p.warn)}</span>` : ""}</div>${btn}</div>
+          <div class="ft"><div class="mt"><span>${dl(p.h)} × ${uL(p.w)}</span><span class="sh">${shadeClass(p.d)}</span>${p.bloom ? `<span class="bl">Blooms</span>` : ""}${p.z ? `<span class="zn" title="${cold ? "Not hardy in zone "+zone : "USDA hardiness zones"}">Z${p.z[0]}–${p.z[1]}</span>` : ""}${p.warn ? `<span class="wn">${escapeHTML(p.warn)}</span>` : ""}</div>${btn}</div>
         </article>`;
       }
       html += `</div>`;
@@ -4253,7 +4335,7 @@ function drawLotPlan(){
     let mx = X((e.A.x+e.B.x)/2), my = Y((e.A.y+e.B.y)/2);
     const dx = mx - cx, dy = my - cy, dl = Math.hypot(dx,dy) || 1;
     mx += dx/dl*16; my += dy/dl*13;
-    const t = Math.round(e.len)+" ft", tw = t.length*6.6 + 12;
+    const t = uL(e.len), tw = t.length*6.6 + 12;
     h += `<rect x="${(mx-tw/2).toFixed(1)}" y="${(my-8).toFixed(1)}" width="${tw.toFixed(1)}" height="16" rx="8" fill="#1B2320" stroke="#2C3631"/>`
       + `<text x="${mx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" fill="#ECE7DA" font-family="Geist Mono,monospace" font-size="11">${t}</text>`;
   }
@@ -4264,7 +4346,7 @@ function drawLotPlan(){
   const n = boundaryEdges().length, on = fenced.size, part = [...fenced.values()].filter(f=>f.partial).length;
   const run = Math.round([...fenced.values()].reduce((t,f)=>t+f.len, 0));
   $("lotfenced").textContent = on === 0 ? "No fence"
-    : (on === n && !part ? `Fenced: all ${n} sides` : `Fenced: ${on} of ${n} sides${part ? `, ${part} in part` : ""}`) + ` · ${run} ft`;
+    : (on === n && !part ? `Fenced: all ${n} sides` : `Fenced: ${on} of ${n} sides${part ? `, ${part} in part` : ""}`) + ` · ${uL(run)}`;
 }
 function drawNorthDial(){
   const d = $("northdial");
@@ -4317,8 +4399,8 @@ function syncYears(){
   document.querySelectorAll("#yearset button[data-yset]").forEach(b=>b.setAttribute("aria-pressed", +b.dataset.yset === n));
   const planted = S.objects.some(o=>o.type === "tree" && o.planted);
   $("yearsahead").classList.toggle("muted", !planted);
-  $("yearsahead").title = planted ? "Trees with a planting date grow to their size in this year"
-    : "Give a tree a planting date (in its panel) to watch it grow";
+  $("yearsahead").title = planted ? "Trees with a planting year grow to their size in this year"
+    : "Give a tree a planting year (in its panel) to watch it grow";
 }
 $("yearsahead").addEventListener("click", e=>{
   const step = e.target.closest("[data-ystep]"), set = e.target.closest("[data-yset]");
@@ -4357,12 +4439,12 @@ function setNorth(v){
 bindNum("north", setNorth);
 bindNum("northnum", setNorth);
 bindNum("tz",  v=>{ S.tz = clamp(v, -12, 14); locationChanged(); });
-bindNum("grid", v=>{ S.grid = Math.max(1,v); buildGrid(); markDirty(); scheduleHist(); });
-bindNum("yardw", v=>{ const b = yardBounds(); scalePolyTo(S.boundary, clamp(v,10,900), b.h);
+bindNum("grid", v=>{ S.grid = Math.max(1, rnd(fromDl(v), 2)); buildGrid(); markDirty(); scheduleHist(); });
+bindNum("yardw", v=>{ const b = yardBounds(); scalePolyTo(S.boundary, clamp(fromDl(v),10,900), b.h);
                       afterBoundaryChange(true); panelFor = null; drawPanel(); });
-bindNum("yardh", v=>{ const b = yardBounds(); scalePolyTo(S.boundary, b.w, clamp(v,10,900));
+bindNum("yardh", v=>{ const b = yardBounds(); scalePolyTo(S.boundary, b.w, clamp(fromDl(v),10,900));
                       afterBoundaryChange(true); panelFor = null; drawPanel(); });
-bindNum("fenceh", v=>{ S.fence.height = clamp(v,0,12); buildFence(); scheduleCompute(); markDirty(); });
+bindNum("fenceh", v=>{ S.fence.height = clamp(rnd(fromDl(v), 2),0,12); buildFence(); scheduleCompute(); markDirty(); });
 function setFenceD(v){
   S.fence.density = clamp(v,0,1);
   $("fenced").value = S.fence.density; $("fenced2").value = S.fence.density;
@@ -4519,6 +4601,7 @@ document.addEventListener("keydown", e=>{
 });
 function openSheet(on){
   $("inspector").classList.toggle("open", on);
+  document.body.classList.toggle("sheetopen", on);
   $("closesheet").style.display = on ? "block" : "none";
 }
 $("sheetbtn").addEventListener("click", ()=>openSheet(!$("inspector").classList.contains("open")));
@@ -4602,7 +4685,7 @@ function loadState(data, frame){
   pointers.clear(); panGrab = null; pinch = null; mode = null; dragObj = null;
   hist.lock = true;
   try{
-    S = Object.assign(freshState(), data);
+    S = Object.assign(baseState(), data);
     /* Presets that were renamed or replaced. */
     for(const o of S.objects || []) if(o.type === "tree" && (o.name === "Flowering crabapple" || o.name === "Snowbound Crabapple")) o.name = "Snowdrift Crabapple";
     /* plans saved before time zones existed used a fixed offset */
@@ -4611,6 +4694,7 @@ function loadState(data, frame){
     if(!Array.isArray(S.boundary) || S.boundary.length < 3)
       S.boundary = rectPoly(S.yard?.w || 110, S.yard?.h || 90);
     for(const o of S.objects){
+      if(o.type === "tree" && o.planted != null) o.planted = plantYear(o);
       if(isOutlineType(o) && !o.poly) o.poly = rectPoly(o.w || PAVING[o.type]?.w || 12, o.h || PAVING[o.type]?.h || 10);
       if(o.type === "deck" && !(o.height >= 0)) o.height = .5;
     }
@@ -4737,10 +4821,11 @@ function syncInputs(){
   $("date").value = S.date;
   syncLocationUI();
   $("north").value = S.north; $("northnum").value = S.north;
-  $("grid").value = S.grid; $("snap").checked = S.snap; $("showgrid").checked = S.showGrid;
+  $("grid").value = dl(S.grid, 1); $("snap").checked = S.snap; $("showgrid").checked = S.showGrid;
   $("simpleview").checked = !!S.simple;
   $("fencestyle").value = S.fence.style || "picket";
-  $("fenceh").value = S.fence.height;
+  $("fenceh").value = dl(S.fence.height, 1);
+  syncUnitLabels();
   $("fenced").value = S.fence.density; $("fenced2").value = S.fence.density;
   $("heat").checked = S.heat; $("leaf").checked = S.leafSeason;
   $("mins").value = S.fullSun; $("mins2").value = S.fullSun;
@@ -4875,8 +4960,26 @@ function syncPrefs(label){
     : "No HDRI could be loaded, so the physical sky is used.";
   syncRanges(document);
 }
+/* static labels in the sidebar that carry a length unit */
+function syncUnitLabels(){
+  document.querySelectorAll(".u.lu").forEach(n=>{ n.textContent = lu(); });
+  for(const id of ["fenceh", "grid"]){ const n = $(id); if(n){ n.step = dstep(id === "grid" ? 1 : .5); n.max = dl(id === "grid" ? 50 : 12, 1); n.min = id === "grid" ? dl(1, 1) : 0; } }
+  for(const id of ["yardw", "yardh"]){ const n = $(id); if(n){ n.min = dl(10); n.max = dl(900); n.step = metric() ? .5 : 1; } }
+  const k = $("rShadK"); if(k) k.textContent = metric() ? "Shadow of 3 m" : "Shadow of 10 ft";
+  document.querySelectorAll("#runits button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.units === (metric() ? "metric" : "imperial")));
+}
+function setUnits(u){
+  if((u === "metric") === metric()) return;
+  prefs.units = u; savePrefs();
+  panelFor = null;
+  syncInputs(); drawPanel(); drawList(); drawFenceEdges(); renderLibrary(); updateSun();
+  if(obsMode) syncObsHud();
+  markDirty();
+  toast(metric() ? "Showing metres" : "Showing feet");
+}
 function initPrefsUI(){
   const changed = ()=>{ savePrefs(); skyKey = null; markDirty(); };
+  document.querySelectorAll("#runits button").forEach(b=>b.addEventListener("click", ()=>setUnits(b.dataset.units)));
   $("rsky").addEventListener("change", e=>{
     prefs.sky = e.target.value;
     if(prefs.sky === "hdri" && !sky.hdri){ prefs.sky = "sky"; e.target.value = "sky"; toast("No HDRI is available, so the physical sky stays on."); }
@@ -5025,7 +5128,7 @@ const TOUR_STEPS = [
      <p>Choose <b>Place</b>, then click the yard where the tree goes.</p>`,
    done:()=>treeCount() > (tourMark.trees ?? 0)},
   {part:"3 · Plant your trees", title:"When it goes in, and how big", target:()=>document.querySelector(".growbox") || $("inspector"),
-   body:`<p>A new tree goes in today at nursery size. In its panel, set the <b>planting date</b> and <b>height at planting</b>; the chart shows how it grows toward full size.</p>
+   body:`<p>A new tree goes in this year at nursery size. In its panel, set the <b>year planted</b>, <b>height at planting</b> and, if you like, its <b>growth rate</b>; the chart shows how it grows toward full size.</p>
      <p>Established trees can be set to <b>full grown</b>.</p>`},
   {part:"3 · Plant your trees", title:"Look years ahead", target:"#yearsahead",
    body:`<p><b>Trees in</b> on the sun card moves the plan 5, 10 or 20 years on. Trees grow up first, then out, and fill in last, so young trees cast lighter shade.</p>`,
@@ -5056,7 +5159,7 @@ function tourTip(key){
     view:["#rstage", "<b>Display</b>: stage, sky, quality and tree detail. Lower tree detail if things feel slow."],
     file:['[data-pane="file"]', "Save your plan to a file and open it again later. Plans stay on your computer."],
     library:["#libsize", "<b>Large</b> or <b>Compact</b> cards. Zone tags in orange aren't hardy where your yard is."],
-    tree:[".growbox", "<b>Growth</b>: planting date and size, and what to expect in 5, 10 and 20 years."],
+    tree:[".growbox", "<b>Growth</b>: year planted, size and growth rate, and what to expect in 5, 10 and 20 years."],
     bed:[".bedins", "Beds report hours of direct sun for the day shown, and through the season."],
     fence:["#props select[data-key=\"style\"]", "Fence style, height and how much sun it blocks. <b>Reshape fence</b> moves its posts."],
   }[key];
@@ -5067,8 +5170,7 @@ function showWelcome(on){
   if(!on) try{ localStorage.setItem(WELCOME_KEY, "1"); }catch{ /* storage off */ }
 }
 function startBlankYard(){
-  const st = freshState();
-  st.objects = []; st.boundary = rectPoly(120, 90); st.yard = {w:120, h:90};
+  const st = baseState();
   st.fence.on = false; st.fence.sides = [false,false,false,false];
   st.title = "My yard";
   loadState(st, true);
@@ -5104,7 +5206,7 @@ function maybeWelcome(){
 
 window.applyImportedBoundary = applyImportedBoundary;   // hook for the property-image importer
 /* development-only hook for automated screenshots */
-if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, get photo(){ return photo; }, get scene(){ return scene; }, rebuildAll, fromPreset, grown, select, worldPoly, get observer(){ return observer; }, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute };
+if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, get photo(){ return photo; }, get scene(){ return scene; }, rebuildAll, fromPreset, grown, select, worldPoly, project, get observer(){ return observer; }, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute };
 initLocationUI();
 initPrefsUI();
 if(document.readyState === "complete") boot();

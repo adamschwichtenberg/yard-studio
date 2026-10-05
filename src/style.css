@@ -626,7 +626,7 @@ body.photo #gl{pointer-events:none}
     border-radius:20px 20px 0 0;border-bottom:0;transform:translateY(100%);
     transition:transform .28s var(--ease);z-index:8}
   #inspector.open{transform:translateY(0)}
-  #sheetbtn{display:grid}
+
   #toast{top:auto;bottom:calc(var(--barH) + 70px)}
   #shTip{top:auto;bottom:calc(var(--barH) + 70px)}
   #library{padding:0}
@@ -857,4 +857,31 @@ body.observe #coach{top:calc(var(--gut) + 150px)}
   #tabs button span{font-size:9.5px}
   body.flying #sunpanel{display:none}
   #obshud{top:calc(var(--gut) + 64px)}
+}
+
+/* planting year & size: a warm yellow so it's easy to find */
+.btn.plant{background:#F2C94C;border-color:#F2C94C;color:#1D1606;font-weight:600;
+  box-shadow:0 0 0 0 rgba(242,201,76,.55);animation:plantpulse 2.4s ease-out 3}
+.btn.plant:hover{background:#F7D774;border-color:#F7D774}
+.btn.plant .ic{width:14px;height:14px;stroke:#1D1606}
+@keyframes plantpulse{0%{box-shadow:0 0 0 0 rgba(242,201,76,.55)}70%{box-shadow:0 0 0 10px rgba(242,201,76,0)}100%{box-shadow:0 0 0 0 rgba(242,201,76,0)}}
+.growfields{display:flex;flex-direction:column;gap:2px;padding:8px 10px 6px;border-radius:12px;
+  background:rgba(242,201,76,.09);border:1px solid rgba(242,201,76,.38)}
+.growfields .lab{color:#F2D27A}
+.growfields .inp input{font-variant-numeric:tabular-nums}
+.growfields .grow-def{margin:2px 0 0;font-size:11.5px;line-height:1.45;color:var(--dim)}
+.growfields .grow-def em{font-style:normal;color:var(--leaf-2)}
+.growfields .linkbtn{border:0;background:none;padding:0;color:#F2C94C;font:inherit;cursor:pointer;text-decoration:underline}
+.growlive{display:flex;flex-direction:column;gap:8px}
+@media (prefers-reduced-motion: reduce){ .btn.plant{animation:none} }
+
+/* phones: a pill above the tab bar reopens the selected item's menu */
+@media (max-width:1020px){
+  body.hassel:not(.sheetopen):not(.observe) #sheetbtn{display:flex;position:fixed;z-index:7;left:50%;transform:translateX(-50%);
+    bottom:calc(var(--barH) + 64px);max-width:calc(100vw - 40px);min-height:42px;padding:0 18px;border-radius:99px;
+    background:#F2C94C;border-color:#F2C94C;color:#1D1606;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+  #sheetbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #sheetbtn .ic{transform:rotate(180deg);stroke:#1D1606;flex:none}
+  body.hassel #toast{bottom:calc(var(--barH) + 118px)}
+  #inspector.open{z-index:12}
 }
