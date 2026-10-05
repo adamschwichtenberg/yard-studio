@@ -3295,14 +3295,21 @@ function growthHTML(o){
       + `<p class="grow-rate">Grows about <b>${rateDl(g)} ${rateU()}</b> a year when young (<em>${growthClass(g)}</em>).</p>`
       + `<div class="btnrow"><button class="btn plant" data-act="plant"><svg class="ic"><use href="#i-plus"/></svg>Set planting year &amp; size</button></div>`;
   }
-  return `<div class="growfields">
+  return `<details class="growedit"${growOpen ? " open" : ""}>
+    <summary>${growSumHTML(o)}</summary>
+    <div class="growfields">
       <div class="field"><span class="lab">Year planted</span><span class="inp"><input type="number" inputmode="numeric" data-grow="planted" min="1900" max="2100" step="1" value="${plantYear(o)}"></span></div>
       <div class="field"><span class="lab">Height at planting</span><span class="inp"><input type="number" inputmode="decimal" data-grow="plantH" min="${dl(1, 1)}" max="${dl(Math.max(2, o.height), 1)}" step="${dstep(.5)}" value="${dl(o.plantH ?? defaultPlantH(o), 1)}"><span class="u">${lu()}</span></span></div>
       <div class="field"><span class="lab">Growth when young</span><span class="inp"><input type="number" inputmode="numeric" data-grow="gr" min="1" max="${metric() ? 150 : 60}" step="1" value="${rateDl(g)}"><span class="u">${rateU()}/yr</span></span></div>
       <p class="grow-def">${growDefHTML(o)}</p>
-    </div>
+    </div></details>
     <div class="growlive">${growthLiveHTML(o)}</div>
     <div class="btnrow"><button class="btn ghost" data-act="established">Treat as full grown</button></div>`;
+}
+/* the planting fields stay folded away until asked for */
+let growOpen = false;
+function growSumHTML(o){
+  return `<span class="gs-t">Edit planting</span><span class="gs-v">${plantYear(o)} · ${uS(o.plantH ?? defaultPlantH(o))} · ${rateDl(treeGrowthRate(o))} ${rateU()}/yr</span><svg class="ic"><use href="#i-chev"/></svg>`;
 }
 function growDefHTML(o){
   const g0 = defaultGrowthRate(o);
@@ -3674,6 +3681,8 @@ props.addEventListener("input", e=>{
     queueRebuild(o); updateSelection(); drawList(); scheduleCompute(); syncYears();
     const gl = props.querySelector(".growlive");
     if(gl) gl.innerHTML = growthLiveHTML(o);
+    const gs = props.querySelector(".growedit > summary");
+    if(gs) gs.innerHTML = growSumHTML(o);
     return;
   }
   const nd = e.target.dataset.node;
@@ -3761,6 +3770,8 @@ props.addEventListener("click", e=>{
     o.planted = +todayISO().slice(0,4); o.plantH = defaultPlantH(o);
     panelFor = null; queueRebuild(o); drawPanel(); updateSelection(); drawList(); scheduleCompute(); syncYears();
     toast(`Planted in ${o.planted} at ${uL(o.plantH, 1)}. Change the year and size below.`);
+    growOpen = true;
+    panelFor = null; drawPanel();
     setTimeout(()=>props.querySelector('[data-grow="planted"]')?.focus({preventScroll:true}), 50);
   }
   if(act === "grdefault" && o.type === "tree"){
@@ -3779,6 +3790,9 @@ props.addEventListener("click", e=>{
     S.objects.push(copy); rebuildObject(copy); select(copy.id); scheduleCompute();
   }
 });
+props.addEventListener("toggle", e=>{
+  if(e.target.classList?.contains("growedit")) growOpen = e.target.open;
+}, true);
 props.addEventListener("change", e=>{
   const gk = e.target.dataset.grow;
   if(gk){

@@ -885,3 +885,18 @@ body.observe #coach{top:calc(var(--gut) + 150px)}
   body.hassel #toast{bottom:calc(var(--barH) + 118px)}
   #inspector.open{z-index:12}
 }
+
+/* planting fields fold away under a yellow summary row */
+.growedit{border-radius:12px;border:1px solid rgba(242,201,76,.38);background:rgba(242,201,76,.09)}
+.growedit > summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 12px;cursor:pointer;border-radius:12px}
+.growedit > summary::-webkit-details-marker{display:none}
+.growedit > summary:hover{background:rgba(242,201,76,.08)}
+.growedit > summary:focus-visible{outline:2px solid #F2C94C;outline-offset:2px}
+.growedit .gs-t{color:#F2D27A;font-size:13px;font-weight:500;white-space:nowrap}
+.growedit .gs-v{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--text-2);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.growedit > summary .ic{width:14px;height:14px;flex:none;stroke:#F2C94C;transition:transform .2s}
+.growedit[open] > summary .ic{transform:rotate(180deg)}
+.growedit .growfields{border:0;background:none;padding:0 12px 10px;border-radius:0}
+
+/* phones: no floating Observe hint card over the sun card */
+@media (max-width:1020px){ #obshud{display:none !important} }
