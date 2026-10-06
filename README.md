@@ -33,7 +33,7 @@ Inspired by three pieces of web work: Lusion's *Of the Oak* (a procedurally grow
 - **Diorama stage** (Display → Stage).
 - **Find on a map** (Lot panel): search an address with OpenStreetMap's free Nominatim search, line the outline up on Esri aerial imagery (or USGS / street map), drag corners, add or remove them, and bring the shape in to scale. It also sets the plan's location and time zone. Needs the app on its own site; pages shown inside claude.ai can't load outside maps.
 - **Plans save themselves.** New plan asks for a name and where to keep it: a .json file on your computer (Chrome and Edge, where the page can write files) or this browser. Changes autosave every 10 minutes, a recovery copy is kept each minute, and the last plan reopens on your next visit. File → Recent plans switches between them.
-- **Crabapples** leaf out with the other deciduous trees and bloom on calendar dates: 20 April, fading from 15 May.
+- **Crabapples** leaf out with the other deciduous trees and bloom on calendar dates: 27 April, fading from 22 May. Deciduous trees leaf out on 21 April by default (plans on the old 5 May default move with it).
 - **Opens on a real lot**: a Fargo, ND yard with its house, shed, deck, driveway and 29 young trees planted this year. Start a blank yard from the welcome screen.
   - **Diorama:** the lot is cut from the earth, its edge showing turf over a scanned soil profile, on a plinth in a studio. The sky still lights it. Tilt-shift grows as you pull back.
   - **Landscape:** keeps the open-country view.

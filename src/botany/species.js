@@ -170,8 +170,8 @@ export const SPECIES = {
   crabapple: { leaf: 'crabapple', bark: 'crabapple', leader: false, angle: 40, tropism: 0.25, arrange: 'alternate', perShoot: 5, twiggy: 0.8, spurs: true,
     shift: { from: 8, to: 38 },
     // Crabapples leaf out with everything else and flower on calendar dates:
-    // 20 April, full by late April, fading from 15 May, gone a week later.
-    ornaments: [{ type: 'blossom', md: ['04-20', '05-22'], fade: 0.22, bloom: true, size: 1.8 },
+    // 27 April, full by early May, fading from 22 May, gone a week later.
+    ornaments: [{ type: 'blossom', md: ['04-27', '05-29'], fade: 0.22, bloom: true, size: 1.8 },
                 { type: 'pome', from: 120, to: 300, color: [0x8a2a2a, 0x5a1a2a], winter: true }] },
   hydrangea: { leaf: 'hydrangea', bark: 'hydrangea', leader: false, angle: 45, tropism: 0.2, arrange: 'opposite', perShoot: 6, twiggy: 0.6, standard: true,
     ornaments: [{ type: 'panicle', from: 62, to: 150, bloom: true }] },

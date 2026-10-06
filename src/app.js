@@ -343,7 +343,7 @@ function baseState(){
     boundaryLabels:[], boundaryImage:null, boundaryImageDraft:null,
     fence:{on:true, style:"picket", height:5, density:.5, sides:[true,true,true,true]},
     heat:false, leafSeason:true, fullSun:6,
-    leafOut:"05-05", leafDrop:"10-12",
+    leafOut:"04-21", leafDrop:"10-12",
     objects:[],
     sel:null
   };
@@ -651,7 +651,7 @@ function fallAmount(t){
 }
 /* Flowering windows, in days after leaf-out (so they follow the leaf season
    and the hemisphere). Panicle hydrangeas flower from midsummer into fall.
-   Crabapples keep calendar dates instead (20 April to mid May, see species.js). */
+   Crabapples keep calendar dates instead (27 April to late May, see species.js). */
 const BLOOM_WINDOWS = {crabapple:{from:0, to:16}, hydrangea:{from:62, to:150}};
 function bloomState(kind){
   const w = BLOOM_WINDOWS[kind];
@@ -5017,6 +5017,8 @@ function loadState(data, frame){
     S = Object.assign(baseState(), data);
     /* Presets that were renamed or replaced. */
     for(const o of S.objects || []) if(o.type === "tree" && (o.name === "Flowering crabapple" || o.name === "Snowbound Crabapple")) o.name = "Snowdrift Crabapple";
+    /* deciduous trees now leaf out two weeks earlier than the old default */
+    if(S.leafOut === "05-05") S.leafOut = "04-21";
     /* plans saved before time zones existed used a fixed offset */
     if(!("tzMode" in data)){ S.tzMode = "manual"; S.place = ""; }
     S.fence = Object.assign({on:true, style:"picket", height:5, density:.5, sides:[]}, data.fence||{});
@@ -5381,8 +5383,7 @@ onComputeDone = ()=>{ refreshHeat(); drawPanel(); drawList(); markDirty(); };
 async function boot(){
   try{
     init();
-    $("bootmsg").textContent = "Loading the sky";
-    const label = await sky.loadHDRI(m=>{ $("bootmsg").textContent = m; });
+    const label = await sky.loadHDRI(()=>{});
     /* always the sky photo; the physical sky only if no photo could load */
     prefs.sky = label ? "hdri" : "sky";
     sky.setMode(prefs.sky);

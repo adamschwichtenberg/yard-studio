@@ -6,7 +6,7 @@
   "place": "Fargo, ND",
   "tzMode": "zone",
   "tzZone": "America/Chicago",
-  "date": "2026-09-09",
+  "date": "2026-06-03",
   "minutes": 1012,
   "north": 180,
   "grid": 1,
@@ -134,11 +134,11 @@
   "heat": false,
   "leafSeason": true,
   "fullSun": 6,
-  "leafOut": "05-05",
+  "leafOut": "04-21",
   "leafDrop": "10-12",
   "objects": [
     {
-      "id": 12,
+      "id": 1,
       "type": "driveway",
       "name": "Driveway",
       "x": -32.202567096189554,
@@ -168,7 +168,7 @@
       ]
     },
     {
-      "id": 14,
+      "id": 2,
       "type": "structure",
       "name": "Shed",
       "x": -17.996545217063883,
@@ -227,7 +227,7 @@
       ]
     },
     {
-      "id": 15,
+      "id": 3,
       "type": "sidewalk",
       "name": "Sidewalk",
       "x": -5.395720834791623,
@@ -253,7 +253,7 @@
       ]
     },
     {
-      "id": 16,
+      "id": 4,
       "type": "deck",
       "name": "Deck",
       "x": -0.6984002723970033,
@@ -288,7 +288,7 @@
       ]
     },
     {
-      "id": 18,
+      "id": 5,
       "type": "tree",
       "name": "Columnar Norway Spruce",
       "x": -64.86628865240753,
@@ -300,11 +300,12 @@
       "density": 0.92,
       "note": "Very narrow column that keeps its lower branches. Hardy to zone 3.",
       "leaf": 2507297,
-      "planted": "2026-10-05",
-      "plantH": 5
+      "planted": 2026,
+      "plantH": 5,
+      "gr": 2
     },
     {
-      "id": 19,
+      "id": 6,
       "type": "tree",
       "name": "Spartan Juniper",
       "x": -57.868178144911695,
@@ -316,11 +317,11 @@
       "density": 0.95,
       "note": "Narrow columnar evergreen. Thin but solid shadow, year round. Rated zone 4, marginal in 4a.",
       "leaf": 3824694,
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 6.5
     },
     {
-      "id": 20,
+      "id": 7,
       "type": "tree",
       "name": "Spartan Juniper",
       "x": -64.68042295632156,
@@ -332,11 +333,11 @@
       "density": 0.95,
       "note": "Narrow columnar evergreen. Thin but solid shadow, year round. Rated zone 4, marginal in 4a.",
       "leaf": 3824694,
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 6.5
     },
     {
-      "id": 21,
+      "id": 8,
       "type": "tree",
       "name": "Redmond Linden",
       "x": -34.78145362938242,
@@ -350,11 +351,12 @@
       "leaf": 4155946,
       "fall": 12098106,
       "crownBase": 7,
-      "planted": "2026-10-05",
-      "plantH": 14
+      "planted": 2026,
+      "plantH": 14.5,
+      "plantW": 5
     },
     {
-      "id": 22,
+      "id": 9,
       "type": "tree",
       "name": "Prairie Horizon Alder",
       "x": -6.789011599399109,
@@ -367,11 +369,11 @@
       "note": "Manchurian alder. Open canopy, so the shade underneath stays dappled. Very hardy and fast.",
       "leaf": 3101732,
       "fall": 7236140,
-      "planted": "2026-10-05",
-      "plantH": 12
+      "planted": 2026,
+      "plantH": 13
     },
     {
-      "id": 23,
+      "id": 10,
       "type": "tree",
       "name": "Greenspire Linden",
       "x": 21.203430430584202,
@@ -384,11 +386,12 @@
       "note": "Littleleaf linden. Tight pyramidal form, dense shade, narrower than Redmond.",
       "leaf": 4155946,
       "fall": 12099648,
-      "planted": "2026-10-05",
-      "plantH": 15
+      "planted": 2026,
+      "plantH": 15.5,
+      "plantW": 6
     },
     {
-      "id": 24,
+      "id": 11,
       "type": "tree",
       "name": "Tannenbaum Mugo Pine",
       "x": 53.10185990252215,
@@ -400,11 +403,11 @@
       "density": 0.9,
       "note": "Compact pyramidal mugo. Slow, stays small, casts dense shade low to the ground.",
       "leaf": 3034402,
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 5
     },
     {
-      "id": 25,
+      "id": 12,
       "type": "tree",
       "name": "Tannenbaum Mugo Pine",
       "x": 59.2628728215938,
@@ -416,11 +419,11 @@
       "density": 0.9,
       "note": "Compact pyramidal mugo. Slow, stays small, casts dense shade low to the ground.",
       "leaf": 3034402,
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 6
     },
     {
-      "id": 26,
+      "id": 13,
       "type": "tree",
       "name": "Moonglow Juniper",
       "x": 61.099700482517385,
@@ -432,11 +435,11 @@
       "density": 0.92,
       "note": "Broad pyramidal blue-green evergreen. Dense year-round shade in a compact footprint.",
       "leaf": 8032922,
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 8
     },
     {
-      "id": 27,
+      "id": 14,
       "type": "tree",
       "name": "Sienna Glen Maple",
       "x": 30.804362639320942,
@@ -450,11 +453,12 @@
       "leaf": 4616236,
       "fall": 11882794,
       "crownBase": 5,
-      "planted": "2026-10-05",
-      "plantH": 17
+      "planted": 2026,
+      "plantH": 17,
+      "plantW": 7
     },
     {
-      "id": 28,
+      "id": 15,
       "type": "tree",
       "name": "Sienna Glen Maple",
       "x": 50.6834999852926,
@@ -468,11 +472,12 @@
       "leaf": 4616236,
       "fall": 11882794,
       "crownBase": 10,
-      "planted": "2026-10-05",
-      "plantH": 17
+      "planted": 2026,
+      "plantH": 17,
+      "plantW": 7
     },
     {
-      "id": 29,
+      "id": 16,
       "type": "tree",
       "name": "Matador Maple",
       "x": 41.267029560567224,
@@ -485,11 +490,11 @@
       "note": "Freeman maple, tighter and more uniform than Sienna Glen. Heavy shade underneath.",
       "leaf": 4352298,
       "fall": 11740702,
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 17
     },
     {
-      "id": 30,
+      "id": 17,
       "type": "tree",
       "name": "Pinky Winky hydrangea",
       "x": 10.623895493246891,
@@ -507,11 +512,11 @@
         15918818,
         13656190
       ],
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 6
     },
     {
-      "id": 31,
+      "id": 18,
       "type": "tree",
       "name": "Parkland Pillar Birch",
       "x": 14.158151543029579,
@@ -524,11 +529,12 @@
       "note": "Columnar white-barked birch. A dense, narrow column of small leaves: solid shade in a tiny footprint. Bronze birch borer resistant.",
       "leaf": 5143086,
       "fall": 13674032,
-      "planted": "2026-10-05",
-      "plantH": 10
+      "planted": 2026,
+      "plantH": 10,
+      "plantW": 2.5
     },
     {
-      "id": 32,
+      "id": 19,
       "type": "tree",
       "name": "Parkland Pillar Birch",
       "x": 14.320784027104803,
@@ -541,11 +547,12 @@
       "note": "Columnar white-barked birch. A dense, narrow column of small leaves: solid shade in a tiny footprint. Bronze birch borer resistant.",
       "leaf": 5143086,
       "fall": 13674032,
-      "planted": "2026-10-05",
-      "plantH": 10
+      "planted": 2026,
+      "plantH": 10,
+      "plantW": 2.5
     },
     {
-      "id": 33,
+      "id": 20,
       "type": "tree",
       "name": "Parkland Pillar Birch",
       "x": 14.48341651118003,
@@ -558,11 +565,12 @@
       "note": "Columnar white-barked birch. A dense, narrow column of small leaves: solid shade in a tiny footprint. Bronze birch borer resistant.",
       "leaf": 5143086,
       "fall": 13674032,
-      "planted": "2026-10-05",
-      "plantH": 10
+      "planted": 2026,
+      "plantH": 10,
+      "plantW": 2.5
     },
     {
-      "id": 34,
+      "id": 21,
       "type": "tree",
       "name": "Parkland Pillar Birch",
       "x": -29.71380558689047,
@@ -575,11 +583,12 @@
       "note": "Columnar white-barked birch. A dense, narrow column of small leaves: solid shade in a tiny footprint. Bronze birch borer resistant.",
       "leaf": 5143086,
       "fall": 13674032,
-      "planted": "2026-10-05",
-      "plantH": 10
+      "planted": 2026,
+      "plantH": 10,
+      "plantW": 2.5
     },
     {
-      "id": 35,
+      "id": 22,
       "type": "tree",
       "name": "Parkland Pillar Birch",
       "x": -29.853204858954946,
@@ -592,11 +601,12 @@
       "note": "Columnar white-barked birch. A dense, narrow column of small leaves: solid shade in a tiny footprint. Bronze birch borer resistant.",
       "leaf": 5143086,
       "fall": 13674032,
-      "planted": "2026-10-05",
-      "plantH": 10
+      "planted": 2026,
+      "plantH": 10,
+      "plantW": 2.5
     },
     {
-      "id": 36,
+      "id": 23,
       "type": "tree",
       "name": "Limelight Hydrangea tree",
       "x": -27.993143986020616,
@@ -614,11 +624,11 @@
         15790304,
         14195360
       ],
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 5.5
     },
     {
-      "id": 37,
+      "id": 24,
       "type": "tree",
       "name": "Ivory Silk Japanese Tree Lilac",
       "x": -54.010762995090474,
@@ -636,11 +646,12 @@
         16183512,
         14209200
       ],
-      "planted": "2026-10-05",
-      "plantH": 7
+      "planted": 2026,
+      "plantH": 7,
+      "plantW": 3
     },
     {
-      "id": 38,
+      "id": 25,
       "type": "tree",
       "name": "Columnar Mugo Pine",
       "x": -44.26902760221464,
@@ -652,11 +663,12 @@
       "density": 0.9,
       "note": "Narrow upright mugo. Slow-growing evergreen screen without a wide shadow.",
       "leaf": 3034402,
-      "planted": "2026-10-05",
-      "plantH": 4.5
+      "planted": 2026,
+      "plantH": 5,
+      "plantW": 3
     },
     {
-      "id": 39,
+      "id": 26,
       "type": "tree",
       "name": "Columnar Mugo Pine",
       "x": 10.972393673408089,
@@ -668,11 +680,11 @@
       "density": 0.9,
       "note": "Narrow upright mugo. Slow-growing evergreen screen without a wide shadow.",
       "leaf": 3034402,
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 4.5
     },
     {
-      "id": 40,
+      "id": 27,
       "type": "tree",
       "name": "Pinky Winky hydrangea",
       "x": 10.55349390117735,
@@ -690,11 +702,11 @@
         15918818,
         13656190
       ],
-      "planted": "2026-08-05",
+      "planted": 2026,
       "plantH": 3.5
     },
     {
-      "id": 41,
+      "id": 28,
       "type": "tree",
       "name": "Canada Red Chokecherry",
       "x": -52.499902258354645,
@@ -713,11 +725,11 @@
         15261912
       ],
       "leaf2": 3540495,
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 8
     },
     {
-      "id": 42,
+      "id": 29,
       "type": "tree",
       "name": "Prairie Expedition elm",
       "x": 80.5127696761995,
@@ -730,11 +742,11 @@
       "note": "Vase shape with a high crown, so shade lands well out from the trunk.",
       "leaf": 4155946,
       "fall": 11573818,
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 9
     },
     {
-      "id": 43,
+      "id": 30,
       "type": "sidewalk",
       "name": "Sidewalk",
       "x": 73.2358606245747,
@@ -780,7 +792,7 @@
       ]
     },
     {
-      "id": 44,
+      "id": 31,
       "type": "sidewalk",
       "name": "Sidewalk",
       "x": -24.46099380434984,
@@ -826,7 +838,7 @@
       ]
     },
     {
-      "id": 45,
+      "id": 32,
       "type": "tree",
       "name": "Snowdrift Crabapple",
       "x": 51.240395117513216,
@@ -848,11 +860,11 @@
         14702110,
         13122074
       ],
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 8
     },
     {
-      "id": 46,
+      "id": 33,
       "type": "tree",
       "name": "Snowdrift Crabapple",
       "x": 70.1430356029962,
@@ -874,11 +886,11 @@
         14702110,
         13122074
       ],
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 8
     },
     {
-      "id": 47,
+      "id": 34,
       "type": "tree",
       "name": "Prairifire Crabapple",
       "x": 60.70333196626008,
@@ -897,11 +909,11 @@
         14705294
       ],
       "leaf2": 3358762,
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 8
     },
     {
-      "id": 48,
+      "id": 35,
       "type": "tree",
       "name": "Prairifire Crabapple",
       "x": 40.847427832299175,
@@ -920,9 +932,10 @@
         14705294
       ],
       "leaf2": 3358762,
-      "planted": "2026-10-05",
+      "planted": 2026,
       "plantH": 8
     }
   ],
-  "sel": null
+  "sel": null,
+  "title": "Backyard Default"
 }
