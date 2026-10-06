@@ -5284,7 +5284,6 @@ const QUALITY_HINT = {
   quality:"Full display resolution, full ambient occlusion. Needs a strong GPU."
 };
 function syncPrefs(label){
-  $("rsky").value = prefs.sky;
   document.querySelectorAll("#rquality button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.quality === prefs.quality));
   document.querySelectorAll("#rtrees button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.trees === prefs.treeDetail));
   document.querySelectorAll("#rstage button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.stage === prefs.stage));
@@ -5292,9 +5291,6 @@ function syncPrefs(label){
   if($("lyPath")) $("lyPath").setAttribute("aria-pressed", prefs.sunPath !== false);
   $("rqualityhint").textContent = QUALITY_HINT[prefs.quality] || "";
   $("rexp").value = prefs.exposure; $("rexp2").value = prefs.exposure;
-  if(label !== undefined) $("rsource").textContent = label
-    ? "Sky photo: "+label+". Display settings are saved in this browser, not in the plan file."
-    : "No HDRI could be loaded, so the physical sky is used.";
   syncRanges(document);
 }
 /* static labels in the sidebar that carry a length unit */
@@ -5317,11 +5313,6 @@ function setUnits(u){
 function initPrefsUI(){
   const changed = ()=>{ savePrefs(); skyKey = null; markDirty(); };
   document.querySelectorAll("#runits button").forEach(b=>b.addEventListener("click", ()=>setUnits(b.dataset.units)));
-  $("rsky").addEventListener("change", e=>{
-    prefs.sky = e.target.value;
-    if(prefs.sky === "hdri" && !sky.hdri){ prefs.sky = "sky"; e.target.value = "sky"; toast("No HDRI is available, so the physical sky stays on."); }
-    sky.setMode(prefs.sky); changed();
-  });
   document.querySelectorAll("#rquality button").forEach(b=>b.addEventListener("click", ()=>{
     prefs.quality = b.dataset.quality;
     applyQuality(false); syncPrefs(); changed();
@@ -5392,7 +5383,8 @@ async function boot(){
     init();
     $("bootmsg").textContent = "Loading the sky";
     const label = await sky.loadHDRI(m=>{ $("bootmsg").textContent = m; });
-    if(!label && prefs.sky === "hdri") prefs.sky = "sky";
+    /* always the sky photo; the physical sky only if no photo could load */
+    prefs.sky = label ? "hdri" : "sky";
     sky.setMode(prefs.sky);
     skyKey = null;
     syncPrefs(label);
@@ -5485,7 +5477,7 @@ const TOUR_STEPS = [
      <p><b>Drone</b> flies from the ground up to 200 ft. Press <b>Esc</b> to stop, and <b>Build</b> to get back to arranging.</p>`},
 ];
 const tour = new Tour({steps:TOUR_STEPS, onEnd:(finished)=>{
-  if(finished) toast("That's the tour. Guide in the sidebar brings it back.");
+  if(finished) toast("That's the tour. Tutorial in the sidebar brings it back.");
 }});
 /* one-off tips while the tour runs */
 function tourTip(key){
@@ -5494,7 +5486,7 @@ function tourTip(key){
     prop:["#fenceedges", "<b>Fence by side</b>: switch each side on or off, or set where its fence starts and stops. <b>Draw a fence</b> for one that leaves the line."],
     site:["#locpreset", "Pick your city or type coordinates. The clock and time zone follow."],
     objs:["#objlist", "Everything in the yard. Tap one to select it and edit it on the right."],
-    view:["#rstage", "<b>Display</b>: stage, sky, quality and tree detail. Lower tree detail if things feel slow."],
+    view:["#rstage", "<b>Display</b>: stage, units, quality and tree detail. Lower tree detail if things feel slow."],
     file:['[data-pane="file"]', "Save your plan to a file and open it again later. Plans stay on your computer."],
     library:["#libsize", "<b>Large</b> or <b>Compact</b> cards. Zone tags in orange aren't hardy where your yard is."],
     tree:[".growbox", "<b>Growth</b>: year planted, size and growth rate, and what to expect in 5, 10 and 20 years."],
