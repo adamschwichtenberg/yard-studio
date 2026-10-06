@@ -19,6 +19,7 @@
   "homepage": "https://github.com/adamschwichtenberg/yard-studio#readme",
   "dependencies": {
     "@dgreenheck/ez-tree": "^1.1.0",
+    "leaflet": "^1.9.4",
     "n8ao": "^2.0.1",
     "postprocessing": "^6.39.5",
     "three": "~0.186.1",

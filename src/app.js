@@ -13,6 +13,7 @@ import { PhotoMode } from "./photo.js";
 import { Observer } from "./observe.js";
 import { Tour } from "./tour.js";
 import DEFAULT_PLAN from "./defaultPlan.json";
+import { LotMap } from "./lotmap.js";
 import { store, newPlanId, canUseFiles, pickSaveFile, pickOpenFile, filePermission, writeFile, readFile, fileName } from "./planstore.js";
 
 const DEG = Math.PI/180;
@@ -1986,6 +1987,56 @@ function applyImportedBoundary({points, labels, reference, source}){
   if(window.innerWidth <= 1020) openSheet(true);
   toast("Property imported and scaled. Existing objects were kept; review their placement.");
 }
+/* ---------- find my lot on a map ---------- */
+let lotMap = null;
+function openLotMap(){
+  if(S.locked){ lockedHint(); return; }
+  lotMap ??= new LotMap({onApply:applyMapBoundary, fmtArea:uArea, layer:prefs.mapLayer,
+                         onLayer:k=>{ prefs.mapLayer = k; savePrefs(); }});
+  const b = yardBounds(), r = S.mapRef;
+  /* a lot traced before reopens where it was; otherwise the plan's location */
+  const anchor = r ? {lat:r.lat, lon:r.lon, x:r.x, y:r.y, north:S.north}
+                   : {lat:S.lat, lon:S.lon, x:b.cx, y:b.cy, north:S.north};
+  lotMap.open({anchor, boundary:S.boundary, label:r?.address || S.place});
+}
+function applyMapBoundary({points, anchor, label}){
+  const b = bbox(points);
+  if(points.length < 3 || polyArea(points) < 1 || b.w > 900 || b.h > 900){
+    toast("The outline must be between 1 and 900 feet across. Zoom in and adjust the corners."); return;
+  }
+  pushHist();
+  /* keep the lot where it was in the plan so trees and buildings stay put */
+  const cur = yardBounds(), dx = cur.cx - b.cx, dy = cur.cy - b.cy;
+  S.boundary = points.map(p=>({x:+(p.x + dx).toFixed(2), y:+(p.y + dy).toFixed(2)}));
+  S.mapRef = {lat:anchor.lat, lon:anchor.lon, x:anchor.x + dx, y:anchor.y + dy, address:label || ""};
+  S.boundaryLabels = points.map(()=>"");
+  S.gridFrame = null;
+  S.fence.sides = points.map(()=>true);
+  S.fence.spans = points.map(()=>null);
+  S.boundaryImage = null; S.boundaryImageDraft = null;
+  /* the lot's own coordinates and a time zone that fits them */
+  S.lat = +anchor.lat.toFixed(5); S.lon = +anchor.lon.toFixed(5);
+  if(label) S.place = label;
+  let tzNote = "";
+  const fits = ()=>Math.abs(((tzOffset() - S.lon/15 + 12)%24 + 24)%24 - 12) <= 2;
+  if(S.tzMode === "manual" || !fits()){
+    const keep = {tzMode:S.tzMode, tzZone:S.tzZone};
+    S.tzMode = "zone"; S.tzZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    zoneOffsetCache.clear();
+    if(!fits()){
+      Object.assign(S, keep, {tzMode:"manual", tz:Math.round(S.lon/15), autoDST:false});
+      tzNote = " Time zone set from longitude: check it under Sun.";
+    }
+  }
+  nodeEdit = true; activeNode = null; panelFor = "init";
+  afterBoundaryChange(true);
+  syncLocationUI(); locationChanged(); syncProject();
+  select(BOUNDARY);
+  setView("vplan", true);
+  pushHist();
+  if(window.innerWidth <= 1020) openSheet(true);
+  toast(`Lot traced${label ? " at " + label : ""}: ${uArea(polyArea(S.boundary))}. Trees and buildings were kept; check where they sit.${tzNote}`);
+}
 function scaleBoundaryFromEdge(k, lengthFeet){
   const edge = boundaryEdges()[k];
   if(!edge || edge.len < .000001 || !Number.isFinite(lengthFeet) || lengthFeet <= 0){
@@ -3878,7 +3929,9 @@ function syncLotFields(){
   set("bcount", S.boundary.length);
   set("barea", uArea(polyArea(S.boundary)));
   set("bperim", uL(polyPerimeter(S.boundary))+" perimeter");
-  set("boundary-image-state", S.boundaryImageDraft
+  set("boundary-image-state", S.mapRef && !S.boundaryImage && !S.boundaryImageDraft
+    ? `Traced on the map${S.mapRef.address ? " at " + S.mapRef.address : ""}. Use Find on a map again to adjust it.`
+    : S.boundaryImageDraft
     ? "Unscaled image draft: saved with your plan. Import the same picture to resume and set a known length."
     : S.boundaryImage ? "Image-based outline. Names and measurements are saved with the plan; the image itself is not included." : "");
   const b = yardBounds();
@@ -4588,6 +4641,7 @@ $("heat").addEventListener("change", e=>{
   scheduleCompute();
 });
 $("leaf").addEventListener("change", e=>{ S.leafSeason = e.target.checked; lastLeaf = null; afterDateChange(); });
+document.querySelectorAll("[data-lotmap]").forEach(b=>b.addEventListener("click", openLotMap));
 $("editBoundary").addEventListener("click", ()=>{
   select(BOUNDARY);
   nodeEdit = true;

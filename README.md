@@ -31,6 +31,7 @@ Inspired by three pieces of web work: Lusion's *Of the Oak* (a procedurally grow
 - **Guided start.** First launch offers a four-step guide (map your lot, add buildings and hardscape, plant trees, observe) that points at each control and moves on as you do it, with one-off tips as you open panels. **Guide** in the rail brings it back.
 - **Schematic view** marks every tree's centre with a dot.
 - **Diorama stage** (Display → Stage).
+- **Find on a map** (Lot panel): search an address with OpenStreetMap's free Nominatim search, line the outline up on Esri aerial imagery (or USGS / street map), drag corners, add or remove them, and bring the shape in to scale. It also sets the plan's location and time zone. Needs the app on its own site; pages shown inside claude.ai can't load outside maps.
 - **Plans save themselves.** New plan asks for a name and where to keep it: a .json file on your computer (Chrome and Edge, where the page can write files) or this browser. Changes autosave every 10 minutes, a recovery copy is kept each minute, and the last plan reopens on your next visit. File → Recent plans switches between them.
 - **Crabapples** leaf out with the other deciduous trees and bloom on calendar dates: 20 April, fading from 15 May.
 - **Opens on a real lot**: a Fargo, ND yard with its house, shed, deck, driveway and 29 young trees planted this year. Start a blank yard from the welcome screen.
