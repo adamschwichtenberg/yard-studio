@@ -62,7 +62,7 @@ A planting bed is an in-ground bed of perennials, grasses, groundcovers and shru
 ![Designing a bed from above](docs/planting-design.png)
 ![The same bed in 3D](docs/planting-3d.png)
 
-- **Plant library:** 186 perennials, grasses, groundcovers and shrubs, each pictured in bloom from its own 3D model. Open it from **Add to yard → Perennial or shrub**, from **Plants** in the rail, or from the designer. Filter by type, sun, flower colour and height, or search.
+- **Plant library:** 198 perennials, grasses, groundcovers, shrubs and evergreen shrubs, each pictured in bloom from its own 3D model. Open it from **Add to yard → Perennial or shrub**, from **Plants** in the rail, or from the designer. Filter by type, sun, flower colour and height, or search.
 - **Shape:** any outline. Reshape it corner by corner like a driveway; **Curved edge** runs a smooth curve through the corners. Surface is bark, soil, gravel or lawn.
 - **Design this bed** (or double-click the bed) opens the designer:
   - The view drops to Plan and frames the bed. Trees whose canopy would cover it step aside while you work.
@@ -77,15 +77,17 @@ A planting bed is an in-ground bed of perennials, grasses, groundcovers and shru
 
 ![The plant library](docs/plant-library.png)
 ![Hydrangea presets from the QA gallery](docs/plant-models.png)
+![Evergreen shrubs](docs/plant-evergreens.png)
 
 #### Plant models
 
-Every variety is a preset on one of 23 parametric growth forms, built like the trees: alpha-tested cards with procedural leaf and flower textures, tubes for stems and a dark inner mass.
+Every variety is a preset on one of 24 parametric growth forms, built like the trees: alpha-tested cards with procedural leaf and flower textures, tubes for stems and a dark inner mass.
 
 | Group | Growth forms |
 | --- | --- |
 | Perennials | Coneflowers & daisies, hostas, spikes, daylilies, tall clumps (bee balm, phlox, sedum, lilies), globes on stalks, peonies & bushy perennials, astilbes & ferns, ruffled mounds (coral bells, columbine), cushions, groundcover mats, upright grasses, fountain grasses, irises |
 | Shrubs | Panicle hydrangeas, mophead hydrangeas, arching shrubs (weigela, forsythia), upright shrubs (dogwood, ninebark, viburnum), cut-leaf shrubs (sumac, elderberry), mounding shrubs (spirea, potentilla), lilacs, small-leaved mounds (barberry, boxwood), columnar shrubs |
+| Evergreen shrubs | One conifer model with five structures: globe (arborvitae, mugo pine, nest spruce), flat-topped globe (dwarf blue spruce), cone (dwarf Colorado spruce), spreading (creeping junipers, which turn plum in winter) and mounded yews; spruce, pine, arborvitae, juniper and yew foliage |
 | Add-on | A standard trunk (`opt.trunk`, in feet) turns any shrub canopy into a patio tree |
 
 `gallery.html` (with `npm run dev`, at `/gallery.html`) renders every preset in bloom, in June, in August, in fall and in winter, plus the texture sheet. It is a development page for checking models and is not part of the standalone build.
@@ -108,18 +110,25 @@ In plan files a bed is `{type:"planting", x, y, rot, poly, smooth, mulch, plants
 
 | Group | Species |
 | --- | --- |
-| Maples | Autumn Blaze, Sienna Glen, Matador, Crimson King, Crimson Sunset, Royal Red |
-| Lindens | Redmond, Greenspire |
-| Birches | Parkland Pillar (columnar, white bark), River Birch (cinnamon bark) |
-| Oaks | Bur Oak, Crimson Spire (columnar), Swamp white oak |
-| Elms, hackberries, honeylocusts, alders | Prairie Expedition elm, Common Hackberry, Thornless Honeylocust (fine leaflets, dappled shade), Prairie Horizon Alder |
-| Poplars & aspens | Quaking Aspen, Swedish Columnar Aspen, Hybrid Poplar, Tower Poplar |
-| Willows | Weeping Willow (hanging streamers) |
-| Crabapples | Prairifire, Flowering crabapple: pink-red blossoms for about two weeks from leaf-out in spring, gone by summer |
+| Maples | Autumn Blaze, Sienna Glen, Matador, Celebration, Silver, Sugar, Fall Fiesta, Inferno, Apollo (columnar), Emerald Lustre, Crimson King, Crimson Sunset, Royal Red, Flame and Ruby Slippers Amur, Hot Wings Tatarian (red winged seeds in summer) |
+| Lindens | Redmond, Greenspire, Boulevard, Front Yard, Harvest Gold |
+| Birches | Parkland Pillar and Dakota Pinnacle (columnar, white bark), River Birch and Northern Tribute (peeling cinnamon bark), Prairie Dream paper birch, single stem or clump |
+| Oaks | Bur Oak, Swamp white oak, Prairie Stature, Crimson Spire and Regal Prince (columnar) |
+| Elms | Prairie Expedition, Accolade, Cathedral, Princeton, Triumph, Valley Forge |
+| Hackberries, honeylocusts, alders | Common Hackberry, Prairie Sentinel (columnar), Thornless and Northern Acclaim Honeylocust (fine leaflets, dappled shade), Prairie Horizon Alder |
+| Poplars & aspens | Quaking Aspen, Prairie Gold, Summer Shimmer, Swedish Columnar Aspen, Hybrid Poplar, Robusta, Siouxland, Tower Poplar |
+| Willows | Weeping Willow (hanging streamers), Prairie Reflection laurel willow |
+| Crabapples | Prairifire, Adams, Courageous, Red Splendor, Rejoice, Royal Raindrops (single stem or clump), Starlite, Sparkling Sprite, Green Wall and Ivory Spear (columnar), and a generic flowering crab. Each blooms in its own colour for about two weeks from leaf-out |
+| Cherries & pears | Amur Chokecherry, Klondike, Ming (coppery peeling bark, white flowers), Prairie Gem Pear |
+| Small flowering trees | Winter King Hawthorn, Northern Redbud (single stem or clump), European Mountain Ash, Summerfrost Amur Maackia |
+| Tree lilacs | Japanese Tree Lilac clump, Ivory Silk, Snowdance: creamy plumes in early summer |
+| Other shade trees | Early Glow Buckeye, Northern Catalpa, Rising Fire Hornbeam, Ironwood, KoolKat Katsura, Espresso Kentucky Coffeetree |
 | Hydrangeas | Limelight, Pinky Winky tree forms: panicles from midsummer that go lime → white → pink into fall |
-| Spruces | Norway (pendulous branchlets), Columnar Norway, Colorado Blue, Black Hills |
-| Pines | Tannenbaum Mugo, Columnar Mugo, Columnar Norway Pine |
-| Junipers & arborvitae | Techny and Emerald Green arborvitae (flat sprays), Spartan and Moonglow junipers |
+| Spruces | Norway (pendulous branchlets), Columnar Norway, Colorado Blue, Fat Albert, Black Hills, Meyer, Weeping White |
+| Pines | Tannenbaum and Hyland Splendor Mugo, Columnar Mugo, Columnar Norway Pine |
+| Junipers & arborvitae | Techny, Technito, Emerald Green, Holmstrup, North Pole, Pyramidal and Rushmore arborvitae (flat sprays); Spartan, Moonglow, Medora and Skyrocket junipers |
+
+A species can borrow another's foliage, carry its own flower form and bloom window, have its own bark, and grow as a three-stem clump (`lk`, `bk`, `bw`, `bark`, `clump` on its entry in `PRESETS`).
 
 Flowering follows the leaf-out date and the hemisphere, so blossoms appear and drop with the season you pick.
 

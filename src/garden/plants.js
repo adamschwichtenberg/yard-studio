@@ -34,7 +34,8 @@
      winter   out of season: "dormant" (cut back), "standing" (dry stems and
               seedheads), "heads" (bare stems holding dried blooms), "bare"
               (twigs), "evergreen"
-     fall     autumn leaf colour
+     fall     autumn leaf colour. winterFoliage: the colour an evergreen
+              turns in the cold (a juniper going plum).
      opt      options for the growth form (see its build() in models.js);
               `trunk` (ft) raises a shrub's canopy into a patio tree
      note     a line for the library card
@@ -46,7 +47,8 @@ export const CATEGORIES = [
   {k:"perennial",   label:"Perennials"},
   {k:"grass",       label:"Grasses"},
   {k:"groundcover", label:"Groundcovers"},
-  {k:"shrub",       label:"Shrubs"}
+  {k:"shrub",       label:"Shrubs"},
+  {k:"evergreen",   label:"Evergreens"}
 ];
 
 const FULL = ["full"], FP = ["full","part"], PS = ["part","shade"], ANY = ["full","part","shade"];
@@ -396,18 +398,43 @@ group({...BAR, model:"columnar", note:"A narrow exclamation point of coloured fo
   ["Buckthorn 'Fine Line'", 6, 2.5, null, {sci:"Frangula alnus 'Ron Williams'", sun:FP, zone:[2,7], foliage:0x4a7a3a, fall:0xD8B83A, opt:{leafTex:"leaf:needle"}, note:"A feathery column of narrow leaves for hedges and tight corners."}]
 ]);
 
+/* ================================================================ EVERGREENS */
+/* Evergreen shrubs. winterFoliage: the colour the needles turn in the cold. */
+const EVG = {model:"conifer", cat:"evergreen", sun:FULL, zone:[3,7], foliage:0x3d6a2c, stem:0x5a4636, winter:"evergreen", symbol:"foliage"};
+group({...EVG, sci:"Thuja occidentalis", opt:{form:"globe", leafTex:"leaf:arborvitae"}}, [
+  ["Globe Arborvitae 'Hetz Midget'", 2, 2, null, {sci:"Thuja occidentalis 'Hetz Midget'", k:"arborvitae-hetz-midget", winterFoliage:0x4a6230, note:"A dense little globe of rich green, flat-sprayed foliage that needs no shearing."}],
+  ["Globe Arborvitae 'Planet Earth'", 4, 4, null, {sci:"Thuja occidentalis 'RutThu4'", sun:FP, zone:[4,8], foliage:0x3f7030, note:"Perfectly round without pruning, and resistant to needle blight."}]
+]);
+group({...EVG, sci:"Juniperus horizontalis", opt:{form:"spreading", leafTex:"leaf:juniper"}, note:"A low, spreading carpet for banks, edges and the front of a bed."}, [
+  ["Creeping Juniper 'Andorra Compact'", 1.5, 4, null, {sci:"Juniperus horizontalis 'Plumosa Compacta'", foliage:0x5f8a54, winterFoliage:0x6a4a5a, note:"Feathery light green foliage that turns plum-purple for fall and winter."}],
+  ["Creeping Juniper 'Blue Chip'", .8, 4, null, {sci:"Juniperus horizontalis 'Blue Chip'", sun:FP, foliage:0x587c94, winterFoliage:0x5f6488, note:"Very low, with outstanding steel-blue colour all season."}]
+]);
+group({...EVG, sci:"Pinus mugo", zone:[2,7], foliage:0x3a6a2a, opt:{form:"mound", leafTex:"leaf:pine"}}, [
+  ["Mugo Pine", 4, 4.5, null, {note:"A rugged, bright green mound. Stays dwarf if the spring candles are pinched."}],
+  ["Mugo Pine 'Slowmound'", 2.5, 3.5, null, {sci:"Pinus mugo 'Slowmound'", foliage:0x34602a, note:"A dense, slow mound that rarely needs pruning; about two feet in ten years. Salt tolerant."}]
+]);
+group({...EVG, sci:"Picea pungens", foliage:0x5c839c, opt:{form:"flat", leafTex:"leaf:spruce"}}, [
+  ["Dwarf Globe Blue Spruce", 4, 5.5, null, {sci:"Picea pungens 'Glauca Globosa'", note:"A flat-topped, densely branched bun of bright blue needles. Very slow."}],
+  ["Dwarf Globe Blue Spruce tree form", 6, 5.5, null, {sci:"Picea pungens 'Glauca Globosa'", opt:{form:"flat", leafTex:"leaf:spruce", trunk:2.6}, note:"The blue globe grafted on a standard: a blue ball on a stem."}],
+  ["Dwarf Blue Spruce 'Sester Dwarf'", 7, 4.5, null, {sci:"Picea pungens 'Sester Dwarf'", zone:[2,7], opt:{form:"cone", leafTex:"leaf:spruce"}, note:"A perfect, slow, miniature Colorado spruce: classic cone, stunning blue."}],
+  ["Dwarf Norway Spruce 'Pumila'", 3.5, 3.5, null, {sci:"Picea abies 'Pumila'", sun:FP, foliage:0x2f5228, opt:{form:"mound", leafTex:"leaf:spruce"}, note:"A nest-type spruce: rounded when young, spreading with age, with short dark needles."}]
+]);
+group({...EVG, sci:"Taxus × media", sun:ANY, zone:[4,7], foliage:0x24481f, opt:{form:"mound", leafTex:"leaf:yew", reach:true}}, [
+  ["Yew 'Dark Green'", 4, 6.5, null, {sci:"Taxus × media 'Dark Green'", note:"For hedges and foundations, in sun or shade, as long as the soil drains. Red berries in summer."}],
+  ["Yew 'Taunton'", 3.5, 5, null, {sci:"Taxus × media 'Tauntonii'", note:"A slow, spreading yew that takes shade and resists winter burn. Easy to prune."}]
+]);
+
 /* ---------------------------------------------------------------- lookups */
 const BY_KEY = new Map(PLANTS.map(p=>[p.k, p]));
 /* keys used by plans saved before the full catalogue */
-const ALIASES = {"russian-sage":"russian-sage-denim-n-lace", "hosta-patriot":"hosta-francee",
-  "ninebark-little-devil":"ninebark-summer-wine", "arborvitae-hetz-midget":"boxwood-green-velvet"};
+const ALIASES = {"russian-sage":"russian-sage-denim-n-lace", "hosta-patriot":"hosta-francee", "ninebark-little-devil":"ninebark-summer-wine"};
 /* Plans can outlive the catalog: an unknown key still draws, as a grey mound. */
 const UNKNOWN = {k:"?", n:"Unknown plant", sci:"", cat:"perennial", model:"cushion", h:1.5, w:1.5, flower:null,
                  foliage:0x7a8274, sun:ANY, zone:[1,13], opt:{}, note:"This plant is not in the catalog."};
 export function plantByKey(k){ return BY_KEY.get(k) || BY_KEY.get(ALIASES[k]) || UNKNOWN; }
 
 export function winterHabit(p){
-  return p.winter || (p.cat === "shrub" ? "bare" : p.cat === "grass" ? "standing" : "dormant");
+  return p.winter || (p.cat === "evergreen" ? "evergreen" : p.cat === "shrub" ? "bare" : p.cat === "grass" ? "standing" : "dormant");
 }
 const seqAt = (c, t)=>{
   if(!Array.isArray(c)) return c;

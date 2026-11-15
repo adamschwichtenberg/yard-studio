@@ -3,7 +3,7 @@ import "./importer.js";
 import { SkyEnvironment } from "./scene/environment.js";
 import { lawnTextures, sidingTextures, shingleTextures, concreteTile, paverTextures } from "./scene/textures.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { TreeLibrary, leafKindFor } from "./trees/trees.js";
+import { TreeLibrary, bloomKindFor } from "./trees/trees.js";
 import { createPost } from "./post.js";
 import { PLANTS, CATEGORIES, plantByKey, symbolColor, sunClass, SUN_LABEL, sunNeeds, bloomText, bedLegend, winterHabit } from "./garden/plants.js";
 import { symbolPath, MODELS } from "./garden/models.js";
@@ -117,7 +117,154 @@ const PRESETS = [
  {gn:"Junipers & arborvitae", n:"Spartan Juniper", s:"columnar", h:18, w:5, ev:true, d:.95, leaf:0x2f4a2a,
   sci:"Juniperus chinensis 'Spartan'", note:"Narrow columnar evergreen. Thin but solid shadow, year round. Rated zone 4, marginal in 4a."},
  {gn:"Junipers & arborvitae", n:"Moonglow Juniper", s:"pyramidal", h:20, w:10, ev:true, d:.92, leaf:0x66796b,
-  sci:"Juniperus scopulorum 'Moonglow'", note:"Broad pyramidal blue-green evergreen. Dense year-round shade in a compact footprint."}
+  sci:"Juniperus scopulorum 'Moonglow'", note:"Broad pyramidal blue-green evergreen. Dense year-round shade in a compact footprint."},
+
+ /* ---- the rest of the garden-centre tree list. Most borrow a crown shape and
+    foliage from the species above: `lk` names the leaf texture, `bk`/`bw` the
+    flower form and its window in days after leaf-out, `bark` the bark. */
+ {gn:"Maples", n:"Celebration Maple", s:"oval", h:50, w:25, ev:false, d:.85, leaf:0x4a7a30, fall:0xc8401e,
+  sci:"Acer × freemanii 'Celzam'", note:"Seedless Freeman maple with a strong central leader and a narrower crown. Red and orange in fall."},
+ {gn:"Maples", n:"Emerald Lustre Norway Maple", s:"round", h:55, w:50, ev:false, d:.95, leaf:0x2f5a26, fall:0xd8b030,
+  sci:"Acer platanoides 'Emerald Lustre'", note:"Big, glossy deep-green leaves on a broad oval crown. Heavy shade; golden yellow in fall."},
+ {gn:"Maples", n:"Silver Maple", s:"vase", h:55, w:42, ev:false, d:.68, leaf:0x5a8a40, fall:0xd0b440,
+  sci:"Acer saccharinum", note:"The fastest native maple. Tall, open crown with silvery leaf undersides and medium shade."},
+ {gn:"Maples", n:"Sugar Maple", s:"oval", h:45, w:32, ev:false, d:.88, leaf:0x3f6a2a, fall:0xe07a1e,
+  sci:"Acer saccharum", note:"Dense oval crown and the classic fall show of red, orange and yellow."},
+ {gn:"Maples", n:"Fall Fiesta Sugar Maple", s:"oval", h:60, w:45, ev:false, d:.9, leaf:0x34602a, fall:0xe0601e,
+  sci:"Acer saccharum 'Bailsta'", note:"Leathery, glossy leaves and more red in its fall colour than most sugar maples."},
+ {gn:"Maples", n:"Inferno Sugar Maple", s:"oval", h:40, w:30, ev:false, d:.88, leaf:0x3f6a2a, fall:0xd8401e,
+  sci:"Acer saccharum 'Jeferno'", note:"Canadian selection picked for hardiness. Bright orange and red in fall."},
+ {gn:"Maples", n:"Apollo Sugar Maple", s:"fastigiate", h:30, w:12, ev:false, d:.9, leaf:0x3a642a, fall:0xe08a1e,
+  sci:"Acer saccharum 'Barrett Cole'", note:"A dense, narrow column of sugar maple for tight spaces."},
+ {gn:"Maples", n:"Flame Amur Maple", s:"round", h:20, w:20, ev:false, d:.8, leaf:0x46702c, fall:0xc8201a,
+  sci:"Acer ginnala 'Flame'", note:"Small, rounded, fine-textured. Brilliant red in fall. Very hardy."},
+ {gn:"Maples", n:"Ruby Slippers Amur Maple", s:"oval", h:18, w:15, ev:false, d:.8, leaf:0x3f6a2a, fall:0xe0701e,
+  bloom:[0xc8283a, 0xd8304a, 0xb04030], bk:"crabapple", bw:[30, 62], sci:"Acer ginnala 'Ruby Slippers'",
+  note:"Small oval tree covered in ruby-red winged seeds in early summer. Orange in fall."},
+ {gn:"Maples", n:"Hot Wings Tatarian Maple", s:"round", h:25, w:19, ev:false, d:.78, leaf:0x3f6a2a, fall:0xd8601e,
+  bloom:[0xd8283a, 0xe8304a, 0xb84030], bk:"crabapple", bw:[45, 95], sci:"Acer tataricum 'GarAnn'",
+  note:"Bright red winged seeds through summer read like a second bloom. Yellow to red in fall."},
+ {gn:"Lindens", n:"Boulevard Linden", s:"linden", h:60, w:30, ev:false, d:.9, leaf:0x3f6a2a, fall:0xc0a038,
+  sci:"Tilia americana 'Boulevard'", note:"A narrow, pyramidal American linden with ascending branches: height without the width."},
+ {gn:"Lindens", n:"Front Yard Linden", s:"linden", h:65, w:40, ev:false, d:.9, leaf:0x3f6a2a, fall:0xc0a038,
+  sci:"Tilia americana 'Bailyard'", note:"Symmetrical from youth; broadly pyramidal, rounding out with age. Dense shade."},
+ {gn:"Lindens", n:"Harvest Gold Linden", s:"linden", h:32, w:25, ev:false, d:.85, leaf:0x4a7a30, fall:0xe0b428,
+  sci:"Tilia mongolica 'Harvest Gold'", note:"A smaller, upright linden with peeling bark and superb golden fall colour."},
+ {gn:"Birches", n:"Dakota Pinnacle Birch", s:"fastigiate", h:35, w:9, ev:false, d:.7, leaf:0x4a7a2e, fall:0xd8b030, bark:"paperbirch",
+  sci:"Betula platyphylla 'Fargo'", note:"Narrow, white-barked column selected in Fargo. Golden yellow in fall."},
+ {gn:"Birches", n:"Northern Tribute River Birch", s:"oval", h:35, w:32, ev:false, d:.62, leaf:0x46702c, fall:0xc8a040, bark:"riverbirch",
+  sci:"Betula nigra 'Dickinson'", note:"Ivory bark peeling to copper-bronze. Takes alkaline, compacted and dry soil better than other river birches."},
+ {gn:"Birches", n:"Prairie Dream Paper Birch", s:"oval", h:40, w:25, ev:false, d:.65, leaf:0x4a7a2e, fall:0xdcb428, bark:"paperbirch",
+  sci:"Betula papyrifera 'Varen'", note:"Snow-white peeling bark, from the Killdeer Mountains of North Dakota. Resists bronze birch borer."},
+ {gn:"Birches", n:"Prairie Dream Paper Birch clump", s:"oval", h:40, w:28, ev:false, d:.65, leaf:0x4a7a2e, fall:0xdcb428, bark:"paperbirch", clump:true,
+  sci:"Betula papyrifera 'Varen'", note:"Prairie Dream grown as a three-stem clump."},
+ {gn:"Oaks", n:"Prairie Stature Oak", s:"oval", h:45, w:30, ev:false, d:.8, leaf:0x3a6a30, fall:0x8a2a3a, lk:"whiteoak",
+  sci:"Quercus × bimundorum 'Prairie Stature'", note:"NDSU hybrid of bur and English oak. Stately pyramidal crown; reddish-purple in fall."},
+ {gn:"Oaks", n:"Regal Prince Oak", s:"fastigiate", h:45, w:16, ev:false, d:.85, leaf:0x3a6430, fall:0xc8a438, lk:"whiteoak",
+  sci:"Quercus × warei 'Long'", note:"Columnar hybrid oak with glossy, mildew-resistant leaves. Yellow in fall."},
+ {gn:"Elms", n:"Accolade Elm", s:"vase", h:70, w:40, ev:false, d:.72, leaf:0x356428, fall:0xd0a830,
+  sci:"Ulmus 'Morton'", note:"Glossy dark leaves on a classic arching vase. Excellent Dutch elm disease resistance."},
+ {gn:"Elms", n:"Cathedral Elm", s:"vase", h:45, w:50, ev:false, d:.75, leaf:0x4a7a34, fall:0xd0b038,
+  sci:"Ulmus 'Cathedral'", note:"Broadly vase-shaped, wider than tall, with large leaves like an American elm."},
+ {gn:"Elms", n:"Princeton Elm", s:"vase", h:65, w:45, ev:false, d:.72, leaf:0x3f6a2a, fall:0xc8a838,
+  sci:"Ulmus americana 'Princeton'", note:"American elm selected in the 1920s. Vigorous, upright vase."},
+ {gn:"Elms", n:"Triumph Elm", s:"oval", h:60, w:40, ev:false, d:.78, leaf:0x346228, fall:0xc8a838,
+  sci:"Ulmus 'Triumph'", note:"Shiny dark foliage on a somewhat upright crown. An NDSU-recommended elm."},
+ {gn:"Elms", n:"Valley Forge Elm", s:"vase", h:65, w:60, ev:false, d:.7, leaf:0x3f6a2a, fall:0xd0b038,
+  sci:"Ulmus americana 'Valley Forge'", note:"The most disease-resistant American elm, with the full classic spreading vase."},
+ {gn:"Hackberries", n:"Prairie Sentinel Hackberry", s:"fastigiate", h:45, w:12, ev:false, d:.78, leaf:0x4a6a30, fall:0xd8b030,
+  sci:"Celtis occidentalis 'Prairie Sentinel'", note:"A very narrow hackberry with near-vertical branches. Tough anywhere."},
+ {gn:"Honeylocusts", n:"Northern Acclaim Honeylocust", s:"oval", h:40, w:32, ev:false, d:.45, leaf:0x5a8030, fall:0xdcb428,
+  sci:"Gleditsia triacanthos var. inermis 'Harve'", note:"NDSU's hardy, thornless, seedless honeylocust. Symmetrical and upright; dappled shade."},
+ {gn:"Poplars & aspens", n:"Prairie Gold Aspen", s:"oval", h:40, w:17, ev:false, d:.6, leaf:0x5a7a30, fall:0xe0b828, bark:"aspen",
+  sci:"Populus tremuloides 'Prairie Gold'", note:"A quaking aspen from Nebraska that takes prairie heat, drought and humidity."},
+ {gn:"Poplars & aspens", n:"Summer Shimmer Aspen", s:"oval", h:35, w:17, ev:false, d:.6, leaf:0x6a8a3a, fall:0xdcb428, bark:"aspen",
+  sci:"Populus tremuloides 'Summer Shimmer'", note:"Narrow when young, rounding with age. Light green leaves, silver beneath."},
+ {gn:"Poplars & aspens", n:"Robusta Poplar", s:"oval", h:75, w:45, ev:false, d:.78, leaf:0x46702c, fall:0xc8b040,
+  sci:"Populus × canadensis 'Robusta'", note:"Seedless cottonwood that can put on four feet a year. Big shade, fast."},
+ {gn:"Poplars & aspens", n:"Siouxland Poplar", s:"oval", h:80, w:40, ev:false, d:.8, leaf:0x3f6a2a, fall:0xc8b040,
+  sci:"Populus deltoides 'Siouxland'", note:"Seedless cottonwood with large leaves. A very tall, fast shade tree."},
+ {gn:"Willows", n:"Prairie Reflection Laurel Willow", s:"round", h:37, w:25, ev:false, d:.85, leaf:0x2f6228, fall:0xa8a040, lk:"broadleaf", bark:"willow",
+  sci:"Salix pentandra 'Silver Lake'", note:"NDSU laurel-leaf willow. Dense, rounded and very glossy; not a weeper."},
+ {gn:"Crabapples", n:"Adams Crabapple", s:"round", h:20, w:20, ev:false, d:.72, leaf:0x46702c, fall:0xd0581e,
+  bloom:[0xc02a5a, 0xe86a9a, 0xf0a8c0], sci:"Malus 'Adams'", note:"Clear pink single flowers; red-tinted spring leaves; orange-red in fall. Fruit hangs on into winter."},
+ {gn:"Crabapples", n:"Courageous Crabapple", s:"oval", h:22, w:17, ev:false, d:.72, leaf:0x4a6030, fall:0xd0701e,
+  bloom:[0xb02a5a, 0xd85a90, 0xe89ab8], sci:"Malus 'DurLawrence'", note:"Broad and upright, with rosy-pink bloom over bronze-red new leaves. Almost fruitless. Zone 2."},
+ {gn:"Crabapples", n:"Green Wall Crabapple", s:"fastigiate", h:20, w:6, ev:false, d:.78, leaf:0x34602a, fall:0x8a6a30,
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], sci:"Malus 'Jefwall'", note:"A strongly upright column of glossy green with white flowers and tiny red fruit."},
+ {gn:"Crabapples", n:"Ivory Spear Crabapple", s:"fastigiate", h:18, w:7, ev:false, d:.8, leaf:0x34602a, fall:0xc0a038,
+  bloom:[0xe89ab8, 0xf6f2ea, 0xf4f0e6], sci:"Malus 'JFS KW214MX'", note:"Pink buds open white on a dense, narrow column. Bright red fruit into late fall."},
+ {gn:"Crabapples", n:"Red Splendor Crabapple", s:"round", h:22, w:20, ev:false, d:.7, leaf:0x4a5a30, fall:0xa0502a,
+  bloom:[0xc8386a, 0xe878a4, 0xf0b0c8], sci:"Malus 'Red Splendor'", note:"Single pink flowers, glossy reddish-green leaves and red fruit that feeds birds into winter."},
+ {gn:"Crabapples", n:"Rejoice Crabapple", s:"oval", h:20, w:14, ev:false, d:.74, leaf:0x4a4a32, fall:0x8a4a2a,
+  bloom:[0xb02a5a, 0xd8508a, 0xe888b0], sci:"Malus 'Rejzam'", note:"Rose-pink semi-double flowers on an upright crown with a burgundy cast to the leaves."},
+ {gn:"Crabapples", n:"Royal Raindrops Crabapple", s:"oval", h:20, w:15, ev:false, d:.74, leaf:0x5a2a3a, fall:0xc02a20,
+  bloom:[0x9c1850, 0xd02a78, 0xe0609a], sci:"Malus 'Royal Raindrops'", note:"Magenta flowers and deep purple cut leaves all season; scarlet in fall."},
+ {gn:"Crabapples", n:"Royal Raindrops Crabapple clump", s:"round", h:20, w:17, ev:false, d:.74, leaf:0x5a2a3a, fall:0xc02a20, clump:true,
+  bloom:[0x9c1850, 0xd02a78, 0xe0609a], sci:"Malus 'Royal Raindrops'", note:"Royal Raindrops grown as a multi-stem clump."},
+ {gn:"Crabapples", n:"Sparkling Sprite Crabapple", s:"round", h:12, w:12, ev:false, d:.85, leaf:0x4a7a30, fall:0xc0a038,
+  bloom:[0xe89ab8, 0xf6f2ea, 0xf4f0e6], sci:"Malus 'JFS-KW207'", note:"A top-grafted dwarf with a dense round head smothered in white from pink buds."},
+ {gn:"Crabapples", n:"Starlite Crabapple", s:"oval", h:20, w:15, ev:false, d:.74, leaf:0x2f5a26, fall:0xc0a038,
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], sci:"Malus 'Jeflite'", note:"White flowers in mid-May, glossy disease-resistant leaves and tiny red fruit that stays on."},
+ {gn:"Cherries & pears", n:"Amur Chokecherry", s:"round", h:25, w:27, ev:false, d:.68, leaf:0x46702c, fall:0xd8b030, lk:"crabapple", bark:"cherry",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"crabapple", bw:[10, 22], sci:"Prunus maackii", note:"Small tree with glistening golden-bronze, peeling bark. White flower clusters in spring. Zone 2."},
+ {gn:"Cherries & pears", n:"Klondike Amur Chokecherry", s:"oval", h:22, w:17, ev:false, d:.7, leaf:0x46702c, fall:0xd8b030, lk:"crabapple", bark:"cherry",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"crabapple", bw:[10, 22], sci:"Prunus maackii 'Klondike'", note:"An improved Amur cherry with stronger branching, less frost cracking and immunity to black knot."},
+ {gn:"Cherries & pears", n:"Ming Amur Chokecherry", s:"oval", h:22, w:15, ev:false, d:.7, leaf:0x46702c, fall:0xe0b828, lk:"crabapple", bark:"cherry",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"crabapple", bw:[10, 22], sci:"Prunus maackii × kerrasis 'Ming'", note:"Strong central leader, peeling red-bronze bark and bright yellow fall colour."},
+ {gn:"Cherries & pears", n:"Prairie Gem Pear", s:"round", h:22, w:18, ev:false, d:.85, leaf:0x3a6a2a, fall:0xdcb428, lk:"crabapple",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"crabapple", bw:[0, 10], sci:"Pyrus ussuriensis 'MorDak'", note:"NDSU's ornamental pear: a dense round crown of leathery leaves, white in spring, gold in fall."},
+ {gn:"Small flowering trees", n:"Winter King Hawthorn", s:"spreading", h:20, w:25, ev:false, d:.68, leaf:0x34602a, fall:0x9a5a2a, lk:"crabapple", bark:"hawthorn",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"crabapple", bw:[18, 30], sci:"Crataegus viridis 'Winter King'", note:"Silvery bark and bold, angular branching. White clusters in spring; fruit holds into winter."},
+ {gn:"Small flowering trees", n:"Northern Redbud", s:"spreading", h:25, w:20, ev:false, d:.65, leaf:0x4a7a34, fall:0xd0b038, lk:"linden", cb:5,
+  bloom:[0xb04a9a, 0xd870b4, 0xe0a0c8], bk:"crabapple", bw:[0, 12], sci:"Cercis canadensis (Minnesota strain)", note:"Rosy-pink flowers along bare branches before the heart-shaped leaves. Wants shelter and part sun."},
+ {gn:"Small flowering trees", n:"Northern Redbud clump", s:"spreading", h:25, w:22, ev:false, d:.65, leaf:0x4a7a34, fall:0xd0b038, lk:"linden", cb:4, clump:true,
+  bloom:[0xb04a9a, 0xd870b4, 0xe0a0c8], bk:"crabapple", bw:[0, 12], sci:"Cercis canadensis (Minnesota strain)", note:"The northern redbud grown multi-stemmed."},
+ {gn:"Small flowering trees", n:"European Mountain Ash", s:"oval", h:25, w:22, ev:false, d:.6, leaf:0x4a7a30, fall:0xd0581e, lk:"locust",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"crabapple", bw:[16, 28], sci:"Sorbus aucuparia", note:"Fine, ferny leaves; flat white flower clusters in spring and orange-red berries in fall."},
+ {gn:"Small flowering trees", n:"Summerfrost Amur Maackia", s:"round", h:18, w:14, ev:false, d:.7, leaf:0x5a6a3a, fall:0x8a8a3a, lk:"locust",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"hydrangea", bw:[50, 64], sci:"Maackia amurensis 'Summerfrost'", note:"Silvery new leaves mature olive green. Upright white flower spikes in early summer; coppery peeling bark."},
+ {gn:"Tree lilacs", n:"Japanese Tree Lilac clump", s:"round", h:25, w:25, ev:false, d:.8, leaf:0x3a6a2a, fall:0x8a8a3a, lk:"broadleaf", bark:"cherry", clump:true,
+  bloom:[0xe8e4c0, 0xf6f2dc, 0xe0d8b0], bk:"hydrangea", bw:[40, 56], sci:"Syringa reticulata", note:"Multi-stemmed small tree with foot-long plumes of creamy white, fragrant flowers in June."},
+ {gn:"Tree lilacs", n:"Ivory Silk Tree Lilac", s:"oval", h:25, w:15, ev:false, d:.82, leaf:0x3a6a2a, fall:0x8a8a3a, lk:"broadleaf", bark:"cherry",
+  bloom:[0xe8e4c0, 0xf6f2dc, 0xe0d8b0], bk:"hydrangea", bw:[44, 60], sci:"Syringa reticulata 'Ivory Silk'", note:"Sturdy, compact oval with big creamy plumes in early summer and cherry-like bark."},
+ {gn:"Tree lilacs", n:"Snowdance Tree Lilac", s:"round", h:18, w:20, ev:false, d:.82, leaf:0x346228, fall:0x8a8a3a, lk:"broadleaf", bark:"cherry",
+  bloom:[0xe8e4c0, 0xf6f2dc, 0xe0d8b0], bk:"hydrangea", bw:[38, 54], sci:"Syringa reticulata 'Snowdance'", note:"Shorter and wider than other tree lilacs, with very heavy bloom and almost no seed."},
+ {gn:"Other shade trees", n:"Early Glow Buckeye", s:"round", h:30, w:20, ev:false, d:.85, leaf:0x34602a, fall:0xc0281e, lk:"broadleaf",
+  bloom:[0xc8d070, 0xdce08a, 0xc8c070], bk:"hydrangea", bw:[12, 26], sci:"Aesculus 'Early Glow'", note:"Upright greenish-yellow flower clusters in May and bright red fall colour that comes early."},
+ {gn:"Other shade trees", n:"Northern Catalpa", s:"oval", h:55, w:38, ev:false, d:.8, leaf:0x4a7a34, fall:0xb8b040, lk:"linden",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"hydrangea", bw:[46, 60], sci:"Catalpa speciosa", note:"Huge heart-shaped leaves on an irregular oval crown, with big white flower clusters in late June. Takes heat, drought and alkaline soil."},
+ {gn:"Other shade trees", n:"Rising Fire Hornbeam", s:"fastigiate", h:30, w:15, ev:false, d:.82, leaf:0x3f6a2a, fall:0xd8501e, lk:"elm", bark:"smooth",
+  sci:"Carpinus caroliniana 'Uxbridge'", note:"A columnar American hornbeam that turns red and orange. Tolerates shade."},
+ {gn:"Other shade trees", n:"Ironwood", s:"oval", h:40, w:25, ev:false, d:.78, leaf:0x3f6a2a, fall:0xc8a438, lk:"birch",
+  sci:"Ostrya virginiana", note:"Hop hornbeam: a tough, medium-sized tree with slender branches and hop-like fruit in late summer."},
+ {gn:"Other shade trees", n:"KoolKat Katsura", s:"oval", h:37, w:22, ev:false, d:.78, leaf:0x5a7f5a, fall:0xe0a040, lk:"aspen",
+  sci:"Cercidiphyllum japonicum 'Kooldak'", note:"Round leaves emerge bronze, turn blue-green, then yellow and apricot. Goes dormant early, which is what makes it hardy."},
+ {gn:"Other shade trees", n:"Espresso Kentucky Coffeetree", s:"vase", h:50, w:35, ev:false, d:.55, leaf:0x4a7438, fall:0xc8b040, lk:"locust",
+  sci:"Gymnocladus dioicus 'Espresso'", note:"Seedless. Huge doubly compound leaves on arching, elm-like limbs; light shade."},
+ // ---- Evergreen
+ {gn:"Spruces", n:"Fat Albert Blue Spruce", s:"pyramidal", h:27, w:13, ev:true, d:.95, leaf:0x6f94ae,
+  sci:"Picea pungens 'Fat Albert'", note:"A dense, broad, perfectly formed blue pyramid. Slow; a living Christmas tree."},
+ {gn:"Spruces", n:"Meyer Spruce", s:"pyramidal", h:50, w:28, ev:true, d:.92, leaf:0x5a7f86,
+  sci:"Picea meyeri", note:"Blue-green, softer-needled alternative to Colorado spruce that stands up to winter wind and holds its shape."},
+ {gn:"Spruces", n:"Weeping White Spruce", s:"columnar", h:20, w:9, ev:true, d:.92, leaf:0x6a8a80, lk:"norway",
+  sci:"Picea glauca 'Pendula'", note:"A narrow, formal spire: branches hang straight down against the trunk, heavy with grey-green needles."},
+ {gn:"Pines", n:"Hyland Splendor Mugo Pine", s:"pyramidal", h:16, w:9, ev:true, d:.9, leaf:0x2f5230,
+  sci:"Pinus mugo 'Hydak'", note:"NDSU's upright mugo: faster than Tannenbaum and darker green through winter."},
+ {gn:"Junipers & arborvitae", n:"Holmstrup Arborvitae", s:"columnar", h:8, w:3, ev:true, d:.95, leaf:0x447a2e,
+  sci:"Thuja occidentalis 'Holmstrup'", note:"A compact, bright green column with tightly layered foliage. Slow and tidy."},
+ {gn:"Junipers & arborvitae", n:"North Pole Arborvitae", s:"columnar", h:12, w:4, ev:true, d:.95, leaf:0x2f5a28,
+  sci:"Thuja occidentalis 'Art Boe'", note:"Narrow, dark green column from Faribault, Minnesota. Resists winter burn."},
+ {gn:"Junipers & arborvitae", n:"Pyramidal Arborvitae", s:"columnar", h:18, w:4, ev:true, d:.93, leaf:0x447a2e,
+  sci:"Thuja occidentalis 'Pyramidalis'", note:"Fast, narrow cone of soft bright green. Needs little trimming."},
+ {gn:"Junipers & arborvitae", n:"Rushmore Arborvitae", s:"columnar", h:25, w:6, ev:true, d:.95, leaf:0x2a5226,
+  sci:"Thuja occidentalis 'Rushmore'", note:"Dense, deep green and upright: a tall hedge or screen that shrugs off wind and winter burn."},
+ {gn:"Junipers & arborvitae", n:"Technito Arborvitae", s:"pyramidal", h:6, w:6, ev:true, d:.96, leaf:0x2f5a28,
+  sci:"Thuja occidentalis 'Bailjohn'", note:"A smaller, denser Techny that keeps its dark green through winter and needs less pruning."},
+ {gn:"Junipers & arborvitae", n:"Medora Juniper", s:"columnar", h:11, w:3, ev:true, d:.95, leaf:0x5a7a78,
+  sci:"Juniperus scopulorum 'Medora'", note:"North Dakota selection. A slender blue-green column, slow growing, good as a specimen."},
+ {gn:"Junipers & arborvitae", n:"Skyrocket Juniper", s:"columnar", h:15, w:3, ev:true, d:.95, leaf:0x66808a,
+  sci:"Juniperus scopulorum 'Skyrocket'", note:"About the narrowest juniper there is: a silvery-blue rocket for screens and accents."}
 ];
 /* Deciduous first, then evergreen; genera in the order they appear above. */
 function presetGroups(){
@@ -214,6 +361,7 @@ function fromPreset(name, x, y){
           evergreen:d.ev, density:d.d, note:d.note, leaf:d.leaf, fall:d.fall};
   if(d.bloom) o.bloom = d.bloom;
   if(d.cb != null) o.crownBase = d.cb;
+  speciesTraits(o, d);
   return o;
 }
 /* The planting bed in the starting yard: tall at the back, low along the front. */
@@ -228,6 +376,14 @@ function starterPlanting(x, y){
   const plants = [];
   for(const [k, ...at] of rows) for(const [px, py] of at) plants.push({id:nid(), k, x:px, y:py});
   return {id:nid(), type:"planting", name:"Perennial border", x, y, rot:0, poly:starterOutline(20, 8), smooth:true, mulch:"bark", plants};
+}
+/* What a species carries beyond its crown: borrowed foliage (`lk`), a flower
+   form and season (`bk`, `bw` in days after leaf-out), bark (`bark`) and a
+   multi-stem habit (`clump`). */
+function speciesTraits(o, d){
+  for(const [from, to] of [["lk","leafKind"],["bk","bloomKind"],["bw","bloomWin"],["bark","barkKind"],["clump","clump"]]){
+    if(d[from] != null) o[to] = d[from]; else delete o[to];
+  }
 }
 function isoToday(){
   const d = new Date();
@@ -490,8 +646,8 @@ function fallAmount(){
    and the hemisphere). Crabapples bloom as the leaves emerge and are over in
    about two weeks; panicle hydrangeas flower from midsummer into fall. */
 const BLOOM_WINDOWS = {crabapple:{from:0, to:16}, hydrangea:{from:62, to:150}};
-function bloomState(kind){
-  const w = BLOOM_WINDOWS[kind];
+function bloomState(kind, win){
+  const w = win ? {from:win[0], to:win[1]} : BLOOM_WINDOWS[kind];
   if(!w || !leafOn()) return null;
   const day = mdDay(seasonMD()) - mdDay(S.leafOut);
   const end = Math.min(w.to, mdDay(S.leafDrop) - mdDay(S.leafOut) - 2);
@@ -537,7 +693,7 @@ function treeDiscs(t, u, cot){
    left out: it only shades its own feet. */
 const PLANT_SHADE_MIN = 2.5;
 function plantShadeDensity(p, leaves){
-  const full = p.cat === "shrub" ? .8 : p.cat === "grass" ? .5 : .6;
+  const full = p.cat === "evergreen" ? .88 : p.cat === "shrub" ? .8 : p.cat === "grass" ? .5 : .6;
   if(leaves) return full;
   const w = winterHabit(p);
   return w === "evergreen" ? full : w === "dormant" ? 0 : w === "standing" ? .3 : .15;
@@ -3044,7 +3200,8 @@ function shortSide(n){ n = String(n); return n.length > 7 ? n.slice(0,6)+"…" :
 function presetFor(o){ return o && o.type === "tree" ? PRESETS.find(p=>p.n === o.name) : null; }
 function shadeClass(d){ return d < .65 ? "Dappled" : d < .88 ? "Moderate" : "Dense"; }
 function bloomLabel(o){
-  const k = o.type === "tree" && !o.evergreen ? leafKindFor(o) : null;
+  const k = o.type === "tree" ? bloomKindFor(o) : null;
+  if(k && o.bloomWin) return o.bloomWin[0] < 26 ? "Blooms in spring" : o.bloomWin[0] < 58 ? "Blooms in early summer" : "Blooms in summer";
   return k === "crabapple" ? "Blooms in spring" : k === "hydrangea" ? "Blooms midsummer to fall" : "";
 }
 function footHTML(o){
@@ -3335,6 +3492,7 @@ function applyPreset(o, p){
   o.evergreen = p.ev; o.density = p.d; o.note = p.note; o.leaf = p.leaf; o.fall = p.fall;
   if(p.bloom) o.bloom = p.bloom; else delete o.bloom;
   if(p.cb != null) o.crownBase = p.cb;
+  speciesTraits(o, p);
   panelFor = null;
   rebuildObject(o); drawPanel(); drawList(); updateSelection(); scheduleCompute();
 }

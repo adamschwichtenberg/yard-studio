@@ -209,6 +209,55 @@ function blades(o){
     }
   };
 }
+/* a conifer branchlet: needles along a twig and its side shoots.
+   needle: length; spread: how far needles stand off the twig (rad); flat keeps
+   them in two ranks (yew, fir); tufts gathers long needles at the tips (pine);
+   scales draws overlapping scale leaves instead (arborvitae, juniper). */
+function conifer(o){
+  return (g, N, r)=>{
+    const {shoots = 7, needle = .05, spread = 1, step = .012, flat = false, tufts = false, scales = false, fan = .9, width = .006, reach = .6} = o;
+    const twig = (x0, y0, ang, L, depth)=>{
+      const x1 = x0 + Math.sin(ang)*L, y1 = y0 - Math.cos(ang)*L;
+      stemLine(g, x0, y0, x1, y1, N*(scales ? .02 : .01)*(depth ? .7 : 1), scales ? .7 : .42);
+      if(scales){
+        /* braided scale leaves: overlapping diamonds along the shoot */
+        for(let t = 0; t <= 1; t += .07){
+          g.save(); g.translate(x0 + (x1 - x0)*t, y0 + (y1 - y0)*t); g.rotate(ang);
+          g.fillStyle = ink(.6 + r()*.36); g.beginPath();
+          g.moveTo(0, -N*.03); g.lineTo(N*.016, 0); g.lineTo(0, N*.018); g.lineTo(-N*.016, 0); g.fill(); g.restore();
+        }
+      } else if(!tufts){
+        for(let t = .04; t <= 1; t += step/Math.max(.2, L/N)){
+          const px = x0 + (x1 - x0)*t, py = y0 + (y1 - y0)*t;
+          for(const s of flat ? [1, -1] : [1, -1, r() > .5 ? .35 : -.35]){
+            const a = ang + s*spread*(.8 + r()*.4), l = N*needle*(.75 + r()*.5)*(1 - t*.25);
+            g.strokeStyle = ink(.5 + r()*.48); g.lineWidth = N*width; g.lineCap = "round";
+            g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.sin(a)*l, py - Math.cos(a)*l); g.stroke();
+          }
+        }
+      }
+      if(tufts || depth === 0){
+        /* the tip: a brush of needles (pine) or the leading bud */
+        const n = tufts ? 26 : 5, l0 = N*needle*(tufts ? 1 : .9);
+        for(let i = 0; i < n; i++){
+          const a = ang + (r() - .5)*(tufts ? 2.5 : 1.2), l = l0*(.7 + r()*.5);
+          g.strokeStyle = ink(.55 + r()*.45); g.lineWidth = N*width; g.lineCap = "round";
+          g.beginPath(); g.moveTo(x1, y1); g.lineTo(x1 + Math.sin(a)*l, y1 - Math.cos(a)*l); g.stroke();
+        }
+        if(tufts){ g.fillStyle = ink(.95, 0); g.beginPath(); g.ellipse(x1 + Math.sin(ang)*N*.025, y1 - Math.cos(ang)*N*.025, N*.008, N*.03, ang, 0, TAU); g.fill(); }
+      }
+      return [x1, y1];
+    };
+    const main = N*.9;
+    twig(N/2, N*.99, 0, main, 0);
+    for(let i = 0; i < shoots; i++){
+      const t = .12 + .76*(i + .5)/shoots, side = i%2 ? 1 : -1, a = side*fan*(1 - t*.35) + (r() - .5)*.15;
+      const L = N*reach*(1 - t*.6)*(.85 + r()*.3), y = N*.99 - main*t;
+      const [x1, y1] = twig(N/2, y, a, L, 1);
+      if(scales || o.fork) for(const s2 of [1, -1]) twig(N/2 + (x1 - N/2)*.5, y + (y1 - y)*.5, a + s2*.6, L*.45, 2);
+    }
+  };
+}
 /* a carpet of tiny leaves seen from above */
 function carpet(o){
   return (g, N, r)=>{
@@ -467,6 +516,12 @@ const KINDS = {
   "leaf:fine":       [512, sprig({n:130, len:.1, asp:.5, branches:5})],
   "leaf:needle":     [512, sprig({n:110, len:.1, asp:.13, branches:5})],
   "leaf:carpet":     [256, carpet({})],
+  /* conifers */
+  "leaf:spruce":     [512, conifer({shoots:9, needle:.05, spread:1.05, step:.011, fan:1.0, reach:.52})],
+  "leaf:pine":       [512, conifer({shoots:5, needle:.17, tufts:true, fan:.7, reach:.42, width:.005})],
+  "leaf:arborvitae": [512, conifer({shoots:9, scales:true, fan:.75, reach:.5})],
+  "leaf:juniper":    [512, conifer({shoots:11, needle:.03, spread:.55, step:.014, fan:.5, reach:.5, fork:true, width:.007})],
+  "leaf:yew":        [512, conifer({shoots:7, needle:.06, spread:1.2, step:.012, flat:true, fan:.8, reach:.5, width:.008})],
   "leaf:succulent":  [256, carpet({n:260, size:.075, asp:.62})],
   /* compound and cut leaves */
   "leaf:pinnate":    [512, compound({pairs:10, asp:.24, len:.28})],

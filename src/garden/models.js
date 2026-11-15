@@ -460,6 +460,10 @@ const P_BALL   = u=>Math.sqrt(Math.max(0, 1 - Math.pow(2*u - 1, 2)));
 const P_FOUNTAIN = u=>.32 + .68*Math.pow(Math.sin(Math.PI*Math.pow(clamp(u, 0, 1), 1.15)*.96), .6);
 const P_WEEP   = u=>.5 + .5*Math.pow(Math.sin(Math.PI*Math.pow(clamp(u, 0, 1), .8)*.97), .5);
 
+const P_FLAT   = u=>Math.pow(Math.sin(Math.PI*Math.pow(u, .55)*.9), .4)*(u > .94 ? 1 - (u - .94)*6 : 1);
+const P_CONE   = u=>Math.pow(1 - u, .78)*(.55 + .45*Math.min(1, u*9));
+const P_SPREAD = u=>(.42 + .58*Math.pow(clamp(u, 0, 1), .55))*(u > .82 ? Math.sqrt(Math.max(0, 1 - Math.pow((u - .82)/.18, 2))) : 1);
+
 /* ---------- the growth forms ---------- */
 const count = (v, lo, hi)=>clamp(Math.round(v), lo, hi);
 export const MODELS = {
@@ -678,6 +682,45 @@ export const MODELS = {
         foliage:{tex:o.leafTex || "leaf:small", n:count(110 + H*R*44, 120, 320), size:clamp(R*1.05, .4, .9), rise:.5, low:1, wild:.5}});
     }}
 };
+
+/* Evergreen shrubs. One model, five structures (`form`):
+     globe      a dense ball or bun: globe arborvitae, mugo pine, bird's-nest spruce
+     flat       a flat-topped globe wider than tall: dwarf globe blue spruce
+     cone       a small pyramid with a leader: dwarf Colorado spruce
+     spreading  long branches lying along the ground in layers: creeping juniper
+     vase       ascending branches opening outward: spreading yew
+   `leafTex` picks the foliage: spruce, pine, arborvitae, juniper or yew. */
+MODELS.conifer = {label:"Evergreen shrubs", symbol:"box",
+  build(P, p, o){
+    const H = P.H, R = P.R, form = o.form || "globe", tex = o.leafTex || "leaf:spruce", r = P.rnd;
+    if(form === "spreading"){
+      /* main branches radiate along the ground, each carrying flat sprays that lift at the tips */
+      const n = count(11 + R*4, 11, 22), s = clamp(R*.5, .45, 1.1);
+      P.lathe("mass", [[0, R*.7], [H*.4, R*.6], [H*.7, R*.25]]);
+      for(let i = 0; i < n; i++){
+        const az = i*GOLD + r()*.4, L = R*(.72 + .28*r()), out = polar(az, 1), side = V(-out.z, 0, out.x);
+        const k = count(3 + L*2.4, 4, 10);
+        for(let j = 0; j < k; j++){
+          /* sprays lie almost flat, stacked a little higher toward the middle, tips just lifting */
+          const t = (j + .3)/k, y = H*(.25 + .6*(1 - t)*(.6 + .4*r()));
+          for(const sg of [1, -1]){
+            const dir = out.clone().multiplyScalar(.8).addScaledVector(side, sg*.55).addScaledVector(UP, .05 + .14*r()).normalize();
+            const ss = s*(.8 + .4*r());
+            P.card("leaf", tex, polar(az, L*t, y).addScaledVector(dir, -ss*.2), dir, UP, ss, ss, {normal:UP.clone().lerp(dir, .25).normalize()});
+          }
+        }
+      }
+      return;
+    }
+    const profile = {globe:P_BALL, flat:P_FLAT, cone:P_CONE, vase:P_SPREAD, mound:P_MOUND}[form] || P_BALL;
+    const pine = tex === "leaf:pine", trunk = o.trunk || 0, ch = H - trunk;
+    P.bush({profile, trunk, mass:form === "vase" ? .62 : .8, open:form === "vase" ? .15 : 0,
+      stems:{n:form === "cone" ? 3 : count(5 + R*2, 5, 10)},
+      foliage:{tex, n:count(120 + R*ch*40, 120, 380), size:clamp(Math.min(ch, R*2)*(pine ? .42 : .34), .34, 1.3),
+               /* spruce branches hold level, pine candles and yew shoots reach up */
+               rise:pine ? .7 : form === "vase" || o.reach ? .55 : form === "cone" ? .05 : .25, wild:pine ? .5 : .45, low:form === "cone" ? .7 : .85}});
+    if(form === "cone") P.tube("wood", [V(0, 0, 0), V(0, H*.5, 0), V(0, H*.96, 0)], Math.max(.05, H*.014), .012, 5);
+  }};
 
 /* ---------- the layers of one catalog plant, at its real size in feet ---------- */
 const protoCache = new Map();

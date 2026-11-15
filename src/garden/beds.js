@@ -149,6 +149,7 @@ export function plantLayers(p, season){
   const st = ph.state, leafy = st === "growing" || st === "evergreen";
   const fol = C(p.foliage), fol2 = C(p.foliage2 ?? p.foliage);
   if(leafy && ph.fall > 0 && p.fall != null){ fol.lerp(C(p.fall), ph.fall); fol2.lerp(C(p.fall), ph.fall*.6); }
+  if(st === "evergreen" && !season.growing && p.winterFoliage != null){ fol.set(p.winterFoliage); fol2.copy(fol); }
   if(st === "standing"){ fol.lerp(p.cat === "grass" ? STRAW : TAN, .85); fol2.copy(fol); }
   if(st === "dormant"){ fol.copy(TAN).multiplyScalar(.75); fol2.copy(fol); }
   const showLeaf = leafy || st === "standing" || st === "dormant";
@@ -170,7 +171,7 @@ export function plantLayers(p, season){
     } else if(L.role === "stem"){
       if(st === "dormant") continue;
       const col = st === "standing" ? TAN.clone().multiplyScalar(.8)
-        : p.stem != null ? C(p.stem) : p.cat === "shrub" ? TWIG.clone() : C(p.foliage).lerp(C(0x6f8a3a), .5);
+        : p.stem != null ? C(p.stem) : p.cat === "shrub" || p.cat === "evergreen" ? TWIG.clone() : C(p.foliage).lerp(C(0x6f8a3a), .5);
       out.push({geometry:L.geometry, material:plainMaterial(col), scale:[1, 1], shadow:true});
     } else if(L.role === "wood"){
       out.push({geometry:L.geometry, material:plainMaterial(BARK), scale:[1, 1], shadow:true});
