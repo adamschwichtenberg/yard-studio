@@ -30,9 +30,9 @@ All of the original planner's features are here, in a quieter "field notebook" i
   - On phones the rail becomes a bottom tab bar, and panels and the inspector open as bottom sheets.
 - **Toolbar:**
   - Select, pan and measure.
-  - **Add to yard**: a tree from the species library, or a bed, building, deck, driveway or sidewalk.
+  - **Add to yard**: a tree from the species library, or a raised bed, planting bed, building, deck, driveway or sidewalk.
   - Plan / 3D / Eye level, frame the lot, centre on the selection, schematic view, undo and redo. Keyboard: 1 / 2 / 3 / 0 / F / G, Esc to cancel or deselect.
-- **Map layers:** shadows now, the sun-hours heat map, grid and schematic.
+- **Map layers:** shadows now, the sun-hours heat map, grid, schematic, and plant symbols for planting beds.
 - **Sun card:**
   - Drag the sun arc to set the time, or play the day.
   - Pick a date, click the day-length ribbon to move through the year, or jump to a solstice or equinox.
@@ -54,6 +54,36 @@ All of the original planner's features are here, in a quieter "field notebook" i
   - Fence style tiles showing the share of sun each blocks, fence height, density and sides.
   - House angle vs. north with a dial.
 - **Also:** location and clock (see below), the heat map threshold and bare branches in the off-season, render settings, every object in the yard with its size and distance to the property line, and JSON plan files. Undo and redo keep 60 steps. You can import a property image to trace and scale the lot.
+
+### Planting beds
+
+A planting bed is an in-ground bed of perennials, grasses, groundcovers and shrubs. It sits in the yard like any other object, so it gets the same sun-hours reading and shows up in the 3D views.
+
+![Designing a bed from above](docs/planting-design.png)
+![The same bed in 3D](docs/planting-3d.png)
+
+- **Shape:** any outline. Reshape it corner by corner like a driveway; **Curved edge** runs a smooth curve through the corners. Surface is bark, soil, gravel or lawn.
+- **Design this bed** (or double-click the bed) opens the designer:
+  - The view drops to Plan and frames the bed. Trees whose canopy would cover it step aside while you work.
+  - Pick a plant in the palette, then click in the bed once for each one. Esc stops placing.
+  - Plants go exactly where you click. There is no grid, and circles may overlap or reach past the edge.
+  - Drag to move, Alt-drag to copy, Delete to remove. Delete never removes the bed while the designer is open.
+- **Symbols or plants:** symbols are the planting-plan view (a circle the width of the mature plant, coloured by its flowers, with an edge that says what kind of plant it is). Plants are the 3D models. The switch is in the designer, and under **Plant symbols** in the map layers for the whole yard. Plan / 3D / Eye level work in both.
+- **Numbers:** every plant of a kind carries the same number, listed in the planting key with a count.
+- **Sun check:** select a plant to see the hours of sun at that spot and whether it suits the plant. The palette flags plants that want different light from the bed's average.
+- **Seasons:** flowers appear inside each plant's bloom dates. Out of season, perennials are cut back, grasses and seedheads stand tan, shrubs are bare and evergreens stay.
+
+The plant list and the models are a starter set. Shrubs and perennials do not cast shade in the sun-hours maths yet.
+
+#### Adding plants and models
+
+| To change | Edit | Notes |
+| --- | --- | --- |
+| The plant list | `src/garden/plants.js` | One entry per plant: size, colours, bloom dates, sun, zones. The header documents every field. |
+| Plan symbols and 3D models | `src/garden/models.js` | `HABITS` (overall form: symbol edge, foliage geometry, where flowers sit) and `FLOWERS` (one flower of each form). A plant picks one of each by key. |
+| How a bed is drawn | `src/garden/beds.js` | Outline, mulch, instancing, seasons. Rarely needs touching. |
+
+In plan files a bed is `{type:"planting", x, y, rot, poly, smooth, mulch, plants:[{id, k, x, y}]}`: `k` is the catalog key and `x, y` are feet in the bed's own axes.
 
 ### Trees
 

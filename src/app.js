@@ -5,6 +5,9 @@ import { lawnTextures, sidingTextures, shingleTextures, concreteTile, paverTextu
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { TreeLibrary, leafKindFor } from "./trees/trees.js";
 import { createPost } from "./post.js";
+import { PLANTS, CATEGORIES, plantByKey, symbolColor, sunClass, SUN_LABEL, sunNeeds, bloomText, bedLegend } from "./garden/plants.js";
+import { symbolPath } from "./garden/models.js";
+import { MULCHES, bedOutline, starterOutline, plantRadius, plantAt, bedSeasonKey, buildPlantingBed } from "./garden/beds.js";
 
 const DEG = Math.PI/180;
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
@@ -212,6 +215,19 @@ function fromPreset(name, x, y){
   if(d.cb != null) o.crownBase = d.cb;
   return o;
 }
+/* The planting bed in the starting yard: tall at the back, low along the front. */
+function starterPlanting(x, y){
+  const rows = [
+    ["karl-foerster", [-6,1.6],[-4.3,2],[5.5,1.8]], ["hydrangea-little-lime", [.5,1.2]],
+    ["russian-sage", [-2.5,1.4],[3.3,1.6]], ["coneflower-magnus", [-5.2,-.3],[-3.8,-.5],[-4.5,.6]],
+    ["rudbeckia-goldsturm", [2.2,-.4],[3.6,-.2],[5,.1]], ["catmint-walkers-low", [-7,-1.2],[-1.5,-1.6],[6.6,-1.4]],
+    ["salvia-may-night", [0,-1.4],[1.2,-1.8],[-.2,-2.6]], ["sedum-autumn-joy", [7.6,.6],[-8,.4]],
+    ["creeping-thyme", [-3.5,-2.8],[2.8,-3],[4.6,-2.4]], ["daylily-stella", [-6,-2.2],[8.2,-.6]]
+  ];
+  const plants = [];
+  for(const [k, ...at] of rows) for(const [px, py] of at) plants.push({id:nid(), k, x:px, y:py});
+  return {id:nid(), type:"planting", name:"Perennial border", x, y, rot:0, poly:starterOutline(20, 8), smooth:true, mulch:"bark", plants};
+}
 function isoToday(){
   const d = new Date();
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
@@ -222,6 +238,7 @@ function freshState(){
     place:"Fargo, ND", tzMode:"zone", tzZone:"America/Chicago",
     date: isoToday(), minutes: 13*60,
     north:0, grid:5, snap:true, showGrid:true, simple:false, gridFrame:null,
+    plantView:"plants", plantLabels:true,
     yard:{w:110, h:90},
     boundary: rectPoly(110, 90),
     boundaryLabels:[], boundaryImage:null, boundaryImageDraft:null,
@@ -234,7 +251,7 @@ function freshState(){
       fromPreset("Sienna Glen Maple", -32, 8),
       fromPreset("Black Hills spruce", 34, -2),
       {id:nid(), type:"bed", name:"Vegetable bed", x:2, y:20, w:16, h:8, rot:0},
-      {id:nid(), type:"bed", name:"Perennial bed", x:-26, y:30, w:20, h:6, rot:0}
+      starterPlanting(30, 30)
     ],
     sel:null
   };
@@ -258,7 +275,18 @@ let nodeEdit = false;
 
 const isPoly = o => !!(o && o.poly);
 const isPaved = o => !!(o && Object.hasOwn(PAVING,o.type));
-const isOutlineType = o => o.type === "structure" || o.type === "deck" || isPaved(o);
+const isOutlineType = o => o.type === "structure" || o.type === "deck" || o.type === "planting" || isPaved(o);
+const isPlanting = o => !!(o && o.type === "planting");
+/* raised beds and planting beds both get sun-hour readings */
+const isBed = o => !!(o && (o.type === "bed" || o.type === "planting"));
+/* the rectangle, in a bed's own axes, that its sun readings are sampled over */
+function bedFrame(o){
+  if(o.type !== "planting") return {cx:0, cy:0, w:o.w, h:o.h, outline:null};
+  const outline = bedOutline(o), b = bbox(outline);
+  return {cx:b.cx, cy:b.cy, w:Math.max(.5, b.w), h:Math.max(.5, b.h), outline};
+}
+/* a planting bed's drawn edge (curved if smoothed) in yard coordinates */
+function outlineWorld(o){ return isPlanting(o) ? worldPoly({...o, poly:bedOutline(o)}) : worldPoly(o); }
 function ensureFenceSides(){
   const n = S.boundary.length;
   if(!Array.isArray(S.fence.sides)) S.fence.sides = [];
@@ -615,7 +643,16 @@ function scheduleCompute(){
     mask[r*cols+q] = pointInPoly(S.boundary, x0+q*cell, y0+r*cell) ? 1 : 0;
 
   const NB = 11;
-  const bedAcc = S.objects.filter(o=>o.type==="bed").map(bd=>({b:bd, grid:new Float32Array(NB*NB), series:new Float32Array(times.length)}));
+  const bedAcc = S.objects.filter(isBed).map(bd=>{
+    const fr = bedFrame(bd), mask = new Uint8Array(NB*NB);
+    let inside = 0;
+    for(let iy=0; iy<NB; iy++) for(let ix=0; ix<NB; ix++){
+      const on = !fr.outline || pointInPoly(fr.outline, fr.cx + (ix/(NB-1) - .5)*fr.w, fr.cy + (iy/(NB-1) - .5)*fr.h);
+      if(on){ mask[iy*NB+ix] = 1; inside++; }
+    }
+    if(!inside){ mask.fill(1); inside = NB*NB; }
+    return {b:bd, fr, mask, inside, grid:new Float32Array(NB*NB), series:new Float32Array(times.length)};
+  });
   computeJob = {
     i:0, times, stepH:stepMin/60, raf:0, NB, bedAcc, wantHeat:S.heat,
     heat:{cols, rows, cell, x0, y0, mask, data:new Float32Array(cols*rows), max:0}
@@ -643,13 +680,13 @@ function computeTick(){
       }
     }
     for(const acc of J.bedAcc){
-      const b = acc.b, a = b.rot*DEG, N = J.NB;
+      const b = acc.b, a = (b.rot||0)*DEG, N = J.NB, fr = acc.fr;
       for(let iy=0; iy<N; iy++){
-        const ly = (iy/(N-1) - .5)*b.h;
+        const ly = fr.cy + (iy/(N-1) - .5)*fr.h;
         for(let ix=0; ix<N; ix++){
-          const p = rot2((ix/(N-1) - .5)*b.w, ly, a);
+          const p = rot2(fr.cx + (ix/(N-1) - .5)*fr.w, ly, a);
           const f = sunFraction(c, b.x+p.x, b.y+p.y);
-          if(f > 0){ acc.grid[iy*N+ix] += J.stepH*f; acc.series[ti] += f/(N*N); }
+          if(f > 0){ acc.grid[iy*N+ix] += J.stepH*f; if(acc.mask[iy*N+ix]) acc.series[ti] += f/acc.inside; }
         }
       }
     }
@@ -662,7 +699,11 @@ function computeTick(){
   bedStats = new Map();
   for(const acc of J.bedAcc){
     let sum=0, mn=99, mxb=0, good=0;
-    for(const v of acc.grid){ sum+=v; if(v<mn) mn=v; if(v>mxb) mxb=v; if(v>=S.fullSun) good++; }
+    for(let i=0;i<acc.grid.length;i++){
+      if(!acc.mask[i]) continue;
+      const v = acc.grid[i];
+      sum+=v; if(v<mn) mn=v; if(v>mxb) mxb=v; if(v>=S.fullSun) good++;
+    }
     /* hour-by-hour share of the bed in sun, for the insights strip */
     const hours = [];
     for(let i=0;i<J.times.length;i++){
@@ -672,8 +713,9 @@ function computeTick(){
       h.f += acc.series[i]; h.n++;
     }
     for(const h of hours) h.f /= h.n;
-    bedStats.set(acc.b.id, {avg:sum/acc.grid.length, min:mn, max:mxb,
-                            pct:Math.round(100*good/acc.grid.length), grid:acc.grid, N:J.NB, hours});
+    bedStats.set(acc.b.id, {avg:sum/acc.inside, min:mn, max:mxb,
+                            pct:Math.round(100*good/acc.inside), grid:acc.grid, N:J.NB, hours,
+                            fr:acc.fr, mask:acc.mask, inside:acc.inside});
   }
   computeJob = null;
   onComputeDone();
@@ -1417,12 +1459,41 @@ function refreshHeat(){
 function disposeTree(root){
   root.traverse(n=>{
     if(n.geometry && !n.geometry.userData.shared) n.geometry.dispose();
+    if(n.isInstancedMesh) n.dispose();
     if(n.material?.userData?.uniforms) n.material.dispose();
   });
+}
+/* What beds.js needs to know to draw a planting bed right now. */
+const toneCache = new Map();
+function toneColor(hex){
+  const exposure = renderer.toneMappingExposure || 1, key = hex+"|"+exposure;
+  let c = toneCache.get(key);
+  if(!c){
+    c = preToneMap([hex>>16 & 255, hex>>8 & 255, hex & 255], exposure).map(v=>toLin(v)*HEAT_GAIN);
+    toneCache.set(key, c);
+  }
+  return c;
+}
+/* The designer has its own symbols/plants switch, so opening it never edits the plan. */
+const plantMode = ()=>(design ? design.view : S.plantView) === "symbols" ? "symbols" : "plants";
+const plantSeason = ()=>({md:seasonMD(), growing:leafOn(), fall:fallAmount()});
+function gardenCtx(){
+  return {simple:!!S.simple, mode:plantMode(), season:plantSeason(),
+          tone:toneColor, toneKey:renderer.toneMappingExposure || 1, soilMap:TEX.soil};
+}
+function rebuildPlantings(onlyIfSeasonChanged){
+  const season = onlyIfSeasonChanged ? plantSeason() : null;
+  for(const o of S.objects){
+    if(!isPlanting(o)) continue;
+    if(season && meshes.get(o.id)?.userData.seasonKey === bedSeasonKey(o, season)) continue;
+    rebuildObject(o);
+  }
+  markDirty();
 }
 function buildFor(o){
   return o.type === "tree" ? buildTree(o)
        : o.type === "bed" ? buildBed(o)
+       : o.type === "planting" ? buildPlantingBed(o, gardenCtx())
        : o.type === "deck" ? buildDeck(o)
        : isPaved(o) ? buildPaved(o)
        : buildStructure(o);
@@ -1437,6 +1508,7 @@ function rebuildObject(o){
   objGroup.add(m);
   meshes.set(o.id, m);
   shadowStamp++;
+  if(design) applyDesignVisibility();
   if(activeView === "vplan") applyCamera();
 }
 function rebuildAll(){
@@ -1444,6 +1516,7 @@ function rebuildAll(){
   meshes.clear();
   for(const o of S.objects) rebuildObject(o);
   buildFence();
+  applyDesignVisibility();
   markDirty();
 }
 function placeObject(o){
@@ -1485,7 +1558,7 @@ function updateSelection(){
     } else {
       const pts = [];
       if(o.poly){
-        const w = worldPoly(o);
+        const w = outlineWorld(o);
         for(let i=0,j=w.length-1;i<w.length;j=i++) pts.push(w[j].x,0,w[j].y, w[i].x,0,w[i].y);
       } else {
         const hw = o.w/2+.4, hd = o.h/2+.4;
@@ -1501,8 +1574,11 @@ function updateSelection(){
       selRing.position.y = OVER + .11;
     }
     selRing.renderOrder = 4;
+    /* while designing, the bed's own edge is enough; keep the ring off the plants */
+    selRing.visible = !(design && design.bedId === o.id);
     helperGroup.add(selRing);
   }
+  updatePlantRing();
   markDirty();
 }
 function localOf(o, gx, gy){
@@ -1695,6 +1771,7 @@ function setView(v, recenter){
   camAnim = null;
   ["vplan","v3d","veye"].forEach(id=>document.getElementById(id).setAttribute("aria-pressed", id === v));
   applyCamera();
+  applyDesignVisibility();
   const b = gridBounds(), span = Math.max(b.w, b.h), center = gridToWorld({x:b.cx,y:b.cy});
   // keep wherever the person has panned to unless they explicitly ask to reframe
   const base = recenter ? {tx:center.x, tz:center.y, az:-gridFrame().angle} : {tx:orbit.tx, tz:orbit.tz};
@@ -1790,8 +1867,10 @@ function project(x, y, z){
   _v.set(x, y, z).project(camera);
   return {x:(_v.x*.5+.5)*window.innerWidth, y:(-_v.y*.5+.5)*window.innerHeight, z:_v.z};
 }
+const camRight = new THREE.Vector3();
 function updateLabels(){
   let n = 0;
+  camRight.setFromMatrixColumn(camera.matrixWorld, 0);
   const take = cls=>{
     let el = labelPool[n];
     if(!el){ el = document.createElement("div"); labelHost.appendChild(el); labelPool.push(el); }
@@ -1799,7 +1878,7 @@ function updateLabels(){
     return el;
   };
   for(const o of S.objects){
-    if(o.type !== "bed") continue;
+    if(!isBed(o) || (design && design.bedId === o.id)) continue;
     const st = bedStats.get(o.id);
     if(!st) continue;
     const p = project(o.x, 1.2, o.y);
@@ -1817,6 +1896,25 @@ function updateLabels(){
       const ft = Math.floor(d), inch = Math.round((d-ft)*12);
       el.textContent = d.toFixed(1)+" ft · "+ft+"' "+inch+'"';
       el.style.left = p.x+"px"; el.style.top = (p.y-14)+"px";
+    }
+  }
+  /* plant numbers: the same number on every plant of a kind, as on a planting plan */
+  if(S.plantLabels) for(const bed of S.objects){
+    if(!isPlanting(bed) || !bed.plants?.length) continue;
+    const designing = design && design.bedId === bed.id;
+    const flat = S.simple || plantMode() === "symbols";
+    if(!designing && !flat) continue;
+    const nos = new Map(bedLegend(bed).map(r=>[r.k, r.no])), a = (bed.rot||0)*DEG;
+    for(const pl of bed.plants){
+      const q = rot2(pl.x, pl.y, a), r = plantRadius(pl), wx = bed.x+q.x, wz = bed.y+q.y;
+      const y = flat ? .1 : plantByKey(pl.k).h*(pl.s||1);
+      const p = project(wx, y, wz);
+      if(p.z > 1 || p.z < -1 || p.x < -20 || p.y < -20 || p.x > innerWidth+20 || p.y > innerHeight+20) continue;
+      const e = project(wx + camRight.x*r, y, wz + camRight.z*r);
+      if(Math.hypot(e.x-p.x, e.y-p.y) < 9) continue;
+      const el = take("pno" + (designing && design.sel === pl.id ? " on" : ""));
+      el.textContent = nos.get(pl.k);
+      el.style.left = p.x+"px"; el.style.top = p.y+"px";
     }
   }
   for(let i=n;i<labelPool.length;i++) labelPool[i].style.display = "none";
@@ -2152,6 +2250,7 @@ const GROUND = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
 const CANOPY_PLANE = new THREE.Plane(new THREE.Vector3(0,1,0), -.07);
 const pointers = new Map();
 let mode = null, pinch = null, dragObj = null, dragOff = null, panGrab = null;
+let dragPlant = null, plantMoved = false, stampDown = null;
 let measure = {a:null, b:null, live:null};
 
 function ndc(x,y){
@@ -2266,6 +2365,29 @@ canvas.addEventListener("pointerdown", e=>{
     mode = "measure";
     return;
   }
+  if(design){
+    /* Designing a bed: the pointer works on its plants, never on the yard. */
+    const bed = designBed(), g = groundAt(e.clientX, e.clientY);
+    stampDown = null;
+    if(bed && g && e.button === 0){
+      const l = localOf(bed, g.x, g.y);
+      if(design.stamp) stampDown = {x:e.clientX, y:e.clientY};     // placed on release, if this was a click and not a pan
+      else {
+        let pl = plantAt(bed, l.x, l.y);
+        if(pl){
+          if(e.altKey){ pl = {...pl, id:nid()}; bed.plants.push(pl); rebuildObject(bed); }
+          design.sel = pl.id;
+          dragPlant = pl; dragOff = {x:pl.x-l.x, y:pl.y-l.y}; plantMoved = false; mode = "plant";
+          updatePlantRing(); drawPanel();
+          return;
+        }
+        if(design.sel != null){ design.sel = null; updatePlantRing(); drawPanel(); }
+      }
+    }
+    mode = activeView === "vplan" ? "pan" : "orbit";
+    if(mode === "pan"){ panGrab = grabPan(e.clientX, e.clientY); canvas.style.cursor = "grabbing"; }
+    return;
+  }
   const hitObj = pickObject(e.clientX, e.clientY);
   if(tool !== "select" && !hitObj){
     const g = groundAt(e.clientX, e.clientY);
@@ -2288,6 +2410,7 @@ canvas.addEventListener("mousedown", e=>{ if(e.button === 1) e.preventDefault();
 canvas.addEventListener("auxclick", e=>{ if(e.button === 1) e.preventDefault(); });
 canvas.addEventListener("pointermove", e=>{
   const held = pointers.has(e.pointerId);
+  if(!held && design?.stamp && tool === "select") moveStampGhost(e.clientX, e.clientY);
   if(!held && !(tool === "measure" && measure.a && !measure.b)) return;
   const prev = held ? pointers.get(e.pointerId) : null;
   if(held) pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
@@ -2302,6 +2425,17 @@ canvas.addEventListener("pointermove", e=>{
   if(!held && tool === "measure"){
     const g = groundAt(e.clientX, e.clientY);
     if(g){ measure.live = snapPt(g); drawMeasureLine(); }
+    return;
+  }
+  if(mode === "plant" && dragPlant){
+    const bed = designBed(), g = groundAt(e.clientX, e.clientY);
+    if(bed && g){
+      /* free placement: plants ignore the yard grid */
+      const l = localOf(bed, g.x, g.y);
+      dragPlant.x = +(l.x+dragOff.x).toFixed(2); dragPlant.y = +(l.y+dragOff.y).toFixed(2);
+      plantMoved = true;
+      queueRebuild(bed); updatePlantRing();
+    }
     return;
   }
   if(mode === "drag" && dragObj){
@@ -2330,6 +2464,16 @@ function endPointer(e){
     mode = "pan";
   }
   if(mode === "drag") scheduleCompute();
+  if(mode === "plant"){
+    if(plantMoved){ scheduleHist(); syncProject(); }
+    dragPlant = null; panelFor = null; drawPanel();
+  }
+  if(stampDown && design?.stamp && e.type === "pointerup" && pointers.size === 0
+     && Math.hypot(e.clientX-stampDown.x, e.clientY-stampDown.y) < 6){
+    const g = groundAt(e.clientX, e.clientY);
+    if(g) stampPlant(g);
+  }
+  stampDown = null;
   dragObj = null;
   if(pointers.size === 0){
     if(mode !== "measure") mode = null;
@@ -2341,6 +2485,9 @@ canvas.addEventListener("pointerup", endPointer);
 canvas.addEventListener("pointercancel", endPointer);
 canvas.addEventListener("contextmenu", e=>e.preventDefault());
 canvas.addEventListener("dblclick", e=>{
+  if(design) return;
+  const hit = tool === "select" ? pickObject(e.clientX, e.clientY) : null;
+  if(isPlanting(hit)){ enterDesign(hit); return; }
   const g = groundAt(e.clientX, e.clientY);
   if(g) recenterOn(g.x, g.y);
 });
@@ -2348,6 +2495,7 @@ let lastTap = 0, lastTapPt = null;
 canvas.addEventListener("pointerup", e=>{        // double-tap to re-centre on touch
   if(e.pointerType === "mouse") return;
   const now = performance.now();
+  if(design){ lastTap = 0; return; }
   if(now - lastTap < 320 && lastTapPt && Math.hypot(e.clientX-lastTapPt.x, e.clientY-lastTapPt.y) < 26){
     const g = groundAt(e.clientX, e.clientY);
     if(g) recenterOn(g.x, g.y);
@@ -2380,6 +2528,8 @@ function addObject(kind, p){
   const rot = gridFrame().angle;
   if(kind === "tree") o = fromPreset(pendingPreset || PRESETS[0].n, p.x, p.y);
   else if(kind === "bed") o = {id:nid(), type:"bed", name:"Garden bed", x:p.x, y:p.y, w:12, h:4, rot};
+  else if(kind === "planting") o = {id:nid(), type:"planting", name:"Planting bed", x:p.x, y:p.y, rot,
+                                    poly:starterOutline(16, 7), smooth:true, mulch:"bark", plants:[]};
   else if(kind === "deck") o = {id:nid(), type:"deck", name:"Deck", x:p.x, y:p.y, rot, height:.5, poly:rectPoly(16,12)};
   else if(Object.hasOwn(PAVING,kind)){
     const preset = PAVING[kind];
@@ -2396,6 +2546,10 @@ function addObject(kind, p){
     if(window.innerWidth <= 1020) openSheet(true);
     toast("Drag corners or add points to shape the "+kind+". Choose Done reshaping when finished.");
   }
+  if(isPlanting(o)){
+    if(window.innerWidth <= 1020) openSheet(true);
+    toast("Planting bed added. Choose Design this bed to fill it with plants.");
+  }
 }
 function removeSelected(){
   if(S.sel === BOUNDARY) return;
@@ -2407,11 +2561,239 @@ function removeSelected(){
   scheduleCompute();
 }
 function select(id){
+  if(design && id !== design.bedId) exitDesign(true);
   S.sel = id;
   if(id !== BOUNDARY && !S.objects.find(o=>o.id===id)){ nodeEdit = false; activeNode = null; }
   updateSelection();
   drawPanel();
   drawList();
+}
+
+/* ============================================================ bed designer --
+   Designing is a mode on one planting bed. The plan camera frames the bed,
+   the inspector becomes a plant palette and key, and the pointer places,
+   moves and removes plants instead of yard objects. Plants sit wherever they
+   are dropped (no grid) and may overlap. */
+let design = null;       // {bedId, sel, stamp, cat, q, view}
+let plantRing = null, stampGhost = null;
+function designBed(){ return design ? S.objects.find(o=>o.id === design.bedId && isPlanting(o)) || null : null; }
+function designPlant(){ const bed = designBed(); return bed && design.sel != null ? bed.plants.find(p=>p.id === design.sel) || null : null; }
+function plantWorld(bed, pl){ const q = rot2(pl.x, pl.y, (bed.rot||0)*DEG); return {x:bed.x+q.x, y:bed.y+q.y}; }
+function ringMesh(r, width, color, opacity){
+  const geo = new THREE.RingGeometry(Math.max(.02, r), r + width, 56);
+  geo.rotateX(-Math.PI/2);
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color, transparent:true, opacity, side:THREE.DoubleSide, depthWrite:false, depthTest:false}));
+  m.renderOrder = 6;
+  return m;
+}
+function dropHelper(m){ if(m){ helperGroup.remove(m); m.geometry.dispose(); m.material.dispose(); } return null; }
+function updatePlantRing(){
+  plantRing = dropHelper(plantRing);
+  const bed = designBed(), pl = designPlant();
+  if(pl){
+    const w = plantWorld(bed, pl), r = plantRadius(pl);
+    plantRing = ringMesh(r, Math.max(.07, r*.07), 0xffb43f, .95);
+    plantRing.position.set(w.x, OVER + .14, w.y);
+    helperGroup.add(plantRing);
+  }
+  markDirty();
+}
+function setStamp(k){
+  if(!design) return;
+  design.stamp = k || null; design.sel = null;
+  stampGhost = dropHelper(stampGhost);
+  if(design.stamp){
+    const r = plantByKey(design.stamp).w/2;
+    stampGhost = ringMesh(r*.96, r*.04 + .03, 0xffffff, .8);
+    stampGhost.visible = false;
+    helperGroup.add(stampGhost);
+    setTool("select");
+    if(window.innerWidth <= 1020) openSheet(false);     // on a phone the sheet covers the bed
+  }
+  canvas.style.cursor = design.stamp ? "copy" : "default";
+  updatePlantRing(); panelFor = null; drawPanel();
+}
+function moveStampGhost(sx, sy){
+  if(!stampGhost) return;
+  const g = groundAt(sx, sy);
+  stampGhost.visible = !!g;
+  if(g) stampGhost.position.set(g.x, OVER + .14, g.y);
+  markDirty();
+}
+function stampPlant(g){
+  const bed = designBed();
+  if(!bed || !design.stamp) return;
+  const l = localOf(bed, g.x, g.y), outline = bedOutline(bed), reach = plantByKey(design.stamp).w/2 + 1;
+  let near = pointInPoly(outline, l.x, l.y);
+  for(let i=0,j=outline.length-1; !near && i<outline.length; j=i++)
+    near = distToSeg(l.x, l.y, outline[j].x, outline[j].y, outline[i].x, outline[i].y).d <= reach;
+  if(!near){ toast("Click inside the bed to plant. Esc stops placing."); return; }
+  bed.plants.push({id:nid(), k:design.stamp, x:+l.x.toFixed(2), y:+l.y.toFixed(2)});
+  rebuildObject(bed);
+  scheduleHist(); panelFor = null; drawPanel(); drawList();
+}
+function removePlant(id){
+  const bed = designBed();
+  if(!bed) return;
+  bed.plants = bed.plants.filter(p=>p.id !== id);
+  if(design.sel === id) design.sel = null;
+  rebuildObject(bed); updatePlantRing();
+  scheduleHist(); panelFor = null; drawPanel(); drawList();
+}
+function setPlantView(v){
+  v = v === "symbols" ? "symbols" : "plants";
+  if(plantMode() !== v){
+    if(design) design.view = v; else { S.plantView = v; scheduleHist(); }
+    rebuildPlantings();
+  }
+  syncLayers(); panelFor = null; drawPanel(); markDirty();
+}
+/* A canopy over the bed would hide it from straight above: while designing in
+   Plan, trees that reach over the bed step aside. */
+function applyDesignVisibility(){
+  const bed = designBed(), reach = bed ? objReach(bed) : 0;
+  let changed = false;
+  for(const o of S.objects){
+    if(o.type !== "tree") continue;
+    const m = meshes.get(o.id);
+    if(!m) continue;
+    const hide = !!bed && activeView === "vplan" && !S.simple && Math.hypot(o.x-bed.x, o.y-bed.y) < o.spread/2 + reach;
+    if(m.visible === hide){ m.visible = !hide; changed = true; }
+  }
+  if(changed) markShadows();
+}
+function enterDesign(o){
+  if(!isPlanting(o)) return;
+  nodeEdit = false; activeNode = null;
+  if(S.sel !== o.id) select(o.id);
+  setTool("select");
+  design = {bedId:o.id, sel:null, stamp:null, cat:"all", q:"", view:"symbols", sunWasOpen:!$("sunpanel").classList.contains("min")};
+  document.body.classList.add("designing");
+  /* the sun card would sit on top of the bed; tuck it away while designing */
+  if(design.sunWasOpen){ $("sunpanel").classList.add("min"); syncSunH(); }
+  rebuildPlantings(); syncLayers();
+  setView("vplan");
+  /* frame the bed in the space between the rail and the inspector */
+  const b = bbox(outlineWorld(o)), wide = window.innerWidth > 1020;
+  const availW = Math.max(240, window.innerWidth - (wide ? 480 : 0)), availH = Math.max(200, window.innerHeight*(wide ? 1 : .5) - 150);
+  const perPx = Math.max(b.w*1.3/availW, b.h*1.3/availH);            // feet per screen pixel
+  const dist = clamp(perPx*window.innerHeight/(2*Math.tan(perspectiveCamera.fov*DEG/2)), 12, 900);
+  const shift = wide ? 160*perPx : 0;
+  const a = orbit.az*DEG;
+  flyTo({tx:b.cx + Math.cos(a)*shift, tz:b.cy - Math.sin(a)*shift, ty:0, el:90, dist}, 500);
+  updateSelection(); panelFor = null; drawPanel();
+  if(window.innerWidth <= 1020) openSheet(true);
+  toast("Pick a plant, then click in the bed. Drag a plant to move it.");
+}
+function exitDesign(quiet){
+  if(!design) return;
+  const changed = plantMode() !== (S.plantView === "symbols" ? "symbols" : "plants");
+  if(design.sunWasOpen){ $("sunpanel").classList.remove("min"); syncSunH(); }
+  design = null;
+  document.body.classList.remove("designing");
+  plantRing = dropHelper(plantRing); stampGhost = dropHelper(stampGhost);
+  canvas.style.cursor = "default";
+  if(changed) rebuildPlantings();
+  syncLayers(); applyDesignVisibility();
+  if(!quiet){ updateSelection(); panelFor = null; drawPanel(); }
+  markDirty();
+}
+
+/* ---------- planting bed panels ---------- */
+const hexCss = h=>"#"+h.toString(16).padStart(6,"0");
+function swatchSVG(p, no){
+  return `<svg class="psw" viewBox="0 0 40 40" aria-hidden="true"><path d="${symbolPath(p.habit, 20, 20, 17)}" fill="${hexCss(symbolColor(p))}" fill-opacity=".88" stroke="#1c1a17" stroke-width="1.6" stroke-linejoin="round"/>`
+    + (no != null ? `<circle cx="20" cy="20" r="8.5" fill="#F6F2E7"/><text x="20" y="24.2" text-anchor="middle" font-family="Instrument Serif,Georgia,serif" font-size="13" fill="#1c1a17">${no}</text>` : `<circle cx="20" cy="20" r="1.6" fill="#1c1a17"/>`)
+    + `</svg>`;
+}
+const fmtFt = v=>v < 1 ? Math.round(v*12)+" in" : (+v.toFixed(1))+" ft";
+const plantSize = p=>fmtFt(p.h)+" tall · "+fmtFt(p.w)+" wide";
+/* hours of direct sun where one plant stands, from the bed's sun readings */
+function sunAtPlant(bed, pl){
+  const st = bedStats.get(bed.id);
+  if(!st || !st.fr) return null;
+  const N = st.N, ix = clamp(Math.round(((pl.x-st.fr.cx)/st.fr.w + .5)*(N-1)), 0, N-1),
+        iy = clamp(Math.round(((pl.y-st.fr.cy)/st.fr.h + .5)*(N-1)), 0, N-1);
+  return st.grid[iy*N+ix];
+}
+/* plants in this bed standing where the sun does not suit them, on the plan's date */
+function sunMisfits(bed){
+  const out = [];
+  for(const pl of bed.plants || []){
+    const h = sunAtPlant(bed, pl);
+    if(h != null && !plantByKey(pl.k).sun.includes(sunClass(h, S.fullSun))) out.push({pl, h});
+  }
+  return out;
+}
+function legendHTML(bed, pick){
+  const rows = bedLegend(bed);
+  if(!rows.length) return `<p class="hint" style="margin:0">No plants yet.</p>`;
+  const bad = new Set(sunMisfits(bed).map(m=>m.pl.k));
+  return `<div class="plegend">` + rows.map(r=>`<${pick ? `button data-stamp="${escapeHTML(r.k)}" aria-pressed="${design?.stamp === r.k}" title="Place more of these"` : "div"} class="prow">
+      ${swatchSVG(r.plant, r.no)}<span class="tx"><b>${escapeHTML(r.plant.n)}</b><i>${escapeHTML(r.plant.sci || "")}</i></span>
+      ${bad.has(r.k) ? `<span class="pwarn" title="Some of these get the wrong amount of sun here">sun</span>` : ""}<span class="ct num">× ${r.count}</span></${pick ? "button" : "div"}>`).join("") + `</div>`;
+}
+function plantCardHTML(bed, pl){
+  const p = plantByKey(pl.k), no = bedLegend(bed).find(r=>r.k === pl.k)?.no;
+  const h = sunAtPlant(bed, pl), cls = h == null ? null : sunClass(h, S.fullSun), ok = cls && p.sun.includes(cls);
+  const day = new Date(S.date+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});
+  return `<div class="isec plantcard"><div class="prow">${swatchSVG(p, no)}<span class="tx"><b>${escapeHTML(p.n)}</b><i>${escapeHTML(p.sci || "")}</i></span></div>
+    <div class="chips sm"><span>${plantSize(p)}</span><span>${bloomText(p)}</span><span>${sunNeeds(p)}</span><span>Zones ${p.zone[0]}–${p.zone[1]}</span></div>
+    ${h == null ? `<p class="hint">Measuring the sun on this spot…</p>`
+      : `<div class="fit ${ok ? "ok" : "bad"}"><svg class="ic"><use href="#i-${ok ? "check" : "close"}"/></svg><span>This spot gets <b class="num">${h.toFixed(1)} h</b> of direct sun on ${day}: ${SUN_LABEL[cls].toLowerCase()}. ${ok ? "That suits it." : "It wants "+sunNeeds(p).toLowerCase()+"."}</span></div>`}
+    ${p.note ? `<p class="profile">${escapeHTML(p.note)}</p>` : ""}
+    <div class="btnrow"><button class="btn" data-stamp="${escapeHTML(pl.k)}">Place more</button><button class="btn danger" data-act="delplant">Remove plant</button></div></div>`;
+}
+function paletteMatches(p){
+  if(design.cat !== "all" && p.cat !== design.cat) return false;
+  if(!design.q) return true;
+  const hay = (p.n+" "+(p.sci||"")+" "+p.cat+" "+(p.note||"")).toLowerCase();
+  return design.q.split(/\s+/).every(w=>hay.includes(w));
+}
+function paletteRowsHTML(bed){
+  const st = bedStats.get(bed.id), cls = st ? sunClass(st.avg, S.fullSun) : null;
+  const rows = PLANTS.filter(paletteMatches).map(p=>`<button class="prow" data-stamp="${escapeHTML(p.k)}" aria-pressed="${design.stamp === p.k}">
+      ${swatchSVG(p)}<span class="tx"><b>${escapeHTML(p.n)}</b><i>${plantSize(p)} · ${bloomText(p)}</i></span>
+      ${cls && !p.sun.includes(cls) ? `<span class="pwarn" title="This bed averages ${SUN_LABEL[cls].toLowerCase()}; it wants ${sunNeeds(p).toLowerCase()}">${sunNeeds(p)}</span>` : ""}</button>`).join("");
+  return rows || `<p class="hint">No plants match.</p>`;
+}
+function designPanelHTML(o){
+  const pl = designPlant(), stamp = design.stamp ? plantByKey(design.stamp) : null;
+  return `<div class="isec dview"><div class="seg" role="group" aria-label="How plants are drawn">
+        <button data-plantview="symbols" aria-pressed="${plantMode() === "symbols"}">Symbols</button>
+        <button data-plantview="plants" aria-pressed="${plantMode() !== "symbols"}">Plants</button></div>
+      <label class="chk"><input type="checkbox" class="sw" data-plantlabels ${S.plantLabels ? "checked" : ""}>Numbers</label></div>`
+    + (pl ? plantCardHTML(o, pl) : "")
+    + (stamp ? `<div class="isec stamping"><b>Placing ${escapeHTML(stamp.n)}</b><span>Click in the bed for each one. Esc when done.</span><button class="btn" data-stamp="">Stop</button></div>` : "")
+    + `<div class="isec"><div class="fh"><h4>Plant palette</h4><span>Pick one, then click in the bed</span></div>
+      <div class="seg tiny pcats">${[{k:"all", label:"All"}, ...CATEGORIES].map(c=>`<button data-plantcat="${c.k}" aria-pressed="${design.cat === c.k}">${c.label}</button>`).join("")}</div>
+      <label class="search psearch"><svg class="ic"><use href="#i-search"/></svg><input type="search" data-plantsearch placeholder="Search plants" value="${escapeHTML(design.q)}" aria-label="Search plants"></label>
+      <div class="palette">${paletteRowsHTML(o)}</div></div>`
+    + `<div class="isec"><div class="fh"><h4>Planting key</h4><span>${o.plants.length} plant${o.plants.length === 1 ? "" : "s"}</span></div>${legendHTML(o, true)}</div>`
+    + `<p class="hint">Drag a plant to move it. Alt-drag copies it. Delete removes the selected plant. Plants can overlap and reach past the bed edge.</p>`
+    + `<div class="ifoot">${o.plants.length ? `<button class="btn danger" data-act="clearplants">Clear bed</button>` : ""}<span class="grow"></span><button class="btn solid" data-act="enddesign">Done designing</button></div>`;
+}
+function plantKeyHTML(o){
+  const miss = sunMisfits(o);
+  return `<div class="fh"><h4>Planting key</h4><span>${o.plants.length} plant${o.plants.length === 1 ? "" : "s"}</span></div>${legendHTML(o, false)}`
+    + (miss.length ? `<div class="warn">${miss.length} plant${miss.length === 1 ? " stands" : "s stand"} where the sun does not suit ${miss.length === 1 ? "it" : "them"} on this date. Open the designer and select one to see why.</div>` : "");
+}
+function plantingPanelHTML(o, nameRow){
+  const b = bbox(bedOutline(o));
+  return `<div class="btnrow" style="margin:14px 0 4px"><button class="btn solid" data-act="design">Design this bed</button></div>`
+    + `<p class="hint" style="margin-top:6px">Opens the bed from above to place, move and swap plants. Double-clicking the bed does the same.</p>`
+    + `<div class="plkey">${plantKeyHTML(o)}</div>`
+    + `<div class="bedins" style="margin-top:14px;border-top:1px solid var(--line-2)">${bedInsightsHTML(o)}</div>`
+    + `<h4 style="margin-top:18px">Bed shape</h4>` + outlineHTML(o)
+    + `<div class="swrow"><span>Curved edge</span><input type="checkbox" class="sw" data-key="smooth" ${o.smooth ? "checked" : ""} aria-label="Curved edge"></div>`
+    + `<div class="field"><span class="lab">Surface</span><span style="flex:1.4"><select data-key="mulch">${
+        Object.entries(MULCHES).map(([k,v])=>`<option value="${k}" ${k === (o.mulch || "bark") ? "selected" : ""}>${v.label}</option>`).join("")}</select></span></div>`
+    + readRow("Overall", b.w.toFixed(1)+" × "+b.h.toFixed(1)+" ft")
+    + field("Rotation","rot",`min="-180" max="180" step="1" value="${o.rot||0}"`,"°")
+    + `<h4>Position</h4>` + field("Left–right","x",`step="1" value="${o.x}"`)
+    + field("Up–down","y",`step="1" value="${o.y}"`)
+    + nameRow
+    + `<div class="clearbox">${clearanceHTML(o)}</div>`;
 }
 
 /* ============================================================ inspector ---- */
@@ -2639,7 +3021,7 @@ function inspectorHeader(o){
   const tag = $("seltag"), sub = $("selsub"), tags = $("seltags");
   if(!o){ tag.textContent = ""; sub.textContent = ""; tags.innerHTML = ""; return; }
   const p = presetFor(o);
-  const kind = {tree:"Tree", bed:"Garden bed", structure:"Building", deck:"Deck", driveway:"Driveway", sidewalk:"Sidewalk", boundary:"Property"}[o.type] || o.type;
+  const kind = {tree:"Tree", bed:"Garden bed", planting:design ? "Planting bed · Designing" : "Planting bed", structure:"Building", deck:"Deck", driveway:"Driveway", sidewalk:"Sidewalk", boundary:"Property"}[o.type] || o.type;
   tag.textContent = o.type === "tree" ? [kind, o.evergreen ? "Evergreen" : "Deciduous", p ? p.gn : "Custom"].join(" · ") : kind;
   sub.textContent = p?.sci || "";
   let t = "";
@@ -2654,6 +3036,10 @@ function inspectorHeader(o){
     const st = bedStats.get(o.id);
     if(st) t += st.avg >= S.fullSun ? `<span class="tagp brass">Full sun</span>` : st.avg >= 4 ? `<span class="tagp sky">Part sun</span>` : `<span class="tagp">Shade</span>`;
     t += `<span class="tagp">${o.w} × ${o.h} ft · ${Math.round(o.w*o.h)} sq ft</span>`;
+  } else if(o.type === "planting"){
+    const st = bedStats.get(o.id);
+    if(st) t += st.avg >= S.fullSun ? `<span class="tagp brass">Full sun</span>` : st.avg >= 4 ? `<span class="tagp sky">Part sun</span>` : `<span class="tagp">Shade</span>`;
+    t += `<span class="tagp">${Math.round(polyArea(bedOutline(o)))} sq ft</span><span class="tagp leaf">${o.plants.length} plant${o.plants.length === 1 ? "" : "s"}</span>`;
   } else if(o.type === "boundary"){
     t += `<span class="tagp">${Math.round(polyArea(S.boundary)).toLocaleString()} sq ft</span><span class="tagp">${S.boundary.length} corners</span>`;
   }
@@ -2666,6 +3052,14 @@ const FITS = [
   [4, ["Lettuce","Kale","Chard","Peas","Beets","Carrots"], "Good for greens, roots and most herbs."],
   [0, ["Lettuce","Spinach","Mint","Hostas","Ferns"], "Leafy greens only, or move the bed."]
 ];
+/* for planting beds the suggestions come from the plant catalog */
+function plantingFit(h){
+  const cls = sunClass(h, S.fullSun);
+  const names = PLANTS.filter(p=>p.sun.includes(cls)).slice(0, 9).map(p=>p.n.replace(/ '.*$/, ""));
+  return [0, names, cls === "full" ? "Full sun: most flowering perennials and grasses do well."
+    : cls === "part" ? "Part sun: choose plants that take some shade."
+    : "Shade: foliage plants such as hostas and ferns."];
+}
 function fitsFor(h){ return FITS.find(f=>h >= f[0]) || FITS[FITS.length-1]; }
 function fmtHM(mins){ const h = Math.floor(mins/60), m = Math.round(mins%60); return h+" h "+String(m).padStart(2,"0")+" m"; }
 function bedInsightsHTML(o){
@@ -2673,7 +3067,7 @@ function bedInsightsHTML(o){
   if(!st) return `<div class="isec"><p class="hint" style="margin:0">Measuring the sun on this bed…</p></div>`;
   const ed = dayEdges(), dayMin = Math.max(0, ed.set - ed.rise), dayH = dayMin/60;
   const C = 2*Math.PI*54, frac = dayH > 0 ? clamp(st.avg/dayH, 0, 1) : 0;
-  const fit = fitsFor(st.avg);
+  const fit = isPlanting(o) ? plantingFit(st.avg) : fitsFor(st.avg);
   let html = `<div class="isec ring"><svg viewBox="0 0 132 132" role="img" aria-label="${st.avg.toFixed(1)} of ${dayH.toFixed(1)} hours of daylight reach this bed">
       <circle cx="66" cy="66" r="54" fill="none" stroke="#243029" stroke-width="10"/>
       <circle cx="66" cy="66" r="54" fill="none" stroke="#D4A85A" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(C*frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 66 66)"/>
@@ -2707,7 +3101,7 @@ function bedInsightsHTML(o){
 const seasonCache = new Map();
 let seasonTimer = 0;
 function bedSeason(o){
-  const key = [o.id, o.x, o.y, o.w, o.h, o.rot, sceneVer, S.lat, S.lon, S.fullSun].join("|");
+  const key = [o.id, o.x, o.y, o.w, o.h, o.rot, sceneVer, S.lat, S.lon, S.fullSun].join("|");   // sceneVer covers outline edits
   const hit = seasonCache.get(o.id);
   if(hit && hit.key === key) return hit.val;
   clearTimeout(seasonTimer);
@@ -2722,8 +3116,12 @@ function computeBedSeason(o){
   const saveDate = S.date, south = S.lat < 0;
   const months = south ? [9,10,11,0,1,2,3] : [3,4,5,6,7,8,9];
   const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const cur = +saveDate.slice(5,7) - 1, a = o.rot*DEG, pts = [];
-  for(const [u,v] of [[0,0],[-.3,-.3],[.3,-.3],[-.3,.3],[.3,.3]]){ const q = rot2(u*o.w, v*o.h, a); pts.push({x:o.x+q.x, y:o.y+q.y}); }
+  const cur = +saveDate.slice(5,7) - 1, a = (o.rot||0)*DEG, pts = [], fr = bedFrame(o);
+  for(const [u,v] of [[0,0],[-.3,-.3],[.3,-.3],[-.3,.3],[.3,.3]]){
+    const lx = fr.cx + u*fr.w, ly = fr.cy + v*fr.h;
+    if(fr.outline && (u || v) && !pointInPoly(fr.outline, lx, ly)) continue;
+    const q = rot2(lx, ly, a); pts.push({x:o.x+q.x, y:o.y+q.y});
+  }
   const out = [];
   try{
     for(const m of months){
@@ -2762,13 +3160,21 @@ function drawPanel(){
   }
   title.textContent = o.type === "boundary" ? "Property line" : o.name;
   inspectorHeader(o);
-  const key = [o.id, nodeEdit, activeNode, o.poly?o.poly.length:0, o.type === "tree" ? o.name : ""].join("|");
+  if(design && (design.bedId !== o.id || !isPlanting(o))) exitDesign(true);
+  if(design && design.sel != null && !designPlant()) design.sel = null;
+  const key = [o.id, nodeEdit, activeNode, o.poly?o.poly.length:0, o.type === "tree" ? o.name : "",
+    isPlanting(o) ? [o.plants.length, !!design].join(",") : ""].join("|");
+  /* the designer's panel is all live state: redraw it unless the search box is in use */
+  if(design && panelFor === key && !props.querySelector("[data-plantsearch]:focus")) panelFor = null;
   if(panelFor === key){
     if(o.type === "boundary" && !props.contains(document.activeElement)){
       panelFor = "init";
       drawPanel();
       return;
     }
+    if(design) return;
+    const pk = props.querySelector(".plkey");
+    if(pk) pk.innerHTML = plantKeyHTML(o);
     props.querySelectorAll("input[data-key]").forEach(i=>{
       if(document.activeElement === i) return;
       if(i.type === "checkbox") i.checked = !!o[i.dataset.key];
@@ -2824,6 +3230,8 @@ function drawPanel(){
       + field("Up–down","y",`step="1" value="${o.y}"`)
       + nameRow
       + `<div class="clearbox">${clearanceHTML(o)}</div>`;
+  } else if(o.type === "planting"){
+    html += design ? designPanelHTML(o) : plantingPanelHTML(o, nameRow);
   } else if(o.type === "boundary"){
     const b = yardBounds();
     html += `<div style="height:10px"></div>` + outlineHTML(o)
@@ -2851,7 +3259,7 @@ function drawPanel(){
       + nameRow
       + `<div class="clearbox">${clearanceHTML(o)}</div>`;
   }
-  html += footHTML(o);
+  if(!design) html += footHTML(o);
   props.innerHTML = html;
   syncRanges(props);
 }
@@ -2895,10 +3303,22 @@ function applyPreset(o, p){
   panelFor = null;
   rebuildObject(o); drawPanel(); drawList(); updateSelection(); scheduleCompute();
 }
-const GEOKEYS = new Set(["height","spread","density","shape","evergreen","w","h","surface","crownBase"]);
+const GEOKEYS = new Set(["height","spread","density","shape","evergreen","w","h","surface","crownBase","smooth","mulch"]);
 props.addEventListener("input", e=>{
   const o = selected();
   if(!o) return;
+  if(e.target.hasAttribute("data-plantsearch")){
+    /* filter in place so the search box keeps its focus */
+    if(!design) return;
+    design.q = e.target.value.trim().toLowerCase();
+    const host = props.querySelector(".palette");
+    if(host) host.innerHTML = paletteRowsHTML(o);
+    return;
+  }
+  if(e.target.hasAttribute("data-plantlabels")){
+    S.plantLabels = e.target.checked; scheduleHist(); markDirty();
+    return;
+  }
   if(e.target.hasAttribute("data-preset")){
     const p = PRESETS[+e.target.value];
     if(p) applyPreset(o, p);
@@ -2950,10 +3370,29 @@ props.addEventListener("click", e=>{
     }
     return;
   }
+  if(design){
+    const st = e.target.closest("[data-stamp]");
+    if(st){ setStamp(st.dataset.stamp === design.stamp ? null : st.dataset.stamp); return; }
+    const pv = e.target.closest("[data-plantview]");
+    if(pv){ setPlantView(pv.dataset.plantview); return; }
+    const pc = e.target.closest("[data-plantcat]");
+    if(pc){ design.cat = pc.dataset.plantcat; panelFor = null; drawPanel(); return; }
+  }
   const btn = e.target.closest("button[data-act]");
   if(!btn) return;
   const act = btn.dataset.act, o = selected();
   if(!o) return;
+  if(act === "design"){ enterDesign(o); return; }
+  if(act === "enddesign"){ exitDesign(); return; }
+  if(act === "delplant" && design?.sel != null){ removePlant(design.sel); return; }
+  if(act === "clearplants" && isPlanting(o)){
+    askUser("Clear this bed?", "This removes all "+o.plants.length+" plants from "+o.name+". The bed itself stays. Undo brings them back.",
+      [{label:"Cancel"}, {label:"Clear bed", kind:"danger", run:()=>{
+        o.plants = []; if(design) design.sel = null;
+        rebuildObject(o); updatePlantRing(); scheduleHist(); panelFor = null; drawPanel(); drawList();
+      }}]);
+    return;
+  }
   if(act === "scaleboundary" && o.type === "boundary"){
     const edge = +$("boundary-scale-edge").value, lengthFeet = +$("boundary-scale-feet").value;
     scaleBoundaryFromEdge(edge, lengthFeet);
@@ -2966,7 +3405,7 @@ props.addEventListener("click", e=>{
   if(act === "nodes"){
     nodeEdit = !nodeEdit;
     if(!nodeEdit) activeNode = null;
-    else setView("vplan");
+    else { exitDesign(true); setView("vplan"); }
     panelFor = null; drawPanel(); markDirty();
   }
   if(act === "delnode" && o.poly && o.poly.length > 3 && activeNode != null){
@@ -2978,12 +3417,13 @@ props.addEventListener("click", e=>{
     drawPanel(); updateSelection(); drawList();
   }
   if(act === "del") removeSelected();
-  if(act === "done"){ nodeEdit = false; activeNode = null; select(null); openSheet(false); markDirty(); }
+  if(act === "done"){ nodeEdit = false; activeNode = null; exitDesign(true); select(null); openSheet(false); markDirty(); }
   if(act === "species") openLibrary("replace");
   if(act === "dup"){
     const copy = JSON.parse(JSON.stringify(o));
     const offset = rot2(S.grid*2,S.grid*2,gridFrame().angle*DEG);
     copy.id = nid(); copy.x += offset.x; copy.y += offset.y;
+    if(copy.plants) for(const pl of copy.plants) pl.id = nid();
     S.objects.push(copy); rebuildObject(copy); select(copy.id); scheduleCompute();
   }
 });
@@ -3011,14 +3451,15 @@ function drawList(){
       const b = o.poly ? bbox(o.poly) : null;
       const mt = o.type === "tree" ? `${o.height}' × ${o.spread}' · ${near}`
         : o.type === "bed" ? `${o.w}' × ${o.h}' · ${st ? st.avg.toFixed(1)+" h sun" : near}`
+        : o.type === "planting" ? `${Math.round(polyArea(bedOutline(o)))} sq ft · ${o.plants.length} plant${o.plants.length === 1 ? "" : "s"}${bedStats.get(o.id) ? " · "+bedStats.get(o.id).avg.toFixed(1)+" h sun" : ""}`
         : o.type === "deck" ? `${Math.round(polyArea(o.poly))} sq ft · ${(o.height ?? .5).toFixed(1)}' high · ${near}`
         : isPaved(o) ? `${Math.round(polyArea(o.poly))} sq ft · ${o.poly.length} corners · ${near}`
         : `${b.w.toFixed(0)}' × ${b.h.toFixed(0)}' · ${o.height}' to peak`;
-      const ic = o.type === "tree" ? "i-tree" : o.type === "bed" ? "i-bed"
+      const ic = o.type === "tree" ? "i-tree" : o.type === "bed" ? "i-bed" : o.type === "planting" ? "i-planting"
                : o.type === "deck" ? "i-deck" : isPaved(o) ? "i-"+o.type : "i-house";
       rows.push(`<button data-id="${o.id}" aria-pressed="${o.id===S.sel}">
         <svg class="ic"><use href="#${ic}"/></svg>
-        <span class="tx"><span class="nm">${o.name}</span><span class="mt">${mt}</span></span></button>`);
+        <span class="tx"><span class="nm">${escapeHTML(o.name)}</span><span class="mt">${mt}</span></span></button>`);
     }
     el.innerHTML = rows.join("");
     $("objcount").textContent = S.objects.length || "";
@@ -3074,12 +3515,13 @@ function toast(msg){
   toast._t = setTimeout(()=>t.classList.remove("show"), 2000);
 }
 function setTool(t){
+  if(design && !["select","pan","measure"].includes(t)) exitDesign();
   tool = t;
   document.querySelectorAll("button[data-tool]").forEach(b=>
     b.setAttribute("aria-pressed", b.dataset.tool === t));
   $("addbtn").setAttribute("aria-pressed", !["select","pan","measure"].includes(t));
   if(t !== "measure"){ measure = {a:null,b:null,live:null}; drawMeasureLine(); }
-  canvas.style.cursor = t === "pan" ? "grab" : t === "select" ? "default" : "crosshair";
+  canvas.style.cursor = t === "pan" ? "grab" : t === "select" ? (design?.stamp ? "copy" : "default") : "crosshair";
 }
 document.querySelectorAll("button[data-tool]").forEach(b=>
   b.addEventListener("click", ()=>setTool(b.dataset.tool)));
@@ -3107,6 +3549,7 @@ function setSimple(v){
   updateSun(); refreshHeat();
   markDirty();
   scheduleHist();
+  if(design){ panelFor = null; drawPanel(); }
   toast(S.simple ? "Simple view — tree canopy outlines and grid; no tree trunks or branches" : "Realistic view");
 }
 $("vsimple").addEventListener("click", ()=>setSimple(!S.simple));
@@ -3217,6 +3660,7 @@ function syncLayers(){
   $("lySun").setAttribute("aria-pressed", !!S.heat);
   $("lyGrid").setAttribute("aria-pressed", !!S.showGrid);
   $("lySimple").setAttribute("aria-pressed", !!S.simple);
+  $("lyPlants").setAttribute("aria-pressed", plantMode() === "symbols");
 }
 function flipCheck(id, v){
   const c = $(id);
@@ -3228,6 +3672,10 @@ $("lyShadow").addEventListener("click", ()=>{ flipCheck("heat", false); syncLaye
 $("lySun").addEventListener("click", ()=>{ flipCheck("heat", !S.heat); syncLayers(); });
 $("lyGrid").addEventListener("click", ()=>{ flipCheck("showgrid", !S.showGrid); syncLayers(); });
 $("lySimple").addEventListener("click", ()=>{ setSimple(!S.simple); syncLayers(); });
+$("lyPlants").addEventListener("click", ()=>{
+  setPlantView(plantMode() === "symbols" ? "plants" : "symbols");
+  toast(plantMode() === "symbols" ? "Planting beds drawn as plan symbols" : "Planting beds drawn as plants");
+});
 for(const id of ["heat","showgrid","simpleview"]) $(id).addEventListener("change", ()=>syncLayers());
 
 /* ---------- project card ---------- */
@@ -3448,7 +3896,7 @@ function afterDateChange(){
   buildArc();
   const leaf = leafOn();
   if(leaf !== lastLeaf){ lastLeaf = leaf; rebuildAll(); }
-  else trees.setFall(objGroup, fallAmount(), bloomState);
+  else { trees.setFall(objGroup, fallAmount(), bloomState); rebuildPlantings(true); }
   scheduleCompute();
   syncLocationUI();
   markDirty();
@@ -3503,8 +3951,8 @@ function setMins(v){
   $("mins").value = S.fullSun; $("mins2").value = S.fullSun;
   for(const st of bedStats.values()){
     let good = 0;
-    for(const x of st.grid) if(x >= S.fullSun) good++;
-    st.pct = Math.round(100*good/st.grid.length);
+    st.grid.forEach((x, i)=>{ if(st.mask[i] && x >= S.fullSun) good++; });
+    st.pct = Math.round(100*good/st.inside);
   }
   refreshHeat(); panelFor = null; drawPanel(); drawList(); markDirty();
 }
@@ -3580,11 +4028,21 @@ document.addEventListener("keydown", e=>{
   if(!$("library").hidden){ if(e.key === "Escape") closeLibrary(); return; }
   if(e.key === "Escape"){
     if(!addMenu.hidden){ showAddMenu(false); return; }
+    if(design){
+      if(tool !== "select"){ setTool("select"); return; }
+      if(design.stamp){ setStamp(null); return; }
+      if(design.sel != null){ design.sel = null; updatePlantRing(); panelFor = null; drawPanel(); return; }
+      exitDesign(); return;
+    }
     if(nodeEdit){ nodeEdit = false; activeNode = null; panelFor = null; drawPanel(); markDirty(); return; }
     if(tool !== "select"){ setTool("select"); return; }
     if(S.sel != null){ select(null); openSheet(false); markDirty(); return; }
   }
-  if((e.key === "Delete" || e.key === "Backspace") && S.sel != null && S.sel !== BOUNDARY){ removeSelected(); e.preventDefault(); }
+  if(design){
+    /* while designing, Delete only ever removes a plant, never the bed */
+    if(e.key === "Delete" || e.key === "Backspace"){ if(design.sel != null) removePlant(design.sel); e.preventDefault(); return; }
+  }
+  else if((e.key === "Delete" || e.key === "Backspace") && S.sel != null && S.sel !== BOUNDARY){ removeSelected(); e.preventDefault(); }
   if(e.key === "1") setView("vplan");
   if(e.key === "2") setView("v3d");
   if(e.key === "3") setView("veye");
@@ -3601,7 +4059,7 @@ function openSheet(on){
 }
 $("sheetbtn").addEventListener("click", ()=>openSheet(!$("inspector").classList.contains("open")));
 $("closesheet").addEventListener("click", ()=>openSheet(false));
-$("inspclose").addEventListener("click", ()=>{ nodeEdit = false; activeNode = null; select(null); openSheet(false); markDirty(); });
+$("inspclose").addEventListener("click", ()=>{ nodeEdit = false; activeNode = null; exitDesign(true); select(null); openSheet(false); markDirty(); });
 
 /* ============================================================ modal -------- */
 function askUser(title, msg, buttons){
@@ -3662,13 +4120,20 @@ function loadState(data, frame){
     for(const o of S.objects){
       if(isOutlineType(o) && !o.poly) o.poly = rectPoly(o.w || PAVING[o.type]?.w || 12, o.h || PAVING[o.type]?.h || 10);
       if(o.type === "deck" && !(o.height >= 0)) o.height = .5;
+      if(o.type === "planting"){
+        o.plants = Array.isArray(o.plants) ? o.plants.filter(p=>p && typeof p.k === "string" && Number.isFinite(p.x) && Number.isFinite(p.y)) : [];
+        if(!MULCHES[o.mulch]) o.mulch = "bark";
+      }
     }
+    if(S.plantView !== "symbols") S.plantView = "plants";
+    if(design && !designBed()) exitDesign(true);
     ensureFenceSides();
     if(gridFrame().angle !== priorGridAngle){
       orbit.az = -gridFrame().angle;
       applyCamera();
     }
-    uid = Math.max(...S.objects.map(o=>o.id), 0) + 1;
+    uid = Math.max(0, ...S.objects.flatMap(o=>[o.id, ...(o.plants || []).map(p=>p.id)]).filter(Number.isFinite)) + 1;
+    for(const o of S.objects) for(const p of o.plants || []) if(!Number.isFinite(p.id)) p.id = nid();
     measure = {a:null, b:null, live:null};
     nodeEdit = false; activeNode = null; panelFor = "init"; lastLeaf = leafOn();
     applySimpleChrome();
@@ -3930,7 +4395,7 @@ function initPrefsUI(){
     setTimeout(()=>{ trees.setHighDetail(prefs.treeDetail === "high"); rebuildAll(); syncPrefs(); changed(); }, 30);
   }));
   const exp = v=>{ prefs.exposure = clamp(v, .3, 2.5); $("rexp").value = prefs.exposure; $("rexp2").value = prefs.exposure;
-    changed(); clearTimeout(exp.t); exp.t = setTimeout(()=>{ updateSun(); refreshHeat(); markDirty(); }, 200); };
+    changed(); clearTimeout(exp.t); exp.t = setTimeout(()=>{ updateSun(); refreshHeat(); rebuildPlantings(); markDirty(); }, 200); };
   bindNum("rexp", exp); bindNum("rexp2", exp);
 }
 
@@ -4011,7 +4476,8 @@ async function boot(){
 }
 window.applyImportedBoundary = applyImportedBoundary;   // hook for the property-image importer
 /* development-only hook for automated screenshots */
-if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, rebuildAll, fromPreset, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute };
+if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, rebuildAll, fromPreset, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute,
+  select, enterDesign, exitDesign, setStamp, setPlantView, get design(){ return design; }, project };
 initLocationUI();
 initPrefsUI();
 if(document.readyState === "complete") boot();
