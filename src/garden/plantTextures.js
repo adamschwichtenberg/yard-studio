@@ -423,6 +423,23 @@ function plume(o){
     }
   };
 }
+/* smokebush "smoke": a billow of hair-fine flower stalks, drawn as a stippled
+   cloud so it survives alpha testing at a distance */
+function smoke(){
+  return (g, N, r)=>{
+    for(let i = 0; i < 46; i++){
+      const a = -Math.PI/2 + (r() - .5)*2.7, L = N*(.2 + r()*.3);
+      g.strokeStyle = ink(.5 + r()*.3); g.lineWidth = N*.007; g.lineCap = "round";
+      g.beginPath(); g.moveTo(N/2, N*.97);
+      g.quadraticCurveTo(N/2 + Math.cos(a)*L*.4 + (r() - .5)*N*.1, N*.97 + Math.sin(a)*L*.7, N/2 + Math.cos(a)*L, N*.97 + Math.sin(a)*L); g.stroke();
+    }
+    for(let i = 0; i < 2600; i++){
+      /* denser toward the middle, wispy at the edge */
+      const a = r()*TAU, d = Math.pow(r(), .75), x = N*(.5 + Math.cos(a)*d*.45), y = N*(.52 + Math.sin(a)*d*.44);
+      g.fillStyle = ink(.55 + r()*.45); g.beginPath(); g.arc(x, y, N*(.006 + r()*.006)*(1.2 - d*.5), 0, TAU); g.fill();
+    }
+  };
+}
 /* a globe of tiny stars on fine stalks (allium), seen from any side */
 function globe(){
   return (g, N, r)=>{
@@ -565,6 +582,7 @@ const KINDS = {
   "flower:plume-wide":   [256, plume({width:.34, dense:1.3})],
   "flower:plume-arch":   [256, plume({arch:.8, width:.16})],
   "flower:globe":        [256, globe()],
+  "flower:smoke":        [512, smoke()],
   "flower:bells":        [256, wand({kind:"bells"})],
   "flower:columbine":    [256, wand({kind:"columbine"})],
   "flower:hearts":       [256, wand({kind:"hearts"})],

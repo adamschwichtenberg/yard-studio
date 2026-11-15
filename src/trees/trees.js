@@ -488,7 +488,63 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
   }
 }
 
+/* Arborvitae and upright junipers have no visible branch structure: the crown
+   is a tight skin of sprays standing on end, overlapping like shingles.
+   Arborvitae sprays are flat fans held upright; juniper shoots are finer,
+   feathery and a little looser at the tips. */
+function scaleConifer(p, r, bark, leaves, mass, ctx) {
+  const { H, R, cb, dens } = p;
+  const { envelope, normalFn, aoFn, detail, trunkR } = ctx;
+  const arb = p.kind === 'arborvitae';
+  const crownH = Math.max(0.5, H - cb);
+  tube(bark, [V(0, 0, 0), V(0, H * 0.45, 0), V(0, H * 0.88, 0)], trunkR, 0.03, hi(detail, 6, 8));
+
+  const s0 = THREE.MathUtils.clamp(R * (arb ? 0.66 : 0.56), 0.55, arb ? 1.8 : 1.35) / (detail > 1 ? 1.2 : 1);
+  const samples = 64;
+  const cdf = [0];
+  for (let i = 1; i <= samples; i++) cdf.push(cdf[i - 1] + Math.max(0.04, envelope(cb + ((i - 0.5) / samples) * crownH)));
+  const shellArea = cdf[samples] * (crownH / samples) * Math.PI * 2;
+  const count = THREE.MathUtils.clamp(
+    Math.round((shellArea / (s0 * s0)) * (arb ? 5.2 : 6.4) * (0.6 + 0.5 * dens) * (detail > 1 ? 1.4 : 1)), 70, 2600);
+  for (let i = 0; i < count; i++) {
+    const target = ((i + 0.5) / count) * cdf[samples];
+    let k = 1;
+    while (k < samples && cdf[k] < target) k++;
+    const u = (k - 1 + (target - cdf[k - 1]) / Math.max(1e-6, cdf[k] - cdf[k - 1])) / samples;
+    const y = cb + u * crownH;
+    const a = i * GOLDEN + (r() - 0.5) * 0.6;
+    const out = V(Math.cos(a), 0, Math.sin(a));
+    // Two layers: an outer skin, and a few sprays set back so gaps show foliage.
+    const depth = i % 4 === 0 ? 0.62 + 0.2 * r() : (arb ? 0.86 : 0.8) + (arb ? 0.14 : 0.24) * r();
+    const P = V(out.x * envelope(y) * depth, y, out.z * envelope(y) * depth);
+    const s = s0 * (0.72 + 0.5 * r());
+    // Sprays stand up and lean out with the crown; juniper tips wander more.
+    const tip = UP.clone().addScaledVector(out, arb ? 0.3 : 0.42).addScaledVector(randUnit(r), arb ? 0.16 : 0.32).normalize();
+    // Fans face outward, each turned a little, so they overlap rather than line up.
+    const face = out.clone().applyAxisAngle(UP, (r() - 0.5) * (arb ? 1.7 : 2.4)).addScaledVector(UP, 0.12).normalize();
+    const base = P.clone().addScaledVector(tip, -s * 0.5);
+    if (base.y < 0.05) base.y = 0.05;
+    card(leaves, base, tip, face, s, r(), normalFn(P), aoFn(P, s));
+  }
+  // The leader: a few sprays closing the tip.
+  for (let i = 0; i < 5; i++) {
+    const a = i * GOLDEN;
+    const s = s0 * 0.7;
+    card(leaves, V(0, H - s * 0.9, 0), UP.clone().addScaledVector(V(Math.cos(a), 0, Math.sin(a)), 0.12).normalize(),
+      V(Math.cos(a + 1.3), 0, Math.sin(a + 1.3)), s, r(), normalFn(V(0, H, 0)), () => 1);
+  }
+  // A full dark core just under the skin.
+  const core = [];
+  for (let i = 0; i <= 12; i++) {
+    const y = cb + (i / 12) * crownH;
+    core.push(new THREE.Vector2(Math.max(0.04, envelope(y) * 0.7), y));
+  }
+  core.push(new THREE.Vector2(0.01, H * 0.96));
+  mass.push({ core });
+}
+
 function conifer(p, r, bark, leaves, mass, ctx) {
+  if (p.kind === 'arborvitae' || p.kind === 'juniper') return scaleConifer(p, r, bark, leaves, mass, ctx);
   const { H, R, cb, dens, shape } = p;
   const { envelope, normalFn, aoFn, detail, trunkR, tipR } = ctx;
   // Branch habit: arborvitae grows like a juniper, Norway spruce like a spruce

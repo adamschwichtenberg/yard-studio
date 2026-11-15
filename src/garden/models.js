@@ -260,6 +260,10 @@ class Plant {
         break;
       }
       case "berries": this.fan(F, "flower:berries", pos, dir, size/2, .3); break;
+      case "smoke":
+        /* a billow of fine hairs: three crossed puffs, so the haze has depth from any side */
+        this.cross(F, "flower:smoke", pos.clone().addScaledVector(dir, -size*.25), dir, size, size, 3, {normal:dir.clone().lerp(UP, .5).normalize()});
+        break;
       default: this.cross(F, o.tex || "flower:spike", pos, dir, size*.4, size, 2);
     }
   }
@@ -635,12 +639,13 @@ export const MODELS = {
   vase: {label:"Upright shrubs", symbol:"cloud",
     build(P, p, o){
       const H = P.H, R = P.R, head = o.head;
-      const sizes = {flat:.46, berries:.4, plume:.9, spike:.6, single:.24};
+      const sizes = {flat:.46, berries:.4, plume:.9, spike:.6, single:.24, smoke:1};
       P.bush({profile:P_VASE, open:.12, mass:.6,
         stems:{n:count(7 + R*2, 7, 13), thick:clamp(H*.009, .02, .06)},
         foliage:{tex:o.leafTex || "leaf:ovate", n:count(80 + R*R*20, 80, 220), size:clamp(H*.17, .5, 1.05), low:1.15},
-        heads:head && p.flower != null ? {type:head, n:count(8 + R*R*(head === "plume" ? 2 : 3.2), 8, 40), size:(o.headSize ?? sizes[head])*(head === "plume" ? clamp(H/8, .6, 1.2) : 1),
-          zone:[.5, 1], up:head === "spike" ? .8 : .45, tex:head === "plume" ? "flower:plume-wide" : head === "flat" ? "flower:umbel" : o.headTex, wide:head === "plume" ? .85 : undefined} : null});
+        heads:head && p.flower != null ? {type:head, n:count(8 + R*R*(head === "plume" ? 2 : head === "smoke" ? 2.6 : 3.2), 8, head === "smoke" ? 90 : 40),
+          size:(o.headSize ?? sizes[head])*(head === "plume" ? clamp(H/8, .6, 1.2) : head === "smoke" ? clamp(H*.14, .7, 1.6) : 1), out:head === "smoke" ? 1 : undefined,
+          zone:head === "smoke" ? [.5, 1] : [.5, 1], up:head === "spike" ? .8 : head === "smoke" ? .7 : .45, tex:head === "plume" ? "flower:plume-wide" : head === "flat" ? "flower:umbel" : o.headTex, wide:head === "plume" ? .85 : undefined} : null});
     }},
   sumac: {label:"Cut-leaf shrubs", symbol:"fern",
     build(P, p, o){
@@ -704,7 +709,8 @@ MODELS.conifer = {label:"Evergreen shrubs", symbol:"box",
           /* sprays lie almost flat, stacked a little higher toward the middle, tips just lifting */
           const t = (j + .3)/k, y = H*(.25 + .6*(1 - t)*(.6 + .4*r()));
           for(const sg of [1, -1]){
-            const dir = out.clone().multiplyScalar(.8).addScaledVector(side, sg*.55).addScaledVector(UP, .05 + .14*r()).normalize();
+            /* the outer sprays feather upward a little, as the growing tips do */
+            const dir = out.clone().multiplyScalar(.8).addScaledVector(side, sg*.55).addScaledVector(UP, .04 + (.1 + .3*t)*r()).normalize();
             const ss = s*(.8 + .4*r());
             P.card("leaf", tex, polar(az, L*t, y).addScaledVector(dir, -ss*.2), dir, UP, ss, ss, {normal:UP.clone().lerp(dir, .25).normalize()});
           }
@@ -718,7 +724,7 @@ MODELS.conifer = {label:"Evergreen shrubs", symbol:"box",
       stems:{n:form === "cone" ? 3 : count(5 + R*2, 5, 10)},
       foliage:{tex, n:count(120 + R*ch*40, 120, 380), size:clamp(Math.min(ch, R*2)*(pine ? .42 : .34), .34, 1.3),
                /* spruce branches hold level, pine candles and yew shoots reach up */
-               rise:pine ? .7 : form === "vase" || o.reach ? .55 : form === "cone" ? .05 : .25, wild:pine ? .5 : .45, low:form === "cone" ? .7 : .85}});
+               rise:pine ? .7 : tex === "leaf:arborvitae" ? .8 : form === "vase" || o.reach ? .55 : form === "cone" ? .05 : .25, wild:pine ? .5 : tex === "leaf:arborvitae" ? .22 : .45, low:form === "cone" ? .7 : .85}});
     if(form === "cone") P.tube("wood", [V(0, 0, 0), V(0, H*.5, 0), V(0, H*.96, 0)], Math.max(.05, H*.014), .012, 5);
   }};
 

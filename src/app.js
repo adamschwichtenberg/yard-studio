@@ -31,6 +31,13 @@ const SHAPES = {
   vase:      {label:"Vase (elm, serviceberry)",      base:.36,
               r:u=>u<.72 ? .16+.84*Math.pow(Math.sin(Math.PI/2*u/.72),1.25) : Math.sqrt(Math.max(0,1-Math.pow((u-.72)/.28,2)))},
   weeping:   {label:"Weeping (willow)",             base:.16, r:u=>Math.pow(Math.sin(Math.PI*(.18+.78*u)),.42)},
+  /* Arborvitae and upright junipers: foliage to the ground, fullest low down,
+     drawn in to a soft point. Spire is the narrow hedge form, teardrop the
+     broad one. */
+  spire:     {label:"Evergreen spire (arborvitae, juniper)", base:.02,
+              r:u=>u<.22 ? .86+.14*Math.sin(Math.PI/2*u/.22) : Math.pow(Math.max(0,1-Math.pow((u-.22)/.78,1.7)),.7)},
+  teardrop:  {label:"Evergreen teardrop (broad arborvitae)", base:.02,
+              r:u=>u<.18 ? .84+.16*Math.sin(Math.PI/2*u/.18) : Math.pow(Math.max(0,1-Math.pow((u-.18)/.82,1.45)),.8)},
   /* Fastigiate: an upright column with a rounded top, for columnar
      broadleaves (birch, oak, aspen, poplar). Widest a little below the middle. */
   fastigiate:{label:"Columnar broadleaf (birch, oak)", base:.08,
@@ -110,13 +117,13 @@ const PRESETS = [
   sci:"Pinus mugo", note:"Narrow upright mugo. Slow-growing evergreen screen without a wide shadow."},
  {gn:"Pines", n:"Columnar Norway Pine", s:"columnar", h:25, w:8, ev:true, d:.85, leaf:0x2a4a26,
   sci:"Pinus resinosa", note:"Narrow upright conifer. Mature size varies a lot between growers — confirm the tag."},
- {gn:"Junipers & arborvitae", n:"Techny Arborvitae", s:"pyramidal", h:18, w:10, ev:true, d:.95, leaf:0x3a6428,
+ {gn:"Junipers & arborvitae", n:"Techny Arborvitae", s:"teardrop", h:18, w:10, ev:true, d:.95, leaf:0x3a6428,
   sci:"Thuja occidentalis 'Techny'", note:"Broad, dense pyramid of flat, bright-green sprays that stay green in winter. Hardy to zone 3."},
- {gn:"Junipers & arborvitae", n:"Emerald Green Arborvitae", s:"columnar", h:14, w:4, ev:true, d:.95, leaf:0x3f6e2c,
+ {gn:"Junipers & arborvitae", n:"Emerald Green Arborvitae", s:"spire", h:14, w:4, ev:true, d:.95, leaf:0x3f6e2c,
   sci:"Thuja occidentalis 'Smaragd'", note:"Narrow, formal column for hedges and screens. Slim year-round shadow."},
- {gn:"Junipers & arborvitae", n:"Spartan Juniper", s:"columnar", h:18, w:5, ev:true, d:.95, leaf:0x2f4a2a,
+ {gn:"Junipers & arborvitae", n:"Spartan Juniper", s:"spire", h:18, w:5, ev:true, d:.95, leaf:0x2f4a2a,
   sci:"Juniperus chinensis 'Spartan'", note:"Narrow columnar evergreen. Thin but solid shadow, year round. Rated zone 4, marginal in 4a."},
- {gn:"Junipers & arborvitae", n:"Moonglow Juniper", s:"pyramidal", h:20, w:10, ev:true, d:.92, leaf:0x66796b,
+ {gn:"Junipers & arborvitae", n:"Moonglow Juniper", s:"teardrop", h:20, w:10, ev:true, d:.92, leaf:0x66796b,
   sci:"Juniperus scopulorum 'Moonglow'", note:"Broad pyramidal blue-green evergreen. Dense year-round shade in a compact footprint."},
 
  /* ---- the rest of the garden-centre tree list. Most borrow a crown shape and
@@ -251,19 +258,19 @@ const PRESETS = [
   sci:"Picea glauca 'Pendula'", note:"A narrow, formal spire: branches hang straight down against the trunk, heavy with grey-green needles."},
  {gn:"Pines", n:"Hyland Splendor Mugo Pine", s:"pyramidal", h:16, w:9, ev:true, d:.9, leaf:0x2f5230,
   sci:"Pinus mugo 'Hydak'", note:"NDSU's upright mugo: faster than Tannenbaum and darker green through winter."},
- {gn:"Junipers & arborvitae", n:"Holmstrup Arborvitae", s:"columnar", h:8, w:3, ev:true, d:.95, leaf:0x447a2e,
+ {gn:"Junipers & arborvitae", n:"Holmstrup Arborvitae", s:"spire", h:8, w:3, ev:true, d:.95, leaf:0x447a2e,
   sci:"Thuja occidentalis 'Holmstrup'", note:"A compact, bright green column with tightly layered foliage. Slow and tidy."},
- {gn:"Junipers & arborvitae", n:"North Pole Arborvitae", s:"columnar", h:12, w:4, ev:true, d:.95, leaf:0x2f5a28,
+ {gn:"Junipers & arborvitae", n:"North Pole Arborvitae", s:"spire", h:12, w:4, ev:true, d:.95, leaf:0x2f5a28,
   sci:"Thuja occidentalis 'Art Boe'", note:"Narrow, dark green column from Faribault, Minnesota. Resists winter burn."},
- {gn:"Junipers & arborvitae", n:"Pyramidal Arborvitae", s:"columnar", h:18, w:4, ev:true, d:.93, leaf:0x447a2e,
+ {gn:"Junipers & arborvitae", n:"Pyramidal Arborvitae", s:"spire", h:18, w:4, ev:true, d:.93, leaf:0x447a2e,
   sci:"Thuja occidentalis 'Pyramidalis'", note:"Fast, narrow cone of soft bright green. Needs little trimming."},
- {gn:"Junipers & arborvitae", n:"Rushmore Arborvitae", s:"columnar", h:25, w:6, ev:true, d:.95, leaf:0x2a5226,
+ {gn:"Junipers & arborvitae", n:"Rushmore Arborvitae", s:"spire", h:25, w:6, ev:true, d:.95, leaf:0x2a5226,
   sci:"Thuja occidentalis 'Rushmore'", note:"Dense, deep green and upright: a tall hedge or screen that shrugs off wind and winter burn."},
- {gn:"Junipers & arborvitae", n:"Technito Arborvitae", s:"pyramidal", h:6, w:6, ev:true, d:.96, leaf:0x2f5a28,
+ {gn:"Junipers & arborvitae", n:"Technito Arborvitae", s:"teardrop", h:6, w:6, ev:true, d:.96, leaf:0x2f5a28,
   sci:"Thuja occidentalis 'Bailjohn'", note:"A smaller, denser Techny that keeps its dark green through winter and needs less pruning."},
- {gn:"Junipers & arborvitae", n:"Medora Juniper", s:"columnar", h:11, w:3, ev:true, d:.95, leaf:0x5a7a78,
+ {gn:"Junipers & arborvitae", n:"Medora Juniper", s:"spire", h:11, w:3, ev:true, d:.95, leaf:0x5a7a78,
   sci:"Juniperus scopulorum 'Medora'", note:"North Dakota selection. A slender blue-green column, slow growing, good as a specimen."},
- {gn:"Junipers & arborvitae", n:"Skyrocket Juniper", s:"columnar", h:15, w:3, ev:true, d:.95, leaf:0x66808a,
+ {gn:"Junipers & arborvitae", n:"Skyrocket Juniper", s:"spire", h:15, w:3, ev:true, d:.95, leaf:0x66808a,
   sci:"Juniperus scopulorum 'Skyrocket'", note:"About the narrowest juniper there is: a silvery-blue rocket for screens and accents."}
 ];
 /* Deciduous first, then evergreen; genera in the order they appear above. */
@@ -3110,7 +3117,7 @@ function crownPath(fn, cx, top, base, half, n = 28){
   return "M"+pts.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L")+" Z";
 }
 const SHAPE_TILES = [["round","Round"],["oval","Upright oval"],["linden","Linden"],
-  ["pyramidal","Pyramid"],["columnar","Narrow pyramid"],["fastigiate","Column"],
+  ["pyramidal","Pyramid"],["columnar","Narrow pyramid"],["teardrop","Teardrop"],["spire","Spire"],["fastigiate","Column"],
   ["spreading","Spreading"],["vase","Vase"],["weeping","Weeping"]];
 function shapeTiles(o){
   return `<div class="tiles">`+SHAPE_TILES.map(([k,label])=>{
