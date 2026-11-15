@@ -62,7 +62,7 @@ A planting bed is an in-ground bed of perennials, grasses, groundcovers and shru
 ![Designing a bed from above](docs/planting-design.png)
 ![The same bed in 3D](docs/planting-3d.png)
 
-- **Plant library:** 199 perennials, grasses, groundcovers, shrubs and evergreen shrubs, each pictured in bloom from its own 3D model. Open it from **Add to yard → Perennial or shrub**, from **Plants** in the rail, or from the designer. Filter by type, sun, flower colour and height, or search.
+- **Plant library:** 197 perennials, grasses, groundcovers, shrubs and evergreen shrubs, each pictured in bloom from its own 3D model. Open it from **Add to yard → Perennial or shrub**, from **Plants** in the rail, or from the designer. Filter by type, sun, flower colour and height, or search.
 - **Shape:** any outline. Reshape it corner by corner like a driveway; **Curved edge** runs a smooth curve through the corners. Surface is bark, soil, gravel or lawn.
 - **Design this bed** (or double-click the bed) opens the designer:
   - The view drops to Plan and frames the bed. Trees whose canopy would cover it step aside while you work.
@@ -86,7 +86,7 @@ Every variety is a preset on one of 24 parametric growth forms, built like the t
 | Group | Growth forms |
 | --- | --- |
 | Perennials | Coneflowers & daisies, hostas, spikes, daylilies, tall clumps (bee balm, phlox, sedum, lilies), globes on stalks, peonies & bushy perennials, astilbes & ferns, ruffled mounds (coral bells, columbine), cushions, groundcover mats, upright grasses, fountain grasses, irises |
-| Shrubs | Panicle hydrangeas, mophead hydrangeas, arching shrubs (weigela, forsythia), upright shrubs (dogwood, ninebark, viburnum, smoke trees), cut-leaf shrubs (sumac, elderberry), mounding shrubs (spirea, potentilla), lilacs, small-leaved mounds (barberry, boxwood), columnar shrubs |
+| Shrubs | Panicle hydrangeas, mophead hydrangeas, arching shrubs (weigela, forsythia), upright shrubs (dogwood, ninebark, viburnum, smokebush), cut-leaf shrubs (sumac, elderberry), mounding shrubs (spirea, potentilla), lilacs, small-leaved mounds (barberry, boxwood), columnar shrubs |
 | Evergreen shrubs | One conifer model with five structures: globe (arborvitae, mugo pine, nest spruce), flat-topped globe (dwarf blue spruce), cone (dwarf Colorado spruce), spreading (creeping junipers, which turn plum in winter) and mounded yews; spruce, pine, arborvitae, juniper and yew foliage |
 | Add-on | A standard trunk (`opt.trunk`, in feet) turns any shrub canopy into a patio tree |
 
@@ -120,7 +120,7 @@ In plan files a bed is `{type:"planting", x, y, rot, poly, smooth, mulch, plants
 | Willows | Weeping Willow (hanging streamers), Prairie Reflection laurel willow |
 | Crabapples | Prairifire, Adams, Courageous, Red Splendor, Rejoice, Royal Raindrops (single stem or clump), Starlite, Sparkling Sprite, Green Wall and Ivory Spear (columnar), and a generic flowering crab. Each blooms in its own colour for about two weeks from leaf-out |
 | Cherries & pears | Amur Chokecherry, Klondike, Ming (coppery peeling bark, white flowers), Prairie Gem Pear |
-| Small flowering trees | Winter King Hawthorn, Northern Redbud (single stem or clump), European Mountain Ash, Summerfrost Amur Maackia |
+| Small flowering trees | Winter King Hawthorn, Northern Redbud (single stem or clump), European Mountain Ash, Summerfrost Amur Maackia, Royal Purple and Golden Spirit smoke trees (a round head on a short trunk, with a haze of smoke through summer) |
 | Tree lilacs | Japanese Tree Lilac clump, Ivory Silk, Snowdance: creamy plumes in early summer |
 | Other shade trees | Early Glow Buckeye, Northern Catalpa, Rising Fire Hornbeam, Ironwood, KoolKat Katsura, Espresso Kentucky Coffeetree |
 | Hydrangeas | Limelight, Pinky Winky tree forms: panicles from midsummer that go lime → white → pink into fall |

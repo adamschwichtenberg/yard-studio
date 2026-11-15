@@ -600,6 +600,34 @@ function paintPanicle(g, N, rand) {
   }
 }
 
+// Smoke tree "smoke": a billow of hair-fine flower stalks, stippled so the
+// haze survives alpha testing at a distance. Base at the bottom edge.
+function paintSmoke(g, N, rand) {
+  g.lineCap = 'round';
+  for (let i = 0; i < 60; i++) {
+    const a = -Math.PI / 2 + (rand() - 0.5) * 2.6;
+    const L = N * (0.2 + rand() * 0.32);
+    g.strokeStyle = `hsl(0, 0%, ${40 + rand() * 25}%)`;
+    g.lineWidth = N * 0.004;
+    g.beginPath();
+    g.moveTo(N / 2, N * 0.98);
+    g.quadraticCurveTo(N / 2 + Math.cos(a) * L * 0.4 + (rand() - 0.5) * N * 0.1, N * 0.98 + Math.sin(a) * L * 0.7,
+      N / 2 + Math.cos(a) * L, N * 0.98 + Math.sin(a) * L);
+    g.stroke();
+  }
+  for (let i = 0; i < 2400; i++) {
+    // Denser toward the middle, wispy at the edge.
+    const a = rand() * Math.PI * 2;
+    const d = rand() ** 0.7;
+    const x = N * (0.5 + Math.cos(a) * d * 0.46);
+    const y = N * (0.52 + Math.sin(a) * d * 0.45);
+    g.fillStyle = `hsl(0, 0%, ${48 + rand() * 42}%)`;
+    g.beginPath();
+    g.arc(x, y, N * (0.0035 + rand() * 0.004) * (1.25 - d * 0.5), 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
 /* ------------------------------------------------------------ api */
 
 const PAINTERS = {
@@ -612,6 +640,7 @@ const PAINTERS = {
   locust: paintLocust,
   'bloom:crabapple': paintBlossoms,
   'bloom:hydrangea': paintPanicle,
+  'bloom:smoke': paintSmoke,
 };
 
 export const LEAF_KINDS = [...Object.keys(BROADLEAVES), ...Object.keys(PAINTERS)];

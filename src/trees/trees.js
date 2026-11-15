@@ -93,7 +93,7 @@ function barkFor(t, kind) {
 }
 const CONIFERS = new Set(['spruce', 'norway', 'juniper', 'arborvitae', 'pine']);
 /** Species that flower: which flower texture their bloom cards use. */
-export const BLOOMS = { crabapple: 'bloom:crabapple', hydrangea: 'bloom:hydrangea' };
+export const BLOOMS = { crabapple: 'bloom:crabapple', hydrangea: 'bloom:hydrangea', smoke: 'bloom:smoke' };
 /** Which flower form a tree carries, if any: its own choice, else its leaf kind's. */
 export function bloomKindFor(t, kind = leafKindFor(t)) {
   if (t.bloomKind) return BLOOMS[t.bloomKind] ? t.bloomKind : null;
@@ -456,9 +456,11 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
   // 4. Flowers: blossom clusters (crabapple) or cone-shaped panicles
   //    (hydrangea) on the outside of the crown. Shown only in bloom season.
   if (flowers) {
-    const panicle = p.bloom === 'hydrangea';
-    const fs = panicle ? THREE.MathUtils.clamp(R * 0.28, 0.55, 1.1) : size * 0.8;
-    const per = panicle ? Math.round(5 + 6 * dens) : Math.round(perClump * 0.55);
+    // Smoke-tree plumes are built like panicles, only bigger, looser and fewer.
+    const smoke = p.bloom === 'smoke';
+    const panicle = p.bloom === 'hydrangea' || smoke;
+    const fs = smoke ? THREE.MathUtils.clamp(R * 0.3, 0.8, 1.9) : panicle ? THREE.MathUtils.clamp(R * 0.28, 0.55, 1.1) : size * 0.8;
+    const per = smoke ? Math.round(1 + 1.6 * dens) : panicle ? Math.round(5 + 6 * dens) : Math.round(perClump * 0.55);
     for (const cl of clumps) {
       if (!cl.outer) continue;
       const P = cl.c;
@@ -468,7 +470,8 @@ function broadleaf(p, r, bark, leaves, mass, ctx) {
       for (let i = 0; i < per; i++) {
         const d = randUnit(r);
         d.addScaledVector(out, 0.8).addScaledVector(UP, 0.5).normalize();
-        const centre = P.clone().addScaledVector(d, clumpR * (0.75 + 0.3 * r()));
+        // Smoke sits down among the leaves rather than out past them.
+        const centre = P.clone().addScaledVector(d, clumpR * (smoke ? 0.5 + 0.35 * r() : 0.75 + 0.3 * r()));
         const s = fs * (0.7 + 0.5 * r());
         if (panicle) {
           // Panicles stand up and lean out a little, arching under their weight.
@@ -695,6 +698,7 @@ const DEFAULT_NEEDLE = { spruce: 0x2c4a2e, norway: 0x284a26, juniper: 0x5f7a6c, 
 const DEFAULT_BLOOM = {
   crabapple: [0xb0305a, 0xe89ab4, 0xf2d6de],
   hydrangea: [0xc8dc8a, 0xf1f1e2, 0xd8a4a4],
+  smoke: [0xa8809a, 0xc898b0, 0xb09a94],
 };
 
 export class TreeLibrary {

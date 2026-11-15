@@ -341,9 +341,7 @@ group({...VASE, sci:"Physocarpus opulifolius", sun:FULL, bloom:["06-01","06-25"]
   ["Ninebark 'Amber Jubilee'", 5.5, 4, 0xF4F4EA, {foliage:0xD08A3A, fall:0x8a2a3a, note:"New growth in orange, yellow and gold."}]
 ]);
 group(VASE, [
-  ["Smoke Tree 'Lilla'", 4, 4, 0xE8A0B0, {k:"smokebush-lilla", sci:"Cotinus coggygria 'Lilla'", sun:FULL, zone:[4,8], bloom:["06-15","08-20"], bloomLabel:"Smoke", foliage:0x5a2030, fall:0xB8281E, opt:{head:"smoke", leafTex:"leaf:heart"}, note:"A dwarf smokebush: wine-red leaves under pink smoke."}],
-  ["Smoke Tree 'Golden Spirit'", 8, 6.5, 0xEAD2C0, {k:"smokebush-golden-spirit", sci:"Cotinus coggygria 'Ancot'", sun:FULL, zone:[4,8], bloom:["06-15","08-20"], bloomLabel:"Smoke", foliage:0xC8D03A, fall:0xE0642A, opt:{head:"smoke", leafTex:"leaf:heart"}, note:"Round chartreuse-gold leaves under a pale, pinkish haze of smoke in summer; coral, orange and red in fall."}],
-  ["Smoke Tree 'Royal Purple'", 12, 10, 0xC27A9A, {sci:"Cotinus coggygria 'Royal Purple'", sun:FULL, zone:[4,8], bloom:["06-15","08-20"], bloomLabel:"Smoke", foliage:0x4a1c2e, fall:0xC8281E, opt:{head:"smoke", leafTex:"leaf:heart"}, note:"Deep wine-purple leaves all season under purplish-pink smoke; scarlet in fall. Can die back in a hard zone 4 winter and regrow from the base."}],
+  ["Smokebush 'Lilla'", 4, 4, 0xE8A0B0, {sci:"Cotinus coggygria 'Lilla'", sun:FULL, zone:[4,8], bloom:["06-15","08-20"], bloomLabel:"Smoke", foliage:0x5a2030, fall:0xB8281E, opt:{head:"smoke", leafTex:"leaf:heart"}, note:"A dwarf smokebush that stays a four-foot shrub: wine-red leaves under pink smoke. The full-size smoke trees are in the tree library."}],
   ["Viburnum 'Blue Muffin'", 6, 5, 0x3A4FB0, {sci:"Viburnum dentatum 'Christom'", bloom:["08-05","10-10"], bloomLabel:"Blue berries", fall:0x8a2a3a, opt:{head:"berries"}, note:"White flower clusters in June, then bright blue berries the birds strip in fall."}],
   ["Cranberrybush 'Bailey Compact'", 5.5, 5.5, 0xC8202A, {sci:"Viburnum trilobum 'Bailey Compact'", zone:[2,7], bloom:["08-15","10-30"], bloomLabel:"Red berries", fall:0xA8202A, opt:{head:"berries", leafTex:"leaf:lobed"}, note:"A dense native viburnum: red berries and deep red fall colour."}],
   ["Summersweet 'Ruby Spice'", 5, 4, 0xE06A9A, {sci:"Clethra alnifolia 'Ruby Spice'", zone:[4,9], sun:ANY, bloom:["07-15","08-25"], fall:0xD8B83A, opt:{head:"spike"}, note:"Fragrant rose-pink bottlebrushes in late summer, even in shade."}],
@@ -428,7 +426,8 @@ group({...EVG, sci:"Taxus × media", sun:ANY, zone:[4,7], foliage:0x24481f, opt:
 /* ---------------------------------------------------------------- lookups */
 const BY_KEY = new Map(PLANTS.map(p=>[p.k, p]));
 /* keys used by plans saved before the full catalogue */
-const ALIASES = {"russian-sage":"russian-sage-denim-n-lace", "hosta-patriot":"hosta-francee", "ninebark-little-devil":"ninebark-summer-wine"};
+const ALIASES = {"russian-sage":"russian-sage-denim-n-lace", "hosta-patriot":"hosta-francee", "ninebark-little-devil":"ninebark-summer-wine",
+  "smokebush-golden-spirit":"smokebush-lilla", "smoke-tree-royal-purple":"smokebush-lilla"};
 /* Plans can outlive the catalog: an unknown key still draws, as a grey mound. */
 const UNKNOWN = {k:"?", n:"Unknown plant", sci:"", cat:"perennial", model:"cushion", h:1.5, w:1.5, flower:null,
                  foliage:0x7a8274, sun:ANY, zone:[1,13], opt:{}, note:"This plant is not in the catalog."};
