@@ -1,46 +1,46 @@
 /* ============================================================ plant catalog
-   Everything that can go in a planting bed: perennials, grasses, groundcovers
-   and shrubs. This file is data only. To add a plant, add one entry to PLANTS;
-   nothing else needs to change as long as its `habit` and `bloom.form` already
-   exist in models.js.
+   Every plant that can go in a planting bed. Data only: each entry is a
+   preset on one of the growth forms in models.js, so adding a variety is a
+   new row here and nothing else.
 
-   One entry:
+   Rows are written in groups that share a model and defaults:
 
-     k       stable key, saved in plan files. Never rename one that has shipped.
-     n       common name with cultivar, as on a nursery tag
-     sci     botanical name
-     cat     "perennial" | "grass" | "groundcover" | "shrub"
-     habit   the overall form, a key of HABITS in models.js. It picks both the
-             plan symbol outline and the 3D model:
-               mound     soft dome of foliage (catmint, geranium, spirea)
-               upright   stiff vertical stems (salvia, coneflower, Russian sage)
-               fountain  arching strap leaves or blades (daylily, iris, grasses)
-               mat       ground-hugging carpet (thyme, creeping phlox, sedum)
-               rosette   broad leaves from a central crown (hosta, bergenia)
-               shrub     woody, rounded, branched to the ground
-               conifer   dense evergreen globe or cushion
-     h, w    mature height and spread in feet. `w` is the circle on the plan.
-     foliage leaf colour (hex)
-     bloom   optional {color, from, to, form}
-               color  flower colour (hex); also the colour of the plan symbol
-               from, to  "MM-DD" in the northern hemisphere; the app shifts
-                         them six months south of the equator
-               form   a key of FLOWERS in models.js:
-                        spike | daisy | cluster | panicle | bell
-     sun     the exposures it tolerates, any of "full" | "part" | "shade".
-             A spot is "full" at or above the plan's full-sun hours, "part"
-             from 4 hours, otherwise "shade".
-     zone    [coldest, warmest] USDA hardiness zones
-     winter  what is left out of season:
-               "dormant"    dies back to the ground (the default for perennials)
-               "standing"   dry stems and seedheads stay up (grasses, sedum)
-               "bare"       woody twigs, no leaves (the default for shrubs)
-               "evergreen"  unchanged
-     fall    optional autumn foliage colour (hex)
-     note    one or two sentences for the palette and the inspector
+     group({model, cat, sci, sun, zone, bloom, foliage, …}, [
+       [name, height ft, spread ft, flower colour, {overrides}], …
+     ])
 
-   The entries below are a small starter set that exercises every habit and
-   flower form. They are placeholders for the real plant list. */
+   The fields of a finished entry:
+
+     k        stable key, saved in plan files (a slug of the name)
+     n        common name with variety, as on a nursery tag
+     sci      botanical name
+     cat      "perennial" | "grass" | "groundcover" | "shrub"
+     model    a key of MODELS in models.js: the growth form
+     h, w     mature height and spread in feet. `w` is the circle on the plan.
+     foliage  leaf colour. foliage2: the second leaf colour of a variegated
+              or silvered leaf.
+     flower   bloom colour, or a list the bloom ages through over its season
+              (panicle hydrangeas: lime, then white, then pink). null for a
+              foliage plant.
+     flower2  the bloom's second colour: a daisy's cone, a daylily's throat,
+              the older base of a panicle (a list ages like `flower`).
+     mix      other colours individual flowers may take (a seed mix)
+     stem     stem colour: what a shrub shows in winter
+     bloom    {from, to} as "MM-DD", northern hemisphere; the app shifts them
+              six months south of the equator. bloomLabel overrides the
+              wording (berries, plumes).
+     sun      exposures it tolerates: any of "full" | "part" | "shade"
+     zone     [coldest, warmest] USDA zones
+     winter   out of season: "dormant" (cut back), "standing" (dry stems and
+              seedheads), "heads" (bare stems holding dried blooms), "bare"
+              (twigs), "evergreen"
+     fall     autumn leaf colour
+     opt      options for the growth form (see its build() in models.js);
+              `trunk` (ft) raises a shrub's canopy into a patio tree
+     note     a line for the library card
+
+   Sizes are mature sizes from the grower or the garden centre catalogue,
+   rounded; check the tag of the plant you buy. */
 
 export const CATEGORIES = [
   {k:"perennial",   label:"Perennials"},
@@ -49,107 +49,385 @@ export const CATEGORIES = [
   {k:"shrub",       label:"Shrubs"}
 ];
 
-export const PLANTS = [
-  /* ---- perennials ---- */
-  {k:"catmint-walkers-low", n:"Catmint 'Walker's Low'", sci:"Nepeta × faassenii", cat:"perennial", habit:"mound",
-   h:2.5, w:3, foliage:0x8e9c7c, bloom:{color:0x9c8fd6, from:"05-25", to:"09-05", form:"spike"},
-   sun:["full","part"], zone:[3,8],
-   note:"Grey-green mound under a long haze of lavender-blue. Shear after the first flush for a second."},
-  {k:"salvia-may-night", n:"Salvia 'May Night'", sci:"Salvia × sylvestris 'Mainacht'", cat:"perennial", habit:"upright",
-   h:1.75, w:1.5, foliage:0x55703c, bloom:{color:0x4b3a9a, from:"05-28", to:"07-10", form:"spike"},
-   sun:["full"], zone:[4,8],
-   note:"Deep violet spikes in early summer. Good repeated in drifts along the front."},
-  {k:"coneflower-magnus", n:"Purple Coneflower 'Magnus'", sci:"Echinacea purpurea 'Magnus'", cat:"perennial", habit:"upright",
-   h:3, w:1.75, foliage:0x4f6b34, bloom:{color:0xc763a0, from:"07-01", to:"09-10", form:"daisy"},
-   sun:["full","part"], zone:[3,8], winter:"standing",
-   note:"Rosy daisies with a copper cone, midsummer to fall. Seedheads feed finches in winter."},
-  {k:"rudbeckia-goldsturm", n:"Black-eyed Susan 'Goldsturm'", sci:"Rudbeckia fulgida 'Goldsturm'", cat:"perennial", habit:"upright",
-   h:2.25, w:2, foliage:0x47652f, bloom:{color:0xe9b320, from:"07-15", to:"09-25", form:"daisy"},
-   sun:["full","part"], zone:[3,9], winter:"standing",
-   note:"A solid block of gold in late summer. Spreads slowly into a colony."},
-  {k:"daylily-stella", n:"Daylily 'Stella de Oro'", sci:"Hemerocallis 'Stella de Oro'", cat:"perennial", habit:"fountain",
-   h:1.25, w:1.75, foliage:0x5c8238, bloom:{color:0xf0b91e, from:"06-10", to:"08-25", form:"bell"},
-   sun:["full","part"], zone:[3,9],
-   note:"Low arching foliage and golden trumpets that rebloom all summer."},
-  {k:"iris-caesars-brother", n:"Siberian Iris 'Caesar's Brother'", sci:"Iris sibirica 'Caesar's Brother'", cat:"perennial", habit:"fountain",
-   h:3, w:2, foliage:0x4d7740, bloom:{color:0x3d2f8f, from:"05-25", to:"06-20", form:"bell"},
-   sun:["full","part"], zone:[3,8], fall:0xb9923c,
-   note:"Upright grassy blades and velvet-purple flowers for three weeks in early summer."},
-  {k:"peony-sarah-bernhardt", n:"Peony 'Sarah Bernhardt'", sci:"Paeonia lactiflora 'Sarah Bernhardt'", cat:"perennial", habit:"mound",
-   h:3, w:3, foliage:0x3c5f2e, bloom:{color:0xf0a9c2, from:"06-01", to:"06-22", form:"cluster"},
-   sun:["full"], zone:[3,8], fall:0x8a3b2c,
-   note:"Big, fragrant, double pink flowers in June on a shrub-sized mound that lasts decades."},
-  {k:"russian-sage", n:"Russian Sage", sci:"Salvia yangii", cat:"perennial", habit:"upright",
-   h:3.5, w:3, foliage:0xa3ae9c, bloom:{color:0x8f8fd8, from:"07-10", to:"09-30", form:"panicle"},
-   sun:["full"], zone:[4,9], winter:"standing",
-   note:"Airy silver stems and a blue-violet cloud from July to frost. Wants heat and lean soil."},
-  {k:"sedum-autumn-joy", n:"Sedum 'Autumn Joy'", sci:"Hylotelephium 'Herbstfreude'", cat:"perennial", habit:"mound",
-   h:2, w:2, foliage:0x7c9a6c, bloom:{color:0xc0596b, from:"08-20", to:"10-15", form:"cluster"},
-   sun:["full"], zone:[3,9], winter:"standing",
-   note:"Succulent mound; flat flower heads go from pale pink to rust and stand through winter."},
-  {k:"hosta-patriot", n:"Hosta 'Patriot'", sci:"Hosta 'Patriot'", cat:"perennial", habit:"rosette",
-   h:1.5, w:3, foliage:0x3f6b3a, bloom:{color:0xc9b8e6, from:"07-05", to:"07-30", form:"bell"},
-   sun:["part","shade"], zone:[3,8], fall:0xc7a646,
-   note:"Wide green leaves edged in white. The standard answer for the shady side of a bed."},
-  {k:"ostrich-fern", n:"Ostrich Fern", sci:"Matteuccia struthiopteris", cat:"perennial", habit:"fountain",
-   h:3.5, w:3, foliage:0x4f8a3c,
-   sun:["part","shade"], zone:[3,7],
-   note:"Tall shuttlecocks of fresh green fronds. Spreads by runners in moist shade."},
+const FULL = ["full"], FP = ["full","part"], PS = ["part","shade"], ANY = ["full","part","shade"];
+const WHITE = 0xF5F4EC, CREAM = 0xF2EAC8, GREEN = 0x4f6f36, DARK = 0x3a5f2e;
+const slug = s=>s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/['’.]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-  /* ---- grasses ---- */
-  {k:"karl-foerster", n:"Feather Reed Grass 'Karl Foerster'", sci:"Calamagrostis × acutiflora 'Karl Foerster'", cat:"grass", habit:"upright",
-   h:5, w:2, foliage:0x6f8f45, bloom:{color:0xd9c08a, from:"06-20", to:"10-15", form:"panicle"},
-   sun:["full","part"], zone:[4,9], winter:"standing", fall:0xcfae6a,
-   note:"A narrow vertical accent. Wheat-coloured plumes from June that stand all winter."},
-  {k:"little-bluestem", n:"Little Bluestem", sci:"Schizachyrium scoparium", cat:"grass", habit:"fountain",
-   h:3, w:1.75, foliage:0x7fa08f, bloom:{color:0xd8c8b4, from:"08-15", to:"10-15", form:"panicle"},
-   sun:["full"], zone:[3,9], winter:"standing", fall:0xb5562f,
-   note:"Native prairie grass: blue-green in summer, copper-orange from fall through winter."},
+export const PLANTS = [];
+function group(def, rows){
+  for(const [n, h, w, flower, over = {}] of rows){
+    const p = {...def, ...over, n, h, w, flower, k:over.k || slug(n)};
+    p.opt = {...(def.opt || {}), ...(over.opt || {})};
+    if(Array.isArray(p.bloom)) p.bloom = {from:p.bloom[0], to:p.bloom[1]};
+    if(p.flower == null) delete p.bloom;
+    PLANTS.push(p);
+  }
+}
 
-  /* ---- groundcovers ---- */
-  {k:"creeping-thyme", n:"Creeping Thyme", sci:"Thymus serpyllum", cat:"groundcover", habit:"mat",
-   h:.25, w:1.5, foliage:0x5d7a4a, bloom:{color:0xc77fc0, from:"06-05", to:"07-15", form:"cluster"},
-   sun:["full"], zone:[4,9], winter:"evergreen",
-   note:"A flat, fragrant carpet for bed edges and between stones. Pink-purple in early summer."},
-  {k:"creeping-phlox", n:"Creeping Phlox 'Emerald Blue'", sci:"Phlox subulata 'Emerald Blue'", cat:"groundcover", habit:"mat",
-   h:.5, w:2, foliage:0x4d7a4a, bloom:{color:0x8fa2e6, from:"05-01", to:"05-28", form:"cluster"},
-   sun:["full","part"], zone:[3,9], winter:"evergreen",
-   note:"Needle-leaved mat that disappears under lavender-blue flowers in May."},
+/* ================================================================ PERENNIALS */
+/* P1 — coneflowers and daisies */
+const ECH = {model:"coneflower", cat:"perennial", sci:"Echinacea", sun:FP, zone:[4,8], bloom:["07-01","09-10"], foliage:0x4f6b34,
+             flower2:0x8a4a1c, winter:"standing", opt:{droop:.45}, note:"Drooping petals round a raised cone, midsummer to fall. Seedheads stand through winter."};
+group(ECH, [
+  ["Coneflower 'Magnus'", 2.5, 1.5, 0xD0588F, {sci:"Echinacea purpurea 'Magnus'", zone:[3,8], opt:{droop:.3}}],
+  ["Coneflower 'PowWow Wild Berry'", 1.4, 1.2, 0xB0408A],
+  ["Coneflower 'Kismet Raspberry'", 1.75, 1.5, 0xC2275E],
+  ["Coneflower 'Artisan Red Ombre'", 1.9, 1.5, 0xB8202A],
+  ["Coneflower 'Sombrero Fiesta Orange'", 1.6, 1.5, 0xE86A1C, {flower2:0x9a5a2a}],
+  ["Coneflower 'Artisan Soft Orange'", 2, 1.5, 0xF0A060],
+  ["Coneflower 'SunSeekers Mineola'", 1.3, 1.2, 0xEE8A2A, {opt:{droop:.2, tex:"flower:daisy-double"}, note:"Semi-double orange flowers on a compact plant."}],
+  ["Coneflower 'Cheyenne Spirit'", 1.75, 1.5, 0xE2562A, {mix:[0xD7301F, 0xF2C230, 0xE86AA0], note:"A seed mix: each plant flowers in its own shade from scarlet through orange to yellow."}],
+  ["Coneflower 'SunMagic Yellow'", 1.5, 1.3, 0xF2C230]
+]);
+group({...ECH, sci:"Rudbeckia", zone:[3,9], bloom:["07-15","09-25"], foliage:0x47652f, flower2:0x1c120c, opt:{droop:.06},
+       note:"Flat gold daisies with a dark eye, late summer into fall."}, [
+  ["Black-eyed Susan 'Goldsturm'", 2, 2, 0xF2B705, {sci:"Rudbeckia fulgida 'Goldsturm'", k:"rudbeckia-goldsturm"}],
+  ["Black-eyed Susan 'Little Goldstar'", 1.25, 1.25, 0xF2B705, {sci:"Rudbeckia fulgida 'Little Goldstar'"}],
+  ["Rudbeckia 'Prairie Glow'", 3.5, 2.5, 0xA8421C, {sci:"Rudbeckia triloba 'Prairie Glow'", flower2:0xF2C230, opt:{droop:.06, tex:"flower:daisy-tip"}, note:"Burnt-red daisies tipped in yellow on a tall, airy plant."}]
+]);
+group({...ECH, sci:"Leucanthemum × superbum", zone:[4,9], bloom:["06-20","08-15"], foliage:0x2f5a2e, flower2:0xE8C23A, winter:"dormant",
+       opt:{droop:0, tex:"flower:daisy-fine"}, note:"Clean white daisies with a yellow eye in early summer."}, [
+  ["Shasta Daisy 'Snowcap'", 1, 1.25, 0xF7F7F2],
+  ["Shasta Daisy 'Mt. Hood'", 1.7, 1.5, 0xF7F7F2, {opt:{droop:0, tex:"flower:daisy-double"}, note:"Fully double white flowers."}]
+]);
+group({...ECH, opt:{droop:.05}}, [
+  ["False Sunflower 'Tuscan Sun'", 2.5, 2, 0xF0B414, {sci:"Heliopsis helianthoides 'Tuscan Sun'", zone:[3,9], flower2:0xC98A10, bloom:["06-25","09-10"], note:"Golden daisies for most of the summer on a compact plant."}],
+  ["Sneezeweed 'Mardi Gras'", 1.75, 1.5, 0xD8481E, {sci:"Helenium 'Mardi Gras'", flower2:0xF2C230, bloom:["07-10","09-01"], opt:{droop:.3, tex:"flower:daisy-tip"}, note:"Yellow petals splashed orange-red round a brown button."}],
+  ["Blanket Flower 'Arizona Sun'", 1.4, 1.2, 0xC8281E, {sci:"Gaillardia × grandiflora 'Arizona Sun'", zone:[3,9], flower2:0xF2C230, bloom:["06-10","09-25"], winter:"dormant", opt:{droop:.05, tex:"flower:daisy-tip"}, note:"Red daisies tipped in yellow from June to frost on a low mound."}]
+]);
 
-  /* ---- shrubs ---- */
-  {k:"hydrangea-little-lime", n:"Hydrangea 'Little Lime'", sci:"Hydrangea paniculata 'Jane'", cat:"shrub", habit:"shrub",
-   h:4, w:4.5, foliage:0x486f35, bloom:{color:0xdfe8bf, from:"07-10", to:"09-30", form:"panicle"},
-   sun:["full","part"], zone:[3,8],
-   note:"Compact panicle hydrangea. Lime cones turn white, then pink, from midsummer into fall."},
-  {k:"spirea-goldflame", n:"Spirea 'Goldflame'", sci:"Spiraea japonica 'Goldflame'", cat:"shrub", habit:"mound",
-   h:3, w:3.5, foliage:0xa7b24a, bloom:{color:0xd8588f, from:"06-10", to:"07-25", form:"cluster"},
-   sun:["full","part"], zone:[4,8], winter:"bare", fall:0xc8642c,
-   note:"Chartreuse-gold foliage with rosy flower clusters in early summer; coppery in fall."},
-  {k:"ninebark-little-devil", n:"Ninebark 'Little Devil'", sci:"Physocarpus opulifolius 'Donna May'", cat:"shrub", habit:"shrub",
-   h:3.5, w:3.5, foliage:0x5a2f36, bloom:{color:0xf0dce0, from:"06-01", to:"06-25", form:"cluster"},
-   sun:["full","part"], zone:[3,7],
-   note:"Burgundy foliage all season as a dark foil for bright flowers. Pinkish-white clusters in June."},
-  {k:"lilac-dwarf-korean", n:"Dwarf Korean Lilac", sci:"Syringa meyeri 'Palibin'", cat:"shrub", habit:"shrub",
-   h:4.5, w:5.5, foliage:0x436a34, bloom:{color:0xc79adf, from:"05-18", to:"06-08", form:"panicle"},
-   sun:["full"], zone:[3,7],
-   note:"A dense, tidy lilac that stays under five feet. Fragrant lavender panicles in late May."},
-  {k:"arborvitae-hetz-midget", n:"Globe Arborvitae 'Hetz Midget'", sci:"Thuja occidentalis 'Hetz Midget'", cat:"shrub", habit:"conifer",
-   h:3, w:3.5, foliage:0x3d6a2c,
-   sun:["full","part"], zone:[3,8], winter:"evergreen",
-   note:"A slow evergreen ball. Year-round structure between the perennials."}
-];
+/* P2 — hostas and bold foliage */
+group({model:"hosta", cat:"perennial", sci:"Hosta", sun:PS, zone:[3,8], bloom:["07-05","08-05"], foliage:0x3f6b3a, fall:0xc7a646,
+       symbol:"foliage", note:"A mound of broad, ribbed leaves for shade, with flower scapes above in summer."}, [
+  ["Hosta 'Halcyon'", 2.2, 3, 0xC9B8E6, {foliage:0x6F8FA0, opt:{mound:.62}, note:"Powder-blue, heavily ribbed leaves that hold their colour all season."}],
+  ["Hosta 'Sum and Substance'", 4, 5.5, 0xD8CCE8, {foliage:0xB4BE46, sun:ANY, opt:{mound:.72, leaf:1.15}, note:"A giant: chartreuse-gold leaves two feet across. Takes more sun than most."}],
+  ["Hosta 'Royal Standard'", 3.4, 4, WHITE, {foliage:0x4f8a3c, sun:ANY, bloom:["08-10","09-10"], opt:{mound:.6}, note:"Glossy green mound with fragrant white flowers in late summer."}],
+  ["Hosta 'Francee'", 2.6, 3.5, 0xC9B8E6, {foliage:0x2f5a34, foliage2:0xF2F0E2, opt:{mound:.62, variegation:"edge"}, note:"Dark green leaves with a crisp white edge."}],
+  ["Hosta 'Aureomarginata'", 2.8, 3.5, 0x8A6AC0, {sci:"Hosta ventricosa 'Aureomarginata'", foliage:0x356434, foliage2:0xD8C85A, opt:{mound:.6, variegation:"edge"}, note:"Glossy green leaves with a wide gold margin."}],
+  ["Hosta 'Fire and Ice'", 1.6, 1.6, 0xC9B8E6, {foliage:0x2f5a34, foliage2:0xF4F2E6, opt:{mound:.6, variegation:"centre"}, note:"White-centred leaves edged in dark green."}],
+  ["Hosta 'Blue Mouse Ears'", .9, 1, 0xB8A0DC, {foliage:0x6F8FA0, opt:{mound:.6, leaf:1.25}, note:"A miniature: thick, round blue-green leaves."}]
+]);
 
+/* P3 — spikes */
+const SAL = {model:"spikes", cat:"perennial", sci:"Salvia nemorosa", sun:FULL, zone:[4,8], bloom:["05-28","07-10"], foliage:0x55703c,
+             opt:{density:"tight"}, note:"Dense flower spikes in early summer; shear for a second flush."};
+group(SAL, [
+  ["Salvia 'May Night'", 1.6, 1.5, 0x4B3FA0, {sci:"Salvia × sylvestris 'Mainacht'", k:"salvia-may-night"}],
+  ["Salvia 'Caradonna'", 2, 1.5, 0x4A2D8F, {stem:0x2a1c3a, note:"Deep purple spikes on near-black stems."}],
+  ["Salvia 'Sensation Deep Rose'", 1, 1, 0xC2478A],
+  ["Salvia 'Lyrical White'", 1.6, 1.4, 0xF4F2EC],
+  ["Blazing Star 'Kobold'", 2, 1.25, 0xB07CC8, {sci:"Liatris spicata 'Kobold'", zone:[3,9], bloom:["07-10","08-25"], foliage:0x4f7a3a, opt:{density:"tight", leafTex:"leaf:blades", spike:.95}, note:"Fuzzy lavender wands above grassy foliage; a butterfly magnet."}],
+  ["Cardinal Flower 'Queen Victoria'", 3, 1.25, 0xD21F2B, {sci:"Lobelia cardinalis 'Queen Victoria'", sun:FP, bloom:["07-15","09-15"], foliage:0x5a2430, stem:0x4a1c28, opt:{density:"tight", spike:1.2}, note:"Scarlet spikes over burgundy foliage. Wants moist soil."}],
+  ["Catmint 'Walker's Low'", 2.5, 3, 0x9C8FD6, {sci:"Nepeta × faassenii 'Walker's Low'", k:"catmint-walkers-low", sun:FP, zone:[3,8], bloom:["05-25","09-05"], foliage:0x8e9c7c, opt:{density:"loose"}, note:"Grey-green mound under a long haze of lavender-blue."}],
+  ["Russian Sage 'Denim 'n Lace'", 2.7, 3, 0x8F86D8, {sci:"Salvia yangii 'Denim 'n Lace'", zone:[4,9], bloom:["07-10","09-30"], foliage:0xa3ae9c, stem:0xc8ccc0, winter:"standing", opt:{density:"loose", spike:1.3}, note:"Airy silver stems and a lavender-purple cloud from July to frost."}]
+]);
+
+/* P4 — daylilies */
+group({model:"daylily", cat:"perennial", sci:"Hemerocallis", sun:FP, zone:[3,9], bloom:["06-25","08-10"], foliage:0x5c8238, flower2:0xD8D23A,
+       note:"Arching strap leaves and trumpet flowers on wiry scapes through midsummer."}, [
+  ["Daylily 'Stella de Oro'", 1.1, 1.5, 0xF0B91E, {k:"daylily-stella", bloom:["06-10","08-25"], flower2:0xE6A81E, note:"Low and golden, reblooming all summer."}],
+  ["Daylily 'Chicago Apache'", 2.3, 2, 0xB3201E],
+  ["Daylily 'Night Beacon'", 2.3, 2, 0x4A1F4F, {note:"Near-black purple with a chartreuse throat."}],
+  ["Daylily 'Rosy Returns'", 1.2, 1.5, 0xE0708A, {bloom:["06-15","08-25"], flower2:0xE6C83C, note:"Rose-pink rebloomer with a yellow throat."}],
+  ["Daylily 'Rocket City'", 3, 2, 0xF08A1C, {flower2:0xE2561C}],
+  ["Daylily 'Sunday Gloves'", 2.25, 2, 0xF5F0E0, {flower2:0xE6D66A, note:"Near-white, fragrant flowers."}],
+  ["Daylily 'Blazing Glory'", 2, 2, 0xF2C230, {flower2:0xB3201E, note:"Yellow with a red eye."}]
+]);
+
+/* P5 — tall clumps with flowers on top */
+const TALL = {model:"tallclump", cat:"perennial", sun:FP, zone:[4,8], foliage:0x4a6a34};
+group({...TALL, sci:"Monarda didyma", bloom:["07-01","08-20"], opt:{head:"shag"}, note:"Shaggy whorled flowers that hummingbirds work all day. Spreads into a colony."}, [
+  ["Bee Balm 'Jacob Cline'", 4, 2.5, 0xD21F2B],
+  ["Bee Balm 'Bubblegum Blast'", 2, 2.3, 0xE0468F],
+  ["Bee Balm 'Grand Parade'", 1.25, 1.5, 0xB070C0]
+]);
+group({...TALL, sci:"Phlox paniculata", bloom:["07-15","09-10"], opt:{head:"dome"}, note:"Big domed flower heads, fragrant in the evening, at the back of the border."}, [
+  ["Garden Phlox 'David'", 3.5, 2.5, 0xF7F7F2],
+  ["Garden Phlox 'Olympus'", 2, 2, 0xC987B0, {foliage:0x4f7a3a, foliage2:0xF0ECD0, opt:{head:"dome", leafTex:"leaf:lance+edge"}, note:"Rosy-mauve flowers over cream-edged leaves."}]
+]);
+group(TALL, [
+  ["Joe Pye Weed 'Baby Joe'", 2.5, 2.5, 0xB98AA8, {sci:"Eutrochium dubium 'Baby Joe'", zone:[4,9], bloom:["07-25","09-15"], winter:"standing", stem:0x6a3a4a, opt:{head:"flat", headSize:.7}, note:"Mauve-pink domes on purple stems; a compact Joe Pye."}],
+  ["Sedum 'Autumn Joy'", 2, 2, [0xE8B4A8, 0xC0596B, 0x8F3F2E], {sci:"Hylotelephium 'Herbstfreude'", k:"sedum-autumn-joy", sun:FULL, zone:[3,9], bloom:["08-20","10-15"], foliage:0x7c9a6c, winter:"standing", opt:{head:"flat", headSize:.55, leafTex:"leaf:ovate"}, note:"Succulent clump; flat heads go from pale pink to rust and stand through winter."}],
+  ["Showy Goldenrod", 3, 2, 0xE6B81E, {sci:"Solidago speciosa", sun:FULL, zone:[3,8], bloom:["08-10","09-30"], winter:"standing", opt:{head:"plume"}, note:"Dense golden plumes in late summer. A native that stays in a clump."}],
+  ["Lily 'Tiny Heroes'", 1.3, 1, 0xEE7A1C, {sci:"Lilium (Asiatic)", sun:FULL, zone:[3,8], bloom:["06-20","07-15"], flower2:0xC8501C, opt:{head:"trumpet", headSize:.4}, note:"A dwarf Asiatic lily with up-facing orange flowers."}],
+  ["Lily 'Pink Stargazer'", 3, 1.25, 0xE0508A, {sci:"Lilium (Oriental)", sun:FULL, bloom:["07-20","08-15"], flower2:0xF6E0E8, opt:{head:"trumpet", headSize:.55}, note:"Big, fragrant, pink Oriental lily."}],
+  ["Lily 'Red Velvet'", 3.5, 1.25, 0x8F1420, {sci:"Lilium (Asiatic)", sun:FULL, zone:[3,8], bloom:["07-01","07-25"], flower2:0x5a0c14, opt:{head:"trumpet", headSize:.5}, note:"Deep velvet red on tall stems."}]
+]);
+
+/* P6 — globes on stalks */
+const ALL = {model:"allium", cat:"perennial", sci:"Allium", sun:FULL, zone:[4,8], bloom:["07-15","08-25"], foliage:0x5a8a45, flower2:0x6a8a4a,
+             winter:"standing", note:"Globes of tiny flowers on bare stalks over a tidy clump of strap leaves."};
+group(ALL, [
+  ["Allium 'Millenium'", 1.5, 1.25, 0xB565B0],
+  ["Allium 'Summer Beauty'", 1.6, 1.5, 0xD8A0CC],
+  ["Allium 'Serendipity'", 1.5, 1.25, 0x8A3F9A, {foliage:0x6a8f80, note:"Deep purple globes over blue-green leaves."}],
+  ["Nodding Pink Onion", 1.25, 1, 0xE6B4CE, {sci:"Allium cernuum", zone:[3,8], bloom:["06-25","07-30"], opt:{nod:.8}, note:"A prairie native whose pink globes hang from a crook in the stalk."}],
+  ["Gas Plant", 3, 2.5, 0xF4F2EC, {sci:"Dictamnus albus", zone:[3,8], bloom:["06-01","06-28"], foliage:0x3f6a34, opt:{head:"spike", headSize:.9, leafTex:"leaf:pinnate"}, note:"Glossy, lemon-scented foliage and white spires in June. Slow, then lives for decades."}],
+  ["Masterwort 'Star of Fire'", 2, 1.5, 0x8F1F2E, {sci:"Astrantia major 'Star of Fire'", sun:PS, bloom:["06-10","08-10"], foliage:0x3f6a34, winter:"dormant", opt:{leafTex:"leaf:lobed", headSize:.13}, note:"Dark red pincushion flowers on wiry stems for part shade."}]
+]);
+
+/* P7 — peonies and bushy perennials */
+const PEO = {model:"peony", cat:"perennial", sci:"Paeonia lactiflora", sun:FULL, zone:[3,8], bloom:["06-01","06-22"], foliage:0x3c5f2e, fall:0x8a3b2c,
+             stem:0x5a6a3a, note:"Big, fragrant flowers in June on a shrub-sized mound that lives for decades."};
+group(PEO, [
+  ["Peony 'Sarah Bernhardt'", 3, 3, 0xF0A9C2, {k:"peony-sarah-bernhardt"}],
+  ["Peony 'Karl Rosenfield'", 3, 3, 0xB01E3A],
+  ["Peony 'Coral Charm'", 3, 3, 0xF47C6A, {bloom:["05-25","06-15"]}],
+  ["Itoh Peony 'Scrumdiddlyumptious'", 2.5, 3, 0xF2E0A0, {sci:"Paeonia (Itoh hybrid)", zone:[4,9], note:"Cream-yellow flowers blushed pink on a sturdy, self-supporting plant."}]
+]);
+group({...PEO, sci:"Baptisia", zone:[4,9], bloom:["05-28","06-25"], foliage:0x6f8f7a, fall:null, winter:"standing",
+       opt:{head:"spike", leafTex:"leaf:small"}, note:"Lupine-like spikes over a blue-green, shrub-like clump that never needs staking."}, [
+  ["False Indigo 'Blueberry Sundae'", 3, 3, 0x5A5FC0],
+  ["False Indigo 'Lemon Meringue'", 3, 3, 0xF0DC5A, {stem:0x4a4a44}],
+  ["False Indigo 'Vanilla Cream'", 2.75, 3, CREAM]
+]);
+
+/* P8 — astilbes and ferns */
+group({model:"astilbe", cat:"perennial", sci:"Astilbe", sun:PS, zone:[4,8], bloom:["06-25","07-30"], foliage:0x3f6a34, winter:"standing",
+       note:"Feathery plumes over ferny foliage. Needs steady moisture."}, [
+  ["Astilbe 'Fanal'", 1.75, 1.5, 0xB01E2E, {foliage:0x4a4a2e, note:"Blood-red plumes over bronze foliage."}],
+  ["Astilbe 'Deutschland'", 1.75, 1.5, 0xF6F6F0, {k:"astilbe-deutschland-white"}],
+  ["Astilbe 'Visions in Pink'", 1.5, 1.5, 0xF0A9C8, {sci:"Astilbe chinensis 'Visions in Pink'"}],
+  ["Astilbe 'Visions'", 1.25, 1.5, 0xC2378A, {sci:"Astilbe chinensis 'Visions'"}],
+  ["Astilbe 'Younique Salmon'", 1.5, 1.5, 0xF4957A],
+  ["Ostrich Fern", 3.5, 3, null, {sci:"Matteuccia struthiopteris", k:"ostrich-fern", zone:[3,7], foliage:0x4f8a3c, winter:"dormant", opt:{plumes:false}, note:"Tall shuttlecocks of fresh green fronds. Spreads by runners in moist shade."}]
+]);
+
+/* P9 — ruffled mounds with wiry flower stems */
+group({model:"heuchera", cat:"perennial", sci:"Heuchera", sun:PS, zone:[4,9], bloom:["06-05","07-20"], foliage:0x4a2530, winter:"evergreen",
+       symbol:"foliage", note:"Grown for its foliage: a low mound of ruffled leaves with airy flower wands above."}, [
+  ["Coral Bells 'Palace Purple'", 1.7, 1.5, 0xF0E6DC, {foliage:0x4a2530}],
+  ["Coral Bells 'Obsidian'", 1.6, 1.3, 0xF0E6DC, {foliage:0x1e1418, note:"The darkest: glossy, near-black leaves."}],
+  ["Coral Bells 'Lime Marmalade'", 1.3, 1.5, 0xF4F4EA, {foliage:0xB6D24A}],
+  ["Coral Bells 'Caramel'", 1.4, 1.6, 0xF2E0D0, {sci:"Heuchera villosa 'Caramel'", foliage:0xD49A4A}],
+  ["Coral Bells 'Forever Red'", 1.2, 1.2, 0xF4F0E8, {foliage:0x9a1f28}],
+  ["Coral Bells 'Sugar Plum'", 1.5, 1.3, 0xE88AB0, {foliage:0x6a3a5a, foliage2:0xB8B0C0, opt:{silver:true}, note:"Plum leaves frosted with silver; pink flowers."}]
+]);
+group({model:"heuchera", cat:"perennial", sci:"Aquilegia", sun:FP, zone:[3,9], bloom:["05-15","06-20"], foliage:0x6f8f6a,
+       opt:{wand:"columbine", leafTex:"leaf:ferny", mound:.5}, note:"Spurred, two-tone flowers nodding over lacy blue-green foliage in late spring."}, [
+  ["Columbine 'Earlybird Blue White'", 1, 1, 0x4A63C8, {flower2:0xF4F4F0}],
+  ["Columbine 'Earlybird Red White'", 1, 1, 0xB8202A, {flower2:0xF4F4F0}],
+  ["Columbine 'Earlybird Yellow'", 1, 1, 0xF2D23A, {flower2:0xF6E680}],
+  ["Bleeding Heart 'Amore Titanium'", 1, 1.25, 0xF4F2EE, {sci:"Dicentra 'Amore Titanium'", sun:PS, bloom:["05-10","07-30"], foliage:0x7f9a94, flower2:0xE8E0E0, opt:{wand:"hearts", leafTex:"leaf:ferny", mound:.6}, note:"White hearts on arching stems over blue-grey ferny leaves."}]
+]);
+
+/* P10 — cushions dotted with flowers */
+const CUSH = {model:"cushion", cat:"perennial", sun:FP, zone:[4,8], foliage:0x4f7a3a};
+group(CUSH, [
+  ["Geranium 'Rozanne'", 1.5, 2.5, 0x6F6AD8, {sci:"Geranium 'Gerwat'", zone:[5,8], bloom:["06-01","09-30"], flower2:0xF4F2F6, opt:{leafTex:"leaf:lobed", flowerSize:.16, sparse:true}, note:"Violet-blue flowers with a white eye from June to frost."}],
+  ["Aster 'Purple Dome'", 1.5, 2.5, 0x6A3FB0, {sci:"Symphyotrichum novae-angliae 'Purple Dome'", sun:FULL, bloom:["08-25","10-10"], flower2:0xE8C23A, opt:{flower:"daisy", flowerTex:"flower:daisy-fine", flowerSize:.14, leafTex:"leaf:fine"}, note:"A tight dome that disappears under purple daisies in September."}],
+  ["Mum 'Clara Curtis'", 2, 2.5, 0xEE8FB4, {sci:"Chrysanthemum × rubellum 'Clara Curtis'", sun:FULL, bloom:["08-20","10-05"], flower2:0xE8C23A, opt:{flower:"daisy", flowerSize:.22, leafTex:"leaf:lobed"}, note:"A hardy garden mum with single pink daisies."}],
+  ["Dianthus 'Electric Red'", .8, 1, 0xD21F2B, {sci:"Dianthus 'Electric Red'", sun:FULL, bloom:["05-25","07-15"], foliage:0x7f9a94, flower2:0xB01828, winter:"evergreen", opt:{leafTex:"leaf:needle", flowerSize:.11}, note:"Clove-scented red flowers over a blue-grey cushion."}],
+  ["Coreopsis 'Moonbeam'", 1.5, 1.75, 0xF2E68A, {sci:"Coreopsis verticillata 'Moonbeam'", sun:FULL, zone:[3,9], bloom:["06-15","09-10"], flower2:0xE8C84A, opt:{leafTex:"leaf:needle", flowerSize:.13, flowerTex:"flower:daisy"}, note:"Pale yellow stars all summer over thread-fine foliage."}],
+  ["Baby's Breath 'Summer Sparkles'", 2.5, 3, 0xF7F7F2, {sci:"Gypsophila paniculata 'Summer Sparkles'", sun:FULL, zone:[3,9], bloom:["06-20","08-15"], foliage:0x7f9a8a, flower2:0xF7F7F2, opt:{leafTex:"leaf:needle", flowerSize:.09}, note:"A cloud of tiny white flowers."}],
+  ["Bellflower 'Rapido Blue'", .5, 1, 0x5A5AC8, {sci:"Campanula carpatica 'Rapido Blue'", zone:[3,8], bloom:["06-01","08-10"], flower2:0x7a7ad8, opt:{flowerSize:.13}, note:"Up-facing violet-blue bells on a low mound."}]
+]);
+
+/* P11 — groundcover mats */
+const MAT = {model:"mat", cat:"groundcover", sun:FULL, zone:[3,9], foliage:0x4d7a4a, winter:"evergreen"};
+group({...MAT, sci:"Sedum", opt:{leafTex:"leaf:succulent"}, symbol:"foliage", note:"A succulent carpet for hot, dry edges and between stones."}, [
+  ["Sedum 'Angelina'", .4, 1.75, null, {sci:"Sedum rupestre 'Angelina'", zone:[5,8], foliage:0xD8C83A, fall:0xD88A2A, note:"Needle-like gold foliage that turns orange in fall."}],
+  ["Sedum 'Bronze Carpet'", .3, 1.5, 0xE0708A, {sci:"Sedum spurium 'Bronze Carpet'", bloom:["06-25","08-05"], foliage:0x6a2a30, opt:{leafTex:"leaf:succulent", sparse:true}}],
+  ["Sedum 'Blue Spruce'", .5, 1.5, 0xE6C83A, {sci:"Sedum reflexum 'Blue Spruce'", bloom:["06-20","07-25"], foliage:0x7fa3a8, opt:{leafTex:"leaf:succulent", sparse:true}}],
+  ["Sedum kamtschaticum 'Variegatum'", .4, 1.25, 0xE6B81E, {bloom:["06-10","07-20"], foliage:0x7f9a5a, opt:{leafTex:"leaf:succulent", sparse:true}, note:"Green leaves edged in cream, with yellow stars in early summer."}]
+]);
+group({...MAT, sci:"Phlox subulata", sun:FP, bloom:["05-01","05-28"], flower2:0x6a4a8a, note:"A needle-leaved mat that disappears under flowers in May."}, [
+  ["Creeping Phlox 'Emerald Blue'", .5, 2, 0x8FA2E6, {k:"creeping-phlox"}],
+  ["Creeping Phlox 'Scarlet Flame'", .5, 2, 0xD21F4A, {flower2:0x8a1430}],
+  ["Creeping Phlox 'White Delight'", .5, 2, 0xF6F6F2, {flower2:0xE8E0B0}],
+  ["Creeping Phlox 'Candy Stripe'", .5, 2, 0xF6E6EE, {flower2:0xE0508A, note:"White flowers striped in pink."}]
+]);
+group(MAT, [
+  ["Bugleweed 'Black Scallop'", .4, 1.5, 0x4A4FC0, {sci:"Ajuga reptans 'Black Scallop'", sun:PS, zone:[4,9], bloom:["05-10","06-10"], foliage:0x2a1c24, symbol:"foliage", opt:{leafTex:"leaf:succulent", spikes:true}, note:"Glossy near-black leaves with short blue spikes in spring. For shade."}],
+  ["Dead Nettle 'Purple Dragon'", .6, 1.75, 0xB050B0, {sci:"Lamium maculatum 'Purple Dragon'", sun:PS, zone:[4,8], bloom:["05-15","07-15"], foliage:0xB8C4B8, symbol:"foliage", winter:"dormant", opt:{sparse:true}, note:"Silver leaves edged in green; purple flowers. Lights up dry shade."}],
+  ["Periwinkle 'Bowles'", .5, 2, 0x6F6AD8, {sci:"Vinca minor 'Bowles'", sun:PS, zone:[4,8], bloom:["05-01","06-01"], foliage:0x2f5a2e, flower2:0xF0F0F6, opt:{sparse:true}, note:"Glossy evergreen trailer with violet-blue flowers in spring."}],
+  ["Creeping Thyme", .25, 1.5, 0xC77FC0, {sci:"Thymus serpyllum", k:"creeping-thyme", zone:[4,9], bloom:["06-05","07-15"], foliage:0x5d7a4a, flower2:0xC77FC0, note:"A flat, fragrant carpet for bed edges and between stones."}]
+]);
+
+/* P12, P13 — grasses */
+group({model:"grass", cat:"grass", sun:FULL, zone:[4,9], foliage:0x6f8f45, winter:"standing", bloomLabel:"Plumes"}, [
+  ["Feather Reed Grass 'Karl Foerster'", 5, 2, 0xD9C08A, {sci:"Calamagrostis × acutiflora 'Karl Foerster'", k:"karl-foerster", sun:FP, bloom:["06-20","10-15"], fall:0xcfae6a, opt:{foliage:.58, plume:.36}, note:"A narrow vertical accent. Wheat-coloured plumes from June that stand all winter."}],
+  ["Feather Reed Grass 'Overdam'", 3.5, 1.75, 0xD9B8A0, {sci:"Calamagrostis × acutiflora 'Overdam'", sun:FP, bloom:["06-20","10-15"], foliage2:0xE8E6C0, opt:{stripe:true, foliage:.6, plume:.34}, note:"Cream-striped blades under pinkish plumes."}],
+  ["Switchgrass 'Heavy Metal'", 4.5, 2, 0xC8B8A0, {sci:"Panicum virgatum 'Heavy Metal'", bloom:["08-01","10-15"], foliage:0x7f9aa0, fall:0xD8B84A, opt:{foliage:.74, plume:.32, plumeWide:.6}, note:"Stiffly upright, metallic-blue blades with an airy haze of seedheads."}],
+  ["Switchgrass 'Shenandoah'", 3.5, 2, 0xC88A8A, {sci:"Panicum virgatum 'Shenandoah'", bloom:["08-01","10-15"], foliage:0x6f7f4a, fall:0xA8282E, opt:{foliage:.74, plume:.32, plumeWide:.6}, note:"Green blades that turn wine-red from the tips by midsummer."}],
+  ["Little Bluestem 'Blue Heaven'", 3.5, 1.75, 0xD8C8B4, {sci:"Schizachyrium scoparium 'Blue Heaven'", k:"little-bluestem", zone:[3,9], bloom:["08-15","10-15"], foliage:0x7fa0a8, fall:0xB5562F, opt:{foliage:.8, plume:.22}, note:"Native prairie grass: blue in summer, copper and burgundy from fall through winter."}]
+]);
+group({model:"fountain", cat:"grass", sun:FULL, zone:[5,9], foliage:0x5f8a45, winter:"standing", bloomLabel:"Plumes"}, [
+  ["Maiden Grass 'Graziella'", 5.5, 3.5, 0xE6DCCB, {sci:"Miscanthus sinensis 'Graziella'", bloom:["08-20","10-20"], fall:0xC88A3A, note:"A fine-textured fountain with silvery plumes held well above the leaves."}],
+  ["Maiden Grass 'Morning Light'", 5, 3.5, 0xD8C0B0, {sci:"Miscanthus sinensis 'Morning Light'", bloom:["09-10","10-20"], foliage:0x7f9a6a, foliage2:0xE6EAD8, opt:{stripe:true}, note:"Narrow, white-edged blades that shimmer silver."}],
+  ["Maiden Grass 'Flame'", 4.5, 3, 0xE6DCCB, {sci:"Miscanthus 'Purpurascens'", zone:[4,9], bloom:["08-10","10-20"], fall:0xC8401E, note:"The hardiest maiden grass; flaming orange-red in fall."}],
+  ["Golden Hakone Grass", 1.25, 2, null, {sci:"Hakonechloa macra 'Aureola'", sun:PS, foliage:0xC8C83A, foliage2:0x6f9a3a, winter:"dormant", opt:{stripe:true}, note:"A cascading gold-striped grass for shade."}],
+  ["Blue Fescue 'Elijah Blue'", .9, .9, 0xC8B88A, {sci:"Festuca glauca 'Elijah Blue'", zone:[4,8], bloom:["06-10","07-20"], foliage:0x8fb0c0, winter:"evergreen", opt:{foliage:.7, plume:.3, tuftTex:"leaf:blades"}, note:"A tidy, silver-blue tuft."}]
+]);
+
+/* P14 — irises */
+group({model:"iris", cat:"perennial", sci:"Iris", sun:FP, zone:[3,8], bloom:["05-25","06-20"], foliage:0x4d7740, flower2:0xE6D66A, fall:0xb9923c,
+       note:"Upright sword leaves with flag flowers for three weeks in early summer."}, [
+  ["Siberian Iris 'Caesar's Brother'", 3, 2, 0x3D2F8F, {sci:"Iris sibirica 'Caesar's Brother'", k:"iris-caesars-brother"}],
+  ["Blue Flag Iris", 2.5, 2, 0x5A63C8, {sci:"Iris versicolor", zone:[3,9], note:"A native iris for wet ground and pond edges."}],
+  ["Bearded Iris", 2.5, 1.5, 0x8A6AC8, {sci:"Iris × germanica", sun:FULL, zone:[3,9], foliage:0x7f9a8a, opt:{flowerSize:.45, foliage:.62}, note:"Broad grey-green fans and big ruffled flowers. Comes in every colour; this one stands in for them."}]
+]);
+
+/* ==================================================================== SHRUBS */
+/* S1 — panicle hydrangeas. `flower` is what the cones age through. */
+const W0 = 0xF4F4EA;
+const PAN = {model:"panicle", cat:"shrub", sci:"Hydrangea paniculata", sun:FP, zone:[3,8], bloom:["07-10","10-05"], foliage:0x486f35, fall:0x9a8a3a,
+             stem:0x7a5a40, winter:"heads", note:"Cone-shaped flower heads from midsummer that change colour as they age and dry on the plant for winter."};
+group(PAN, [
+  ["Hydrangea 'Limelight'", 7, 7, [0xC8DC8A, 0xF4F4E6, 0xE8A9B8], {note:"The classic: big lime cones that go white, then pink and burgundy in fall."}],
+  ["Hydrangea 'Little Lime'", 4.5, 4.5, [0xCFE0A0, 0xEEF0DC, 0xE6A8B6], {sci:"Hydrangea paniculata 'Jane'", k:"hydrangea-little-lime", note:"Limelight at half the size."}],
+  ["Hydrangea 'Little Hottie'", 4, 4, [0xD2E2A8, 0xF6F6EC, 0xF0C8CE], {note:"Compact and heat-tolerant; green buds open white and blush soft pink."}],
+  ["Hydrangea 'Fire Light'", 5.5, 5.5, [W0, 0xE4708A, 0xB02848], {note:"Upright white cones that turn pomegranate red."}],
+  ["Hydrangea 'Berry White'", 6, 4.5, [W0, 0xE890A8, 0xB02A5A], {note:"Strong upright stems; white cones darken to deep berry pink from the base up."}],
+  ["Hydrangea 'Vanilla Strawberry'", 6.5, 4.5, [0xF6F0DC, 0xF0A0B4, 0xC82A48], {stem:0x8a2a34, note:"Vanilla cones turn pink, then strawberry red, on red stems."}],
+  ["Hydrangea 'Strawberry Sundae'", 4.5, 3.5, [0xF6F0DC, 0xF0A0B4, 0xC83A4E], {stem:0x8a2a34, note:"A compact Vanilla Strawberry."}],
+  ["Hydrangea 'Quick Fire Fab'", 6, 5.5, [W0, 0xF0B4C4, 0xD0486A], {bloom:["06-25","10-05"], opt:{fat:.42}, note:"Blooms a month early; full, mophead-like cones turn from white to pink to red."}],
+  ["Hydrangea 'Diamond Rouge'", 4.5, 3.5, [W0, 0xE86A88, 0xA01830], {note:"The reddest: white cones go pink, then deep wine red."}],
+  ["Hydrangea 'Spring Sizzle'", 4.5, 4.5, [W0, 0xD8587A, 0x9A1830], {bloom:["06-20","10-05"], note:"Very early; white turning deep red."}],
+  ["Hydrangea 'Limelight Prime'", 5.5, 4.5, [0xC8E08A, 0xF4F4E6, 0xD04A78], {bloom:["07-01","10-05"], note:"Earlier and stronger-stemmed than Limelight, with deeper pink fall colour."}],
+  ["Hydrangea 'Little Lime Punch'", 4, 4, [0xC8E08A, 0xF0A0B8, 0xC02848], {flower2:[0xD8E8A0, 0xE0507A, 0xB02040], note:"Lime cones that turn pink and punch red from the bottom up, several colours at once."}],
+  ["Hydrangea 'Pinky Winky'", 7, 6.5, [W0, W0, 0xF2DCE2], {flower2:[W0, 0xE0507A, 0xB8284A], opt:{bloom:1.05}, note:"Two-tone cones: white tips keep opening above a base that has already turned pink."}],
+  ["Hydrangea 'Bobo'", 3, 3.5, [W0, W0, 0xF0C0CC], {opt:{dense:true}, note:"A dwarf covered to the ground in white cones that blush pink."}],
+  ["Hydrangea 'Fire Light Tidbit'", 2.5, 3, [W0, 0xE4708A, 0xB02848], {opt:{dense:true}, note:"The smallest panicle hydrangea; white to pomegranate pink."}],
+  ["Hydrangea 'Puffer Fish'", 4, 4, [0xF6F6EE, 0xF6F6EE, 0xCFE0A0], {opt:{dense:true, fat:.4}, note:"A larger Bobo. Fluffy white cones age to lime, with a fresh burst of white at the tips late in the season."}],
+  ["Hydrangea 'Sweet Starlight'", 4, 3.5, [W0, 0xF0B0C0, 0xD0507A], {zone:[4,8], note:"Compact, with white cones that start turning pink earlier than most."}],
+  ["Hydrangea 'Berry White' tree", 7, 4.5, [W0, 0xE890A8, 0xB02A5A], {opt:{trunk:3}, note:"Berry White grown on a single trunk."}],
+  ["Hydrangea 'Little Lime' tree", 6.5, 4, [0xCFE0A0, 0xEEF0DC, 0xE6A8B6], {opt:{trunk:3}, note:"Little Lime grown on a single trunk."}],
+  ["Hydrangea 'Vanilla Strawberry' patio tree", 7.5, 4.5, [0xF6F0DC, 0xF0A0B4, 0xC82A48], {opt:{trunk:3.2}, note:"Vanilla Strawberry grown on a single trunk."}]
+]);
+
+/* S2 — mophead and smooth hydrangeas */
+const MOP = {model:"mophead", cat:"shrub", sci:"Hydrangea arborescens", sun:FP, zone:[3,8], bloom:["06-25","09-15"], foliage:0x4a7436, fall:0x9a9a3a,
+             stem:0x8a7a5a, winter:"heads", note:"Ball-shaped flower heads through summer. Blooms on new wood, so it flowers after any winter."};
+group(MOP, [
+  ["Hydrangea 'Annabelle'", 5, 5, [0xD8E6B0, 0xF6F6EE, 0xD8E0B8], {note:"The old favourite: big white snowballs that fade back to green."}],
+  ["Hydrangea 'Incrediball'", 4.5, 4.5, [0xC8E08A, 0xF6F6EE, 0xD0DCA8], {opt:{bloom:1.05}, note:"Annabelle with stronger stems and heads up to a foot across."}],
+  ["Hydrangea 'Flowerfull'", 4.5, 4.5, [0xE0E8C0, 0xF6F6EE, 0xDDE2C0], {opt:{bloom:.6}, note:"Two to three times as many white heads as other smooth hydrangeas, held upright."}],
+  ["Hydrangea 'Bubble Bath'", 4.5, 4.5, [0xF4EEDC, 0xF4E0DC, 0xF2C8D2], {note:"Cream heads that blush soft pink."}],
+  ["Hydrangea 'DreamScape'", 4.5, 4.5, [0xD04A78, 0xE090A8, 0xE6C0C4], {note:"Ruby-pink heads that soften to parchment pink."}],
+  ["Hydrangea 'Summer Crush'", 2.5, 2.5, [0xD82A5A, 0xC82A70, 0xA83A8A], {sci:"Hydrangea macrophylla 'Bailmacfive'", zone:[4,9], sun:["part"], foliage:0x2f5a2e, opt:{bloom:.5}, note:"A compact bigleaf hydrangea: raspberry-red to neon-purple mopheads over glossy leaves. Wants afternoon shade and winter protection in zone 4."}],
+  ["Hydrangea 'Invincibelle Sublime'", 4.2, 4.2, [0xB8D86A, 0xC8E08A, 0xD8E0B0], {zone:[3,9], note:"A green-flowered smooth hydrangea: rich lime heads with a pink eye in each floret."}],
+  ["Snowball Viburnum", 11, 11, [0xC8E08A, 0xF6F6F2, 0xF6F6F2], {sci:"Viburnum opulus 'Roseum'", sun:FP, bloom:["05-20","06-12"], foliage:0x4a7436, fall:0x9a3a2a, winter:"bare", opt:{bloom:.42, fine:true}, note:"A big old-fashioned shrub hung with white snowballs in late spring."}]
+]);
+
+/* S3 — arching shrubs */
+const WEI = {model:"weigela", cat:"shrub", sci:"Weigela florida", sun:FULL, zone:[4,8], bloom:["05-25","06-25"], foliage:0x4a7436, stem:0x6a5a44,
+             winter:"bare", note:"Arching branches lined with trumpet flowers in late spring; hummingbirds come for them."};
+group(WEI, [
+  ["Weigela 'Spilled Wine'", 2.5, 3, 0xC8327A, {foliage:0x4a1f2a, note:"Dark red, wavy foliage and magenta flowers on a low, spreading plant."}],
+  ["Weigela 'Shining Sensation'", 5.5, 4, 0xE86A9A, {foliage:0x5a2530, note:"Glossy burgundy leaves with pink flowers."}],
+  ["Weigela 'Red Prince'", 5.5, 5, 0xC81E2E],
+  ["Weigela 'My Monet'", 1.5, 2, 0xE88AB0, {foliage:0x6f9a5a, foliage2:0xF2E6DC, opt:{leafTex:"leaf:ovate+edge"}, note:"A dwarf with green, cream and pink variegated leaves."}],
+  ["Weigela 'Midnight Sun'", 1.25, 1.5, 0xE06A8A, {foliage:0xC8642A, fall:0xB8281E, opt:{sparse:true}, note:"A tiny mound of orange and red foliage."}],
+  ["Forsythia 'Northern Gold'", 6, 6, 0xF2D21E, {sci:"Forsythia 'Northern Gold'", zone:[3,8], bloom:["04-25","05-12"], fall:0x8a7a3a, opt:{droop:.4, flowerSize:.15}, note:"Golden-yellow flowers on bare branches, the first big show of spring. Bud-hardy in the north."}],
+  ["Bridalwreath Spirea 'Renaissance'", 6, 6, 0xF7F7F2, {sci:"Spiraea × vanhouttei 'Renaissance'", zone:[3,8], bloom:["05-15","06-05"], foliage:0x5a8a5a, fall:0xC8642A, opt:{droop:.85, leafTex:"leaf:small", flowerSize:.2, flowerTex:"flower:umbel"}, note:"A fountain of branches smothered in white in late May."}],
+  ["Diervilla 'Dark Mode'", 3.5, 3.5, 0xE6C83A, {sci:"Diervilla", zone:[4,7], sun:ANY, bloom:["06-15","08-15"], foliage:0x2a1c20, fall:0x8a1c2a, opt:{sparse:true, flowerSize:.1}, note:"Near-black foliage with small yellow flowers. Tough, and takes shade."}]
+]);
+
+/* S4 — upright, vase-shaped shrubs */
+const VASE = {model:"vase", cat:"shrub", sun:FP, zone:[3,7], foliage:0x4a7436, stem:0x6a5a44, winter:"bare"};
+group({...VASE, sci:"Cornus sericea", bloom:["05-25","06-15"], fall:0x8a2a3a, opt:{head:"flat"}, note:"Grown for its winter stems, brightest on young wood. White flower clusters in spring."}, [
+  ["Dogwood 'Cardinal'", 8, 8, 0xF4F4EA, {stem:0xC8202A}],
+  ["Dogwood 'Bud's Yellow'", 7, 6, 0xF4F4EA, {sci:"Cornus alba 'Bud's Yellow'", stem:0xD8C83A}],
+  ["Dogwood 'Sgt. Pepper'", 5.5, 5, 0xF4F4EA, {foliage:0x5a8a5a, foliage2:0xF0ECD8, stem:0xB8202A, opt:{head:"flat", leafTex:"leaf:ovate+edge"}, note:"Cream-edged leaves, pink in fall, on red stems."}]
+]);
+group({...VASE, sci:"Physocarpus opulifolius", sun:FULL, bloom:["06-01","06-25"], stem:0x7a5a44, opt:{head:"flat", leafTex:"leaf:lobed"},
+       note:"Coloured foliage all season with pinkish-white flower buttons in June and peeling bark in winter."}, [
+  ["Ninebark 'Summer Wine'", 5.5, 5.5, 0xF0DCE0, {foliage:0x5a2530}],
+  ["Ninebark 'Summer Wine Black'", 5.5, 5.5, 0xF0DCE0, {foliage:0x241418}],
+  ["Ninebark 'Honeycomb'", 5, 5, 0xF4F4EA, {foliage:0xC8C83A}],
+  ["Ninebark 'Amber Jubilee'", 5.5, 4, 0xF4F4EA, {foliage:0xD08A3A, fall:0x8a2a3a, note:"New growth in orange, yellow and gold."}]
+]);
+group(VASE, [
+  ["Smokebush 'Lilla'", 4, 4, 0xE8A0B0, {sci:"Cotinus coggygria 'Lilla'", sun:FULL, zone:[4,8], bloom:["06-15","08-15"], bloomLabel:"Smoke plumes", foliage:0x5a2030, fall:0xB8281E, opt:{head:"plume", leafTex:"leaf:heart"}, note:"A dwarf smokebush: wine-red leaves under pink smoke."}],
+  ["Smokebush 'Golden Spirit'", 8, 6.5, 0xE6C8B0, {sci:"Cotinus coggygria 'Ancot'", sun:FULL, zone:[4,8], bloom:["06-15","08-15"], bloomLabel:"Smoke plumes", foliage:0xC8D03A, fall:0xE0642A, opt:{head:"plume", leafTex:"leaf:heart"}, note:"Chartreuse-gold leaves that turn coral and orange in fall."}],
+  ["Viburnum 'Blue Muffin'", 6, 5, 0x3A4FB0, {sci:"Viburnum dentatum 'Christom'", bloom:["08-05","10-10"], bloomLabel:"Blue berries", fall:0x8a2a3a, opt:{head:"berries"}, note:"White flower clusters in June, then bright blue berries the birds strip in fall."}],
+  ["Cranberrybush 'Bailey Compact'", 5.5, 5.5, 0xC8202A, {sci:"Viburnum trilobum 'Bailey Compact'", zone:[2,7], bloom:["08-15","10-30"], bloomLabel:"Red berries", fall:0xA8202A, opt:{head:"berries", leafTex:"leaf:lobed"}, note:"A dense native viburnum: red berries and deep red fall colour."}],
+  ["Summersweet 'Ruby Spice'", 5, 4, 0xE06A9A, {sci:"Clethra alnifolia 'Ruby Spice'", zone:[4,9], sun:ANY, bloom:["07-15","08-25"], fall:0xD8B83A, opt:{head:"spike"}, note:"Fragrant rose-pink bottlebrushes in late summer, even in shade."}],
+  ["Mock Orange 'Snow White Fantasy'", 5.5, 4.5, 0xF7F7F2, {sci:"Philadelphus 'Snow White Fantasy'", sun:FULL, zone:[4,8], bloom:["06-05","06-30"], flower2:0xE8D880, opt:{head:"single", headSize:.22}, note:"Double, orange-blossom-scented white flowers in June, with some rebloom."}]
+]);
+
+/* S5 — cut-leaf shrubs */
+group({model:"sumac", cat:"shrub", sun:FP, zone:[4,8], foliage:0x4a7436, stem:0x6a5a44, winter:"bare", symbol:"foliage"}, [
+  ["Sumac 'Tiger Eyes'", 6, 6, null, {sci:"Rhus typhina 'Bailtiger'", sun:FULL, foliage:0xC8D83A, stem:0xC88A8A, fall:0xE0642A, opt:{leafTex:"leaf:lacy"}, note:"Chartreuse cut leaves on fuzzy pink stems, orange and scarlet in fall. Suckers slowly."}],
+  ["Elderberry 'Black Lace'", 7, 7, 0xF0B4C8, {sci:"Sambucus nigra 'Eva'", bloom:["06-10","07-05"], foliage:0x2a1820, opt:{leafTex:"leaf:lacy", head:"flat", headSize:.6}, note:"Lacy near-black foliage like a Japanese maple, with flat pink flower heads in June."}],
+  ["Elderberry 'Lemony Lace'", 4, 4.5, 0xF4F4EA, {sci:"Sambucus racemosa 'SMNSRD4'", zone:[3,7], bloom:["05-10","06-01"], foliage:0xD0D83A, opt:{leafTex:"leaf:lacy", head:"flat", headSize:.4}, note:"Finely cut gold foliage, red-tinged when new."}],
+  ["Ash Leaf Spirea 'Matcha Ball'", 2.75, 2.75, 0xF2EAC8, {sci:"Sorbaria sorbifolia 'Levgreen'", zone:[3,7], bloom:["07-01","07-30"], foliage:0x9ab83a, opt:{leafTex:"leaf:pinnate", head:"flat", headSize:.4}, note:"A tidy ball of ferny, tea-green leaves flushed peach in spring."}]
+]);
+
+/* S6 — mounding shrubs */
+const SPI = {model:"spirea", cat:"shrub", sci:"Spiraea japonica", sun:FULL, zone:[4,8], bloom:["06-10","07-25"], foliage:0x5a8a45, stem:0x6a5040, winter:"bare",
+             note:"A fine-textured mound topped with flat flower clusters in early summer; shear for more."};
+group(SPI, [
+  ["Spirea 'Goldflame'", 3, 3.5, 0xD8588F, {k:"spirea-goldflame", foliage:0xA7B24A, fall:0xC8642C, note:"New growth in burnt orange, then gold; rosy flowers; coppery in fall."}],
+  ["Spirea 'Glow Girl'", 3.5, 3.5, 0xF7F7F2, {sci:"Spiraea betulifolia 'Tor Gold'", zone:[3,9], bloom:["05-28","06-25"], foliage:0xC8D83A, fall:0xD8782A}],
+  ["Spirea 'Double Play Blue Kazoo'", 2.5, 2.5, 0xF7F7F2, {sci:"Spiraea media 'SMSMBK'", zone:[3,8], foliage:0x7f9aa0, fall:0xA83A3A, note:"Blue-green leaves with burgundy new growth and white flowers."}],
+  ["Spirea 'Magic Carpet'", 1.75, 2.25, 0xC8327A, {foliage:0xC8B83A, fall:0xB8442A, opt:{low:true}}],
+  ["Spirea 'Double Play Doozie'", 2.5, 2.5, 0xC8284A, {zone:[3,8], bloom:["06-01","09-20"], foliage:0x6f8f3a, note:"Red new growth and red-pink flowers that keep coming without deadheading."}],
+  ["Birchleaf Spirea 'Tor'", 2.75, 2.75, 0xF7F7F2, {sci:"Spiraea betulifolia 'Tor'", zone:[3,9], bloom:["05-28","06-25"], foliage:0x3f6a34, fall:0xC8402A, note:"A dense green ball with white flowers and orange-red-purple fall colour."}],
+  ["Potentilla 'Dakota Sunspot'", 2.5, 2.75, 0xF2D21E, {sci:"Dasiphora fruticosa 'Fargo'", zone:[2,7], bloom:["06-01","09-25"], foliage:0x5a8a4a, flower2:0xE8B81E, opt:{head:"single", leafTex:"leaf:fine"}, note:"Bright yellow flowers from June to frost. Bred in Fargo."}],
+  ["Potentilla 'Mandarin Tango'", 2, 2.5, 0xE0642A, {sci:"Dasiphora fruticosa 'Jefman'", zone:[2,7], bloom:["06-01","09-25"], foliage:0x5a8a4a, flower2:0xF2C230, opt:{head:"single", leafTex:"leaf:fine"}, note:"Orange flowers with a red centre, best colour in cool weather."}],
+  ["Sumac 'Gro-Low'", 1.75, 7, null, {sci:"Rhus aromatica 'Gro-Low'", zone:[3,9], sun:FP, foliage:0x2f6a2e, fall:0xC8402A, symbol:"foliage", opt:{low:true, leafTex:"leaf:ovate", head:null}, note:"A wide, glossy-leaved groundcover shrub for banks; orange-red in fall."}]
+]);
+
+/* S7 — lilacs */
+group({model:"lilac", cat:"shrub", sci:"Syringa", sun:FULL, zone:[3,7], bloom:["05-20","06-10"], foliage:0x436a34, stem:0x6a5a48, winter:"bare",
+       note:"Fragrant flower cones in late spring on a dense, upright shrub."}, [
+  ["Lilac 'Miss Kim'", 6, 5.5, 0xC8A0E0, {sci:"Syringa pubescens subsp. patula 'Miss Kim'", bloom:["05-28","06-15"], fall:0x7a2a44, note:"Late, icy-lavender flowers and burgundy fall colour."}],
+  ["Lilac 'Bloomerang Dark Purple'", 5, 5, 0x6A3A9A, {sci:"Syringa 'SMSJBP7'", bloom:["05-18","06-08"], note:"Blooms in spring, rests, then again from midsummer to frost."}],
+  ["Lilac 'Dream Cloud'", 5.5, 5, 0xE8B0D0, {note:"Soft pink flowers."}],
+  ["Dwarf Korean Lilac patio tree", 6.5, 4.5, 0xD8B8E6, {sci:"Syringa meyeri 'Palibin'", k:"lilac-dwarf-korean", opt:{trunk:3}, note:"The dense dwarf Korean lilac grafted on a single trunk."}]
+]);
+
+/* S8, S9 — small-leaved mounds and columns */
+const BAR = {model:"dense", cat:"shrub", sci:"Berberis thunbergii", sun:FULL, zone:[4,8], foliage:0x8a1f30, stem:0x5a3a34, winter:"bare", symbol:"foliage",
+             note:"A dense, thorny mound grown for its foliage colour. Deer leave it alone."};
+group(BAR, [
+  ["Barberry 'Crimson Pygmy'", 1.75, 2.75, null, {foliage:0x8a1f30, fall:0xC8281E}],
+  ["Barberry 'Concorde'", 1.5, 2, null, {foliage:0x4a1f3a, fall:0xA8202A}],
+  ["Barberry 'Golden Nugget'", 1, 1.5, null, {foliage:0xD8B83A, fall:0xE0782A}],
+  ["Barberry 'Sunjoy Tangelo'", 3.5, 3.5, null, {foliage:0xE0782A, foliage2:0xC8D83A, opt:{leafTex:"leaf:small+edge"}, note:"Orange leaves that develop a chartreuse edge."}],
+  ["Boxwood 'Green Velvet'", 3, 3.5, null, {sci:"Buxus 'Green Velvet'", sun:FP, zone:[4,9], foliage:0x3a6a2e, winter:"evergreen", stem:0x5a4a3a, opt:{round:true}, k:"boxwood-green-velvet", note:"A hardy evergreen ball that holds its green through winter. Shelter it from winter wind."}]
+]);
+group({...BAR, model:"columnar", note:"A narrow exclamation point of coloured foliage."}, [
+  ["Barberry 'Golden Rocket'", 4.5, 1.75, null, {foliage:0xD0C83A, fall:0xE0782A}],
+  ["Barberry 'Orange Rocket'", 4.5, 2, null, {foliage:0xD8643A, fall:0xC8281E, note:"Coral-orange new growth that turns ruby red in fall."}],
+  ["Barberry 'Toscana'", 4, 2.25, null, {foliage:0x8a2030, foliage2:0xD8C83A, fall:0xC8281E, opt:{leafTex:"leaf:small+edge"}, note:"Red leaves with a thin gold edge."}],
+  ["Buckthorn 'Fine Line'", 6, 2.5, null, {sci:"Frangula alnus 'Ron Williams'", sun:FP, zone:[2,7], foliage:0x4a7a3a, fall:0xD8B83A, opt:{leafTex:"leaf:needle"}, note:"A feathery column of narrow leaves for hedges and tight corners."}]
+]);
+
+/* ---------------------------------------------------------------- lookups */
 const BY_KEY = new Map(PLANTS.map(p=>[p.k, p]));
+/* keys used by plans saved before the full catalogue */
+const ALIASES = {"russian-sage":"russian-sage-denim-n-lace", "hosta-patriot":"hosta-francee",
+  "ninebark-little-devil":"ninebark-summer-wine", "arborvitae-hetz-midget":"boxwood-green-velvet"};
 /* Plans can outlive the catalog: an unknown key still draws, as a grey mound. */
-const UNKNOWN = {k:"?", n:"Unknown plant", sci:"", cat:"perennial", habit:"mound", h:1.5, w:1.5,
-                 foliage:0x7a8274, sun:["full","part","shade"], zone:[1,13], note:"This plant is not in the catalog."};
-export function plantByKey(k){ return BY_KEY.get(k) || UNKNOWN; }
+const UNKNOWN = {k:"?", n:"Unknown plant", sci:"", cat:"perennial", model:"cushion", h:1.5, w:1.5, flower:null,
+                 foliage:0x7a8274, sun:ANY, zone:[1,13], opt:{}, note:"This plant is not in the catalog."};
+export function plantByKey(k){ return BY_KEY.get(k) || BY_KEY.get(ALIASES[k]) || UNKNOWN; }
 
 export function winterHabit(p){
   return p.winter || (p.cat === "shrub" ? "bare" : p.cat === "grass" ? "standing" : "dormant");
 }
-/* The colour of a plant on the plan: its flowers if it has any, else its leaves. */
-export function symbolColor(p){ return p.bloom ? p.bloom.color : p.foliage; }
+const seqAt = (c, t)=>{
+  if(!Array.isArray(c)) return c;
+  const f = Math.max(0, Math.min(1, t))*(c.length - 1), i = Math.min(c.length - 2, Math.floor(f)), k = f - i;
+  const ch = s=>Math.round(((c[i] >> s) & 255)*(1 - k) + ((c[i+1] >> s) & 255)*k);
+  return ch(16) << 16 | ch(8) << 8 | ch(0);
+};
+/* a bloom's colours part-way through its season: [main, second] */
+export function flowerColors(p, phase){
+  if(p.flower == null) return null;
+  const aging = Array.isArray(p.flower);
+  const a = seqAt(p.flower, aging ? phase - .08 : 0);
+  const b = p.flower2 != null ? seqAt(p.flower2, phase + .1) : aging ? seqAt(p.flower, phase + .22) : a;
+  return [a, b];
+}
+/* The colour of a plant on the plan: its flowers at their peak, else its leaves. */
+export function symbolColor(p){
+  if(p.flower == null || p.symbol === "foliage") return p.foliage;
+  return seqAt(p.flower, .5);
+}
 
 export function sunClass(hours, fullSunHours){
   return hours >= fullSunHours ? "full" : hours >= 4 ? "part" : "shade";
@@ -165,23 +443,34 @@ const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 const part = md=>{ const d = +md.slice(3); return (d <= 10 ? "early " : d <= 20 ? "mid " : "late ") + MONTHS[+md.slice(0,2)-1]; };
 export function bloomText(p){
   if(!p.bloom) return "Foliage plant";
-  const a = MONTHS[+p.bloom.from.slice(0,2)-1], b = MONTHS[+p.bloom.to.slice(0,2)-1];
-  return a === b ? "Blooms in "+a : "Blooms "+part(p.bloom.from)+" to "+part(p.bloom.to);
+  const a = MONTHS[+p.bloom.from.slice(0,2)-1], b = MONTHS[+p.bloom.to.slice(0,2)-1], what = p.bloomLabel || "Blooms";
+  return a === b ? what+" in "+a : what+" "+part(p.bloom.from)+" to "+part(p.bloom.to);
 }
+const mdDay = md=>{ const [m, d] = md.split("-").map(Number); return Date.UTC(2001, m-1, d)/86400000; };
 
 /* What a plant looks like on a given day.
    md       "MM-DD", already shifted for the hemisphere
    growing  whether the plan's leaf season is on
    fall     0…1 through the last weeks before leaf drop
-   Returns {state, bloom, fall}: state is "growing" | "dormant" | "standing" |
-   "bare" | "evergreen"; bloom is true inside the flowering window. */
+   Returns {state, bloom, spent, phase, fall}:
+     state  "growing" | "evergreen" | "dormant" | "standing" | "heads" | "bare"
+     bloom  inside the flowering window; phase runs 0…1 through it
+     spent  flowering is over but the dried heads are still on the plant */
 export function plantPhase(p, {md, growing, fall}){
-  const wh = winterHabit(p);
-  if(!growing && wh !== "evergreen") return {state:wh, bloom:false, fall:0};
-  const bloom = !!p.bloom && growing && md >= p.bloom.from && md <= p.bloom.to;
-  return {state: wh === "evergreen" ? "evergreen" : "growing", bloom, fall: p.fall != null ? fall : 0};
+  const wh = winterHabit(p), keeps = wh === "standing" || wh === "heads";
+  if(!growing && wh !== "evergreen") return {state:wh, bloom:false, spent:keeps && !!p.bloom, phase:1, fall:0};
+  let bloom = false, spent = false, phase = 0;
+  if(p.bloom && growing){
+    bloom = md >= p.bloom.from && md <= p.bloom.to;
+    if(bloom) phase = (mdDay(md) - mdDay(p.bloom.from))/Math.max(1, mdDay(p.bloom.to) - mdDay(p.bloom.from));
+    else if(md > p.bloom.to && keeps){ spent = true; phase = 1; }
+  }
+  return {state: wh === "evergreen" ? "evergreen" : "growing", bloom, spent, phase, fall: p.fall != null ? fall : 0};
 }
-export function phaseKey(ph){ return ph.state + (ph.bloom ? "+b" : "") + (ph.fall > 0 ? "+f"+Math.round(ph.fall*4) : ""); }
+export function phaseKey(p, ph){
+  return ph.state + (ph.bloom ? "+b"+(Array.isArray(p.flower) || Array.isArray(p.flower2) ? Math.round(ph.phase*10) : "") : "")
+       + (ph.spent ? "+s" : "") + (ph.fall > 0 ? "+f"+Math.round(ph.fall*4) : "");
+}
 
 /* The numbered key for one bed: each kind of plant once, in the order it was
    first planted, with how many there are. Repeated plants share a number. */

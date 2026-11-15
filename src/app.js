@@ -5,8 +5,9 @@ import { lawnTextures, sidingTextures, shingleTextures, concreteTile, paverTextu
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { TreeLibrary, leafKindFor } from "./trees/trees.js";
 import { createPost } from "./post.js";
-import { PLANTS, CATEGORIES, plantByKey, symbolColor, sunClass, SUN_LABEL, sunNeeds, bloomText, bedLegend } from "./garden/plants.js";
-import { symbolPath } from "./garden/models.js";
+import { PLANTS, CATEGORIES, plantByKey, symbolColor, sunClass, SUN_LABEL, sunNeeds, bloomText, bedLegend, winterHabit } from "./garden/plants.js";
+import { symbolPath, MODELS } from "./garden/models.js";
+import { plantThumb } from "./garden/thumbs.js";
 import { MULCHES, bedOutline, starterOutline, plantRadius, plantAt, bedSeasonKey, buildPlantingBed } from "./garden/beds.js";
 
 const DEG = Math.PI/180;
@@ -219,7 +220,7 @@ function fromPreset(name, x, y){
 function starterPlanting(x, y){
   const rows = [
     ["karl-foerster", [-6,1.6],[-4.3,2],[5.5,1.8]], ["hydrangea-little-lime", [.5,1.2]],
-    ["russian-sage", [-2.5,1.4],[3.3,1.6]], ["coneflower-magnus", [-5.2,-.3],[-3.8,-.5],[-4.5,.6]],
+    ["russian-sage-denim-n-lace", [-2.5,1.4],[3.3,1.6]], ["coneflower-magnus", [-5.2,-.3],[-3.8,-.5],[-4.5,.6]],
     ["rudbeckia-goldsturm", [2.2,-.4],[3.6,-.2],[5,.1]], ["catmint-walkers-low", [-7,-1.2],[-1.5,-1.6],[6.6,-1.4]],
     ["salvia-may-night", [0,-1.4],[1.2,-1.8],[-.2,-2.6]], ["sedum-autumn-joy", [7.6,.6],[-8,.4]],
     ["creeping-thyme", [-3.5,-2.8],[2.8,-3],[4.6,-2.4]], ["daylily-stella", [-6,-2.2],[8.2,-.6]]
@@ -532,6 +533,24 @@ function treeDiscs(t, u, cot){
   }
   return out;
 }
+/* Shrubs and tall perennials cast shade too. Anything under this height is
+   left out: it only shades its own feet. */
+const PLANT_SHADE_MIN = 2.5;
+function plantShadeDensity(p, leaves){
+  const full = p.cat === "shrub" ? .8 : p.cat === "grass" ? .5 : .6;
+  if(leaves) return full;
+  const w = winterHabit(p);
+  return w === "evergreen" ? full : w === "dormant" ? 0 : w === "standing" ? .3 : .15;
+}
+function plantDiscs(bed, pl, p, u, cot){
+  const s = pl.s || 1, h = p.h*s, R = p.w/2*s, y0 = (p.opt?.trunk || 0)*s, ch = h - y0;
+  const q = rot2(pl.x, pl.y, (bed.rot||0)*DEG), cx = bed.x + q.x, cy = bed.y + q.y, out = [];
+  for(const [f, k] of [[.2, .8], [.5, 1], [.8, .7]]){
+    const z = y0 + ch*f, r = R*k;
+    out.push({x:cx + u.x*z*cot, y:cy + u.y*z*cot, r2:r*r});
+  }
+  return out;
+}
 function sweptRect(cx, cy, w, h, rotDeg, height, u, cot){
   const L = Math.min(800, height*cot), a = -rotDeg*DEG;
   const d = rot2(u.x*L, u.y*L, a);
@@ -592,6 +611,13 @@ function casters(minutes){
       const dens = o.evergreen ? (o.density ?? .9) : (leaves ? (o.density ?? .85) : .12);
       if(dens <= .02) continue;
       trees.push({discs: treeDiscs(o, u, cot), dens});
+    } else if(o.type === "planting"){
+      for(const pl of o.plants || []){
+        const p = plantByKey(pl.k);
+        if(p.h*(pl.s || 1) < PLANT_SHADE_MIN) continue;
+        const dens = plantShadeDensity(p, leaves);
+        if(dens > .02) trees.push({discs: plantDiscs(o, pl, p, u, cot), dens, bed:o.id});
+      }
     } else if((o.type === "structure" || o.type === "deck") && o.poly && o.poly.length > 2){
       /* a raised deck throws real shade; a ground-level patio does not */
       const H = o.type === "deck" ? deckHeight(o) : o.height;
@@ -601,7 +627,9 @@ function casters(minutes){
   rects.push(...fenceCasters(u, cot));
   return {sp, u, cot, trees, rects, polys};
 }
-function sunFraction(c, px, py){
+/* `ownBed`: a bed's sun reading ignores its own plants, so a spot is not
+   called shady because of the plant that is meant to grow there. */
+function sunFraction(c, px, py, ownBed){
   let f = 1;
   for(let i=0;i<c.polys.length;i++){
     if(inPolyShadow(c.polys[i].ps, px, py)){ f *= (1 - c.polys[i].dens); if(f < .01) return 0; }
@@ -611,6 +639,7 @@ function sunFraction(c, px, py){
   }
   for(let i=0;i<c.trees.length;i++){
     const T = c.trees[i], ds = T.discs;
+    if(ownBed != null && T.bed === ownBed) continue;
     for(let j=0;j<ds.length;j++){
       const d = ds[j], dx = px-d.x, dy = py-d.y;
       if(dx*dx + dy*dy <= d.r2){ f *= (1 - T.dens); break; }
@@ -685,7 +714,7 @@ function computeTick(){
         const ly = fr.cy + (iy/(N-1) - .5)*fr.h;
         for(let ix=0; ix<N; ix++){
           const p = rot2(fr.cx + (ix/(N-1) - .5)*fr.w, ly, a);
-          const f = sunFraction(c, b.x+p.x, b.y+p.y);
+          const f = sunFraction(c, b.x+p.x, b.y+p.y, b.id);
           if(f > 0){ acc.grid[iy*N+ix] += J.stepH*f; if(acc.mask[iy*N+ix]) acc.series[ti] += f/acc.inside; }
         }
       }
@@ -2377,7 +2406,7 @@ canvas.addEventListener("pointerdown", e=>{
         if(pl){
           if(e.altKey){ pl = {...pl, id:nid()}; bed.plants.push(pl); rebuildObject(bed); }
           design.sel = pl.id;
-          dragPlant = pl; dragOff = {x:pl.x-l.x, y:pl.y-l.y}; plantMoved = false; mode = "plant";
+          dragPlant = pl; dragOff = {x:pl.x-l.x, y:pl.y-l.y}; plantMoved = !!e.altKey; mode = "plant";
           updatePlantRing(); drawPanel();
           return;
         }
@@ -2465,7 +2494,7 @@ function endPointer(e){
   }
   if(mode === "drag") scheduleCompute();
   if(mode === "plant"){
-    if(plantMoved){ scheduleHist(); syncProject(); }
+    if(plantMoved){ scheduleCompute(); syncProject(); }
     dragPlant = null; panelFor = null; drawPanel();
   }
   if(stampDown && design?.stamp && e.type === "pointerup" && pointers.size === 0
@@ -2630,7 +2659,7 @@ function stampPlant(g){
   if(!near){ toast("Click inside the bed to plant. Esc stops placing."); return; }
   bed.plants.push({id:nid(), k:design.stamp, x:+l.x.toFixed(2), y:+l.y.toFixed(2)});
   rebuildObject(bed);
-  scheduleHist(); panelFor = null; drawPanel(); drawList();
+  scheduleCompute(); panelFor = null; drawPanel(); drawList();
 }
 function removePlant(id){
   const bed = designBed();
@@ -2638,7 +2667,7 @@ function removePlant(id){
   bed.plants = bed.plants.filter(p=>p.id !== id);
   if(design.sel === id) design.sel = null;
   rebuildObject(bed); updatePlantRing();
-  scheduleHist(); panelFor = null; drawPanel(); drawList();
+  scheduleCompute(); panelFor = null; drawPanel(); drawList();
 }
 function setPlantView(v){
   v = v === "symbols" ? "symbols" : "plants";
@@ -2702,7 +2731,7 @@ function exitDesign(quiet){
 /* ---------- planting bed panels ---------- */
 const hexCss = h=>"#"+h.toString(16).padStart(6,"0");
 function swatchSVG(p, no){
-  return `<svg class="psw" viewBox="0 0 40 40" aria-hidden="true"><path d="${symbolPath(p.habit, 20, 20, 17)}" fill="${hexCss(symbolColor(p))}" fill-opacity=".88" stroke="#1c1a17" stroke-width="1.6" stroke-linejoin="round"/>`
+  return `<svg class="psw" viewBox="0 0 40 40" aria-hidden="true"><path d="${symbolPath(p, 20, 20, 17)}" fill="${hexCss(symbolColor(p))}" fill-opacity=".88" stroke="#1c1a17" stroke-width="1.6" stroke-linejoin="round"/>`
     + (no != null ? `<circle cx="20" cy="20" r="8.5" fill="#F6F2E7"/><text x="20" y="24.2" text-anchor="middle" font-family="Instrument Serif,Georgia,serif" font-size="13" fill="#1c1a17">${no}</text>` : `<circle cx="20" cy="20" r="1.6" fill="#1c1a17"/>`)
     + `</svg>`;
 }
@@ -2752,9 +2781,14 @@ function paletteMatches(p){
 }
 function paletteRowsHTML(bed){
   const st = bedStats.get(bed.id), cls = st ? sunClass(st.avg, S.fullSun) : null;
-  const rows = PLANTS.filter(paletteMatches).map(p=>`<button class="prow" data-stamp="${escapeHTML(p.k)}" aria-pressed="${design.stamp === p.k}">
+  let rows = "", last = null;
+  for(const p of PLANTS){
+    if(!paletteMatches(p)) continue;
+    if(p.model !== last){ last = p.model; rows += `<div class="palhead">${escapeHTML(MODELS[p.model]?.label || "")}</div>`; }
+    rows += `<button class="prow" data-stamp="${escapeHTML(p.k)}" aria-pressed="${design.stamp === p.k}">
       ${swatchSVG(p)}<span class="tx"><b>${escapeHTML(p.n)}</b><i>${plantSize(p)} · ${bloomText(p)}</i></span>
-      ${cls && !p.sun.includes(cls) ? `<span class="pwarn" title="This bed averages ${SUN_LABEL[cls].toLowerCase()}; it wants ${sunNeeds(p).toLowerCase()}">${sunNeeds(p)}</span>` : ""}</button>`).join("");
+      ${cls && !p.sun.includes(cls) ? `<span class="pwarn" title="This bed averages ${SUN_LABEL[cls].toLowerCase()}; it wants ${sunNeeds(p).toLowerCase()}">${sunNeeds(p)}</span>` : ""}</button>`;
+  }
   return rows || `<p class="hint">No plants match.</p>`;
 }
 function designPanelHTML(o){
@@ -2766,6 +2800,7 @@ function designPanelHTML(o){
     + (pl ? plantCardHTML(o, pl) : "")
     + (stamp ? `<div class="isec stamping"><b>Placing ${escapeHTML(stamp.n)}</b><span>Click in the bed for each one. Esc when done.</span><button class="btn" data-stamp="">Stop</button></div>` : "")
     + `<div class="isec"><div class="fh"><h4>Plant palette</h4><span>Pick one, then click in the bed</span></div>
+      <div class="btnrow" style="margin:0 0 10px"><button class="btn accent" data-act="plantlib">Browse the plant library</button></div>
       <div class="seg tiny pcats">${[{k:"all", label:"All"}, ...CATEGORIES].map(c=>`<button data-plantcat="${c.k}" aria-pressed="${design.cat === c.k}">${c.label}</button>`).join("")}</div>
       <label class="search psearch"><svg class="ic"><use href="#i-search"/></svg><input type="search" data-plantsearch placeholder="Search plants" value="${escapeHTML(design.q)}" aria-label="Search plants"></label>
       <div class="palette">${paletteRowsHTML(o)}</div></div>`
@@ -3055,7 +3090,7 @@ const FITS = [
 /* for planting beds the suggestions come from the plant catalog */
 function plantingFit(h){
   const cls = sunClass(h, S.fullSun);
-  const names = PLANTS.filter(p=>p.sun.includes(cls)).slice(0, 9).map(p=>p.n.replace(/ '.*$/, ""));
+  const names = [...new Set(PLANTS.filter(p=>p.sun.includes(cls)).map(p=>p.n.replace(/ '.*$/, "")))].slice(0, 10);
   return [0, names, cls === "full" ? "Full sun: most flowering perennials and grasses do well."
     : cls === "part" ? "Part sun: choose plants that take some shade."
     : "Shade: foliage plants such as hostas and ferns."];
@@ -3133,7 +3168,7 @@ function computeBedSeason(o){
         const c = casters(t);
         if(!c) continue;
         let f = 0;
-        for(const p of pts) f += sunFraction(c, p.x, p.y);
+        for(const p of pts) f += sunFraction(c, p.x, p.y, o.id);
         sum += f/pts.length*(20/60);
       }
       out.push({label:names[m], v:sum, cur:m === cur});
@@ -3383,13 +3418,14 @@ props.addEventListener("click", e=>{
   const act = btn.dataset.act, o = selected();
   if(!o) return;
   if(act === "design"){ enterDesign(o); return; }
+  if(act === "plantlib"){ openLibrary("place", "plants"); return; }
   if(act === "enddesign"){ exitDesign(); return; }
   if(act === "delplant" && design?.sel != null){ removePlant(design.sel); return; }
   if(act === "clearplants" && isPlanting(o)){
     askUser("Clear this bed?", "This removes all "+o.plants.length+" plants from "+o.name+". The bed itself stays. Undo brings them back.",
       [{label:"Cancel"}, {label:"Clear bed", kind:"danger", run:()=>{
         o.plants = []; if(design) design.sel = null;
-        rebuildObject(o); updatePlantRing(); scheduleHist(); panelFor = null; drawPanel(); drawList();
+        rebuildObject(o); updatePlantRing(); scheduleCompute(); panelFor = null; drawPanel(); drawList();
       }}]);
     return;
   }
@@ -3647,7 +3683,8 @@ addMenu.addEventListener("click", e=>{
   const b = e.target.closest("button");
   if(!b) return;
   showAddMenu(false);
-  if(b.hasAttribute("data-lib")) openLibrary("place");
+  if(b.hasAttribute("data-lib")) openLibrary("place", "trees");
+  else if(b.hasAttribute("data-plantlib")) openLibrary("place", "plants");
   else toast("Click the yard to place the " + b.querySelector("b").textContent.toLowerCase());
 });
 document.addEventListener("pointerdown", e=>{
@@ -3705,15 +3742,26 @@ $("projstatus").addEventListener("click", ()=>savePlan());
 /* ---------- species library ---------- */
 let libMode = "place", pendingPreset = null;
 const lib = {type:"all", hmin:5, hmax:60, shade:new Set(["Dappled","Moderate","Dense"]), bloom:false, q:""};
-function openLibrary(mode){
+let libKind = "trees";
+function openLibrary(mode, kind){
   libMode = mode;
+  if(kind) libKind = kind;
+  if(mode === "replace") libKind = "trees";
   showAddMenu(false);
-  const o = selected();
-  $("libtitle").textContent = mode === "replace" ? "Change species" : "Choose a tree";
+  const o = selected(), plants = libKind === "plants";
+  $("libkind").hidden = mode === "replace";
+  $("libkind").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.kind === libKind));
+  $("libfilters").hidden = plants; $("plantfilters").hidden = !plants;
+  $("libsearch").value = plants ? plib.q : lib.q;
+  $("libsearch").placeholder = plants ? "Search plants" : "Search species or cultivar";
+  $("libtitle").textContent = plants ? "Choose a plant" : mode === "replace" ? "Change species" : "Choose a tree";
+  $("libsubtitle").textContent = plants
+    ? "Perennials, grasses, groundcovers and shrubs for planting beds, each shown in bloom."
+    : "Hardy trees for cold-winter yards, drawn to the same scale so you can compare their size at maturity.";
   $("libnote").innerHTML = mode === "replace" && o
     ? `<span>Replacing</span><b>${escapeHTML(o.name)}</b><span>Keeps its place in the yard; size and shape change to the new species.</span>`
     : `<span>Placing</span><b>Pick a tree, then click the yard where it goes.</b><span>Esc cancels.</span>`;
-  renderLibrary();
+  if(plants) renderPlantLibrary(); else renderLibrary();
   $("library").hidden = false;
   setTimeout(()=>$("libsearch").focus({preventScroll:true}), 30);
 }
@@ -3786,7 +3834,131 @@ function renderLibrary(){
   }
   $("libgrid").innerHTML = html || `<p class="libempty">No trees match those filters.</p>`;
 }
+/* ---------- the plant library: perennials, grasses, groundcovers, shrubs ---------- */
+const plib = {cat:"all", sun:new Set(), colour:null, height:"all", q:""};
+const COLOURS = [["red","Red",0xC8202A],["orange","Orange",0xE87A1C],["yellow","Yellow",0xF2C230],["pink","Pink",0xE88AB0],
+                 ["purple","Purple",0x7A4AB0],["blue","Blue",0x5A63C8],["white","White",0xF4F2EC],["green","Green",0xB8D86A]];
+function colourFamily(hexv){
+  const c = new THREE.Color(hexv), h = {}; c.getHSL(h);
+  const deg = h.h*360;
+  if(h.s < .22 || h.l > .9) return h.l > .55 ? "white" : "purple";
+  return deg < 14 || deg >= 345 ? "red" : deg < 40 ? "orange" : deg < 68 ? "yellow" : deg < 170 ? "green"
+       : deg < 250 ? "blue" : deg < 295 ? "purple" : h.l > .6 || deg >= 320 ? "pink" : "purple";
+}
+function plantColours(p){
+  if(p.flower == null) return [];
+  return [...new Set([].concat(p.flower, p.mix || []).map(colourFamily))];
+}
+$("plcolor").innerHTML = COLOURS.map(([k, label, c])=>`<button data-colour="${k}" aria-pressed="false"><i style="background:${"#"+c.toString(16).padStart(6,"0")}"></i>${label}</button>`).join("");
+function plantLibMatches(p){
+  if(plib.cat !== "all" && p.cat !== plib.cat) return false;
+  for(const s of plib.sun) if(!p.sun.includes(s)) return false;
+  if(plib.colour && !plantColours(p).includes(plib.colour)) return false;
+  if(plib.height === "low" && p.h >= 1.5) return false;
+  if(plib.height === "mid" && (p.h < 1.5 || p.h > 4)) return false;
+  if(plib.height === "tall" && p.h <= 4) return false;
+  if(plib.q){
+    const hay = (p.n+" "+(p.sci||"")+" "+p.cat+" "+(MODELS[p.model]?.label || "")+" "+(p.note||"")).toLowerCase();
+    if(!plib.q.split(/\s+/).every(w=>hay.includes(w))) return false;
+  }
+  return true;
+}
+/* the bed a picked plant would go into: the one being designed, else the
+   selected one, else the only one there is */
+function plantingTarget(){
+  const o = designBed() || (isPlanting(selected()) ? selected() : null);
+  if(o) return o;
+  const beds = S.objects.filter(isPlanting);
+  return beds.length === 1 ? beds[0] : null;
+}
+let thumbWatch = null;
+function renderPlantLibrary(){
+  const bed = plantingTarget(), st = bed ? bedStats.get(bed.id) : null, cls = st ? sunClass(st.avg, S.fullSun) : null;
+  const here = new Map();
+  for(const o of S.objects) for(const pl of o.plants || []) here.set(pl.k, (here.get(pl.k)||0) + 1);
+  $("plnote").innerHTML = bed
+    ? `<span>Planting into</span><b>${escapeHTML(bed.name)}</b><span>${st ? SUN_LABEL[cls]+", about "+st.avg.toFixed(1)+" h of sun on this date. " : ""}Pick a plant, then click in the bed for each one.</span>`
+    : `<span>No bed chosen</span><b>${S.objects.some(isPlanting) ? "Select the bed to plant in first." : "Add a planting bed first."}</b><span>Add to yard, then Planting bed.</span>`;
+  let html = "", total = 0;
+  for(const cat of CATEGORIES){
+    const list = PLANTS.filter(p=>p.cat === cat.k && plantLibMatches(p));
+    if(!list.length) continue;
+    total += list.length;
+    html += `<section class="libgroup"><h2>${cat.label}<span>${list.length} ${list.length === 1 ? "plant" : "plants"}</span></h2>`;
+    let last = null;
+    for(const p of list){
+      if(p.model !== last){
+        if(last) html += `</div>`;
+        last = p.model;
+        html += `<div class="libgenus"><h3>${escapeHTML(MODELS[p.model]?.label || "")}</h3></div><div class="libcards">`;
+      }
+      const count = here.get(p.k) || 0, misfit = cls && !p.sun.includes(cls);
+      html += `<article class="lcard"><img class="pthumb" data-thumb="${escapeHTML(p.k)}" alt="">
+        <div class="nm"><h4>${escapeHTML(p.n)}</h4><span class="tg${count ? " here" : ""}">${count ? count+" planted" : ""}</span></div>
+        <div class="la">${escapeHTML(p.sci || "")}</div>
+        ${p.note ? `<p class="nt">${escapeHTML(p.note)}</p>` : ""}
+        <div class="ft"><div class="mt"><span>${fmtFt(p.h)} × ${fmtFt(p.w)}</span><span class="${misfit ? "wr" : "sh"}">${sunNeeds(p)}</span><span class="bl">${bloomText(p).replace(/^Blooms /, "").replace(/^in /, "")}</span></div>
+          <button class="btn" data-plant="${escapeHTML(p.k)}">${count ? "Add more" : "Place"}</button></div>
+      </article>`;
+    }
+    html += `</div></section>`;
+  }
+  $("libgrid").innerHTML = html || `<p class="libempty">No plants match those filters.</p>`;
+  $("libgrid").scrollTop = 0;
+  /* render each picture when its card scrolls into view */
+  thumbWatch?.disconnect();
+  thumbWatch = new IntersectionObserver(entries=>{
+    for(const en of entries){
+      if(!en.isIntersecting) continue;
+      thumbWatch.unobserve(en.target);
+      en.target.src = plantThumb(plantByKey(en.target.dataset.thumb));
+    }
+  }, {root:$("libgrid"), rootMargin:"300px"});
+  $("libgrid").querySelectorAll("img[data-thumb]").forEach(img=>thumbWatch.observe(img));
+}
+function pickPlant(k){
+  closeLibrary();
+  const bed = plantingTarget();
+  if(!bed){
+    toast(S.objects.some(isPlanting) ? "Select the bed to plant in, then pick the plant again." : "Add a planting bed first: Add to yard, then Planting bed.");
+    return;
+  }
+  if(!design || design.bedId !== bed.id) enterDesign(bed);
+  setStamp(k);
+  toast("Click in the bed to place " + plantByKey(k).n + ". Esc when done.");
+}
+$("libkind").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-kind]");
+  if(b && b.dataset.kind !== libKind) openLibrary("place", b.dataset.kind);
+});
+$("pltype").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-cat]");
+  if(!b) return;
+  plib.cat = b.dataset.cat;
+  $("pltype").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x === b));
+  renderPlantLibrary();
+});
+$("plheight").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-h]");
+  if(!b) return;
+  plib.height = b.dataset.h;
+  $("plheight").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x === b));
+  renderPlantLibrary();
+});
+$("plsun").addEventListener("change", e=>{
+  if(e.target.checked) plib.sun.add(e.target.value); else plib.sun.delete(e.target.value);
+  renderPlantLibrary();
+});
+$("plcolor").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-colour]");
+  if(!b) return;
+  plib.colour = plib.colour === b.dataset.colour ? null : b.dataset.colour;
+  $("plcolor").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x.dataset.colour === plib.colour));
+  renderPlantLibrary();
+});
 $("libgrid").addEventListener("click", e=>{
+  const pb = e.target.closest("[data-plant]");
+  if(pb){ pickPlant(pb.dataset.plant); return; }
   const b = e.target.closest("[data-pick]");
   if(!b) return;
   const p = PRESETS[+b.dataset.pick];
@@ -3799,7 +3971,10 @@ $("libgrid").addEventListener("click", e=>{
 });
 $("libclose").addEventListener("click", closeLibrary);
 $("library").addEventListener("pointerdown", e=>{ if(e.target === $("library")) closeLibrary(); });
-$("libsearch").addEventListener("input", e=>{ lib.q = e.target.value.trim().toLowerCase(); renderLibrary(); });
+$("libsearch").addEventListener("input", e=>{
+  const q = e.target.value.trim().toLowerCase();
+  if(libKind === "plants"){ plib.q = q; renderPlantLibrary(); } else { lib.q = q; renderLibrary(); }
+});
 $("libsearch").addEventListener("keydown", e=>{ if(e.key === "Escape") closeLibrary(); e.stopPropagation(); });
 $("libtype").addEventListener("click", e=>{
   const b = e.target.closest("button[data-type]");

@@ -465,8 +465,9 @@ body.designing #insphead h2{font-size:28px}
 #libhead .search:focus-within{border-color:var(--brass-line)}
 #libhead .search input{flex:1;min-width:0;border:0;outline:none;background:none;color:var(--text);font:inherit;font-size:13.5px}
 #libmain{display:flex;gap:32px;flex:1;min-height:0}
-#libfilters{width:236px;flex:none;display:flex;flex-direction:column;gap:22px;overflow-y:auto}
-#libfilters h2{margin:0;font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--label)}
+#libfilters,#plantfilters{width:236px;flex:none;display:flex;flex-direction:column;gap:22px;overflow-y:auto}
+#libfilters[hidden],#plantfilters[hidden]{display:none}
+#libfilters h2,#plantfilters h2{margin:0;font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--label)}
 .fgroup{display:flex;flex-direction:column;gap:9px}
 .fgroup .fh{margin:0}
 .fgroup .fh span{font-family:var(--mono);font-size:12px;color:var(--text)}
@@ -486,7 +487,21 @@ body.designing #insphead h2{font-size:28px}
 #libshade input,.fgroup .chk input{accent-color:var(--brass);margin:0}
 #libshade i{width:28px;height:10px;border-radius:3px;display:block}
 .sh1{background:rgba(143,184,202,.35)} .sh2{background:rgba(143,184,202,.6)} .sh3{background:var(--sky)}
-#libfilters .grow{flex:1}
+#libfilters .grow,#plantfilters .grow{flex:1}
+#libkind{align-self:flex-start;background:var(--well)}
+#libkind button{height:30px;padding:0 12px}
+#pltype,#plheight{background:var(--well);flex-wrap:wrap}
+#pltype button,#plheight button{flex:1 1 auto;height:32px}
+#plsun{display:flex;flex-direction:column;gap:6px}
+#plcolor{display:flex;flex-wrap:wrap;gap:6px}
+#plcolor button{display:flex;align-items:center;gap:7px;height:30px;padding:0 10px 0 8px;border-radius:999px;border:1px solid var(--line-3);color:var(--text-2);font-size:12px;cursor:pointer}
+#plcolor button i{width:12px;height:12px;border-radius:50%;display:block;border:1px solid rgba(0,0,0,.35)}
+#plcolor button[aria-pressed="true"]{border-color:var(--brass);color:var(--text);background:var(--brass-dim)}
+.lcard .pthumb{display:block;width:100%;aspect-ratio:4/3;border-radius:10px;background:linear-gradient(#222b30,#161c19);object-fit:cover}
+.lcard .mt .wr{color:var(--warn)}
+.lcard p.nt{margin:0;font-size:12px;line-height:1.45;color:var(--dim)}
+.palhead{margin:12px 8px 4px;font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--label)}
+.palhead:first-child{margin-top:2px}
 .libnote{padding:14px;display:flex;flex-direction:column;gap:6px;border:1px solid #242D29;border-radius:14px;background:#171E1B;font-size:12.5px;color:var(--text-2)}
 .libnote:empty{display:none}
 .libnote b{font-family:var(--serif);font-weight:400;font-size:17px;line-height:1.25;color:var(--text)}

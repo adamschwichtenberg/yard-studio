@@ -146,6 +146,7 @@
   <button data-lib role="menuitem"><svg class="ic"><use href="#i-tree"/></svg><span><b>Tree</b><i>Browse the species library</i></span></button>
   <button data-tool="bed" role="menuitem"><svg class="ic"><use href="#i-bed"/></svg><span><b>Garden bed</b><i>Raised bed with a sun-hours reading</i></span></button>
   <button data-tool="planting" role="menuitem"><svg class="ic"><use href="#i-planting"/></svg><span><b>Planting bed</b><i>Perennials and shrubs, any shape</i></span></button>
+  <button data-plantlib role="menuitem"><svg class="ic"><use href="#i-leaf"/></svg><span><b>Perennial or shrub</b><i>Browse the plant library</i></span></button>
   <button data-tool="structure" role="menuitem"><svg class="ic"><use href="#i-house"/></svg><span><b>Building</b><i>House, garage or shed</i></span></button>
   <button data-tool="deck" role="menuitem"><svg class="ic"><use href="#i-deck"/></svg><span><b>Deck or patio</b><i>Raised decks cast shade</i></span></button>
   <button data-tool="driveway" role="menuitem"><svg class="ic"><use href="#i-driveway"/></svg><span><b>Driveway</b><i>Editable outline</i></span></button>
@@ -181,7 +182,10 @@
   <section id="libsheet" role="dialog" aria-modal="true" aria-labelledby="libtitle">
     <header id="libhead">
       <div class="t">
-        <span class="eyebrow">Plants</span>
+        <div class="seg tiny" id="libkind" role="group" aria-label="Library">
+          <button data-kind="trees" aria-pressed="true">Trees</button>
+          <button data-kind="plants">Perennials &amp; shrubs</button>
+        </div>
         <h1 id="libtitle">Choose a tree</h1>
         <p id="libsubtitle">Hardy trees for cold-winter yards, drawn to the same scale so you can compare their size at maturity.</p>
       </div>
@@ -220,6 +224,41 @@
         </div>
         <div class="grow"></div>
         <div class="libnote" id="libnote"></div>
+      </aside>
+      <aside id="plantfilters" aria-label="Plant filters" hidden>
+        <div class="fgroup">
+          <h2>Type</h2>
+          <div class="seg tiny" id="pltype">
+            <button data-cat="all" aria-pressed="true">All</button>
+            <button data-cat="perennial">Perennials</button>
+            <button data-cat="grass">Grasses</button>
+            <button data-cat="groundcover">Groundcovers</button>
+            <button data-cat="shrub">Shrubs</button>
+          </div>
+        </div>
+        <div class="fgroup">
+          <h2>Grows in</h2>
+          <div id="plsun">
+            <label class="chk"><input type="checkbox" value="full">Full sun</label>
+            <label class="chk"><input type="checkbox" value="part">Part sun</label>
+            <label class="chk"><input type="checkbox" value="shade">Shade</label>
+          </div>
+        </div>
+        <div class="fgroup">
+          <h2>Flower colour</h2>
+          <div id="plcolor"></div>
+        </div>
+        <div class="fgroup">
+          <h2>Mature height</h2>
+          <div class="seg tiny" id="plheight">
+            <button data-h="all" aria-pressed="true">Any</button>
+            <button data-h="low">Under 1½ ft</button>
+            <button data-h="mid">1½–4 ft</button>
+            <button data-h="tall">Over 4 ft</button>
+          </div>
+        </div>
+        <div class="grow"></div>
+        <div class="libnote" id="plnote"></div>
       </aside>
       <div id="libgrid"></div>
     </div>

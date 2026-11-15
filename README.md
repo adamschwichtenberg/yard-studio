@@ -62,6 +62,7 @@ A planting bed is an in-ground bed of perennials, grasses, groundcovers and shru
 ![Designing a bed from above](docs/planting-design.png)
 ![The same bed in 3D](docs/planting-3d.png)
 
+- **Plant library:** 186 perennials, grasses, groundcovers and shrubs, each pictured in bloom from its own 3D model. Open it from **Add to yard → Perennial or shrub**, from **Plants** in the rail, or from the designer. Filter by type, sun, flower colour and height, or search.
 - **Shape:** any outline. Reshape it corner by corner like a driveway; **Curved edge** runs a smooth curve through the corners. Surface is bark, soil, gravel or lawn.
 - **Design this bed** (or double-click the bed) opens the designer:
   - The view drops to Plan and frames the bed. Trees whose canopy would cover it step aside while you work.
@@ -71,17 +72,35 @@ A planting bed is an in-ground bed of perennials, grasses, groundcovers and shru
 - **Symbols or plants:** symbols are the planting-plan view (a circle the width of the mature plant, coloured by its flowers, with an edge that says what kind of plant it is). Plants are the 3D models. The switch is in the designer, and under **Plant symbols** in the map layers for the whole yard. Plan / 3D / Eye level work in both.
 - **Numbers:** every plant of a kind carries the same number, listed in the planting key with a count.
 - **Sun check:** select a plant to see the hours of sun at that spot and whether it suits the plant. The palette flags plants that want different light from the bed's average.
-- **Seasons:** flowers appear inside each plant's bloom dates. Out of season, perennials are cut back, grasses and seedheads stand tan, shrubs are bare and evergreens stay.
+- **Seasons:** flowers appear inside each plant's bloom dates, and panicle and smooth hydrangeas change colour through theirs (lime, then white, then pink). Leaves take their fall colour before leaf drop. Out of season, perennials are cut back, grasses and seedheads stand tan, hydrangeas keep their dried heads on bare stems, dogwoods show their coloured canes and evergreens stay.
+- **Shade:** shrubs and perennials 2.5 ft and taller cast shade in the sun-hours maths, on the lawn, on other beds and on the heat map. A bed's own reading ignores its own plants, so a spot is not called shady because of the plant meant to grow there.
 
-The plant list and the models are a starter set. Shrubs and perennials do not cast shade in the sun-hours maths yet.
+![The plant library](docs/plant-library.png)
+![Hydrangea presets from the QA gallery](docs/plant-models.png)
+
+#### Plant models
+
+Every variety is a preset on one of 23 parametric growth forms, built like the trees: alpha-tested cards with procedural leaf and flower textures, tubes for stems and a dark inner mass.
+
+| Group | Growth forms |
+| --- | --- |
+| Perennials | Coneflowers & daisies, hostas, spikes, daylilies, tall clumps (bee balm, phlox, sedum, lilies), globes on stalks, peonies & bushy perennials, astilbes & ferns, ruffled mounds (coral bells, columbine), cushions, groundcover mats, upright grasses, fountain grasses, irises |
+| Shrubs | Panicle hydrangeas, mophead hydrangeas, arching shrubs (weigela, forsythia), upright shrubs (dogwood, ninebark, viburnum), cut-leaf shrubs (sumac, elderberry), mounding shrubs (spirea, potentilla), lilacs, small-leaved mounds (barberry, boxwood), columnar shrubs |
+| Add-on | A standard trunk (`opt.trunk`, in feet) turns any shrub canopy into a patio tree |
+
+`gallery.html` (with `npm run dev`, at `/gallery.html`) renders every preset in bloom, in June, in August, in fall and in winter, plus the texture sheet. It is a development page for checking models and is not part of the standalone build.
+
+Sizes, zones and bloom dates are typical mature figures; check the tag of the plant you buy.
 
 #### Adding plants and models
 
 | To change | Edit | Notes |
 | --- | --- | --- |
-| The plant list | `src/garden/plants.js` | One entry per plant: size, colours, bloom dates, sun, zones. The header documents every field. |
-| Plan symbols and 3D models | `src/garden/models.js` | `HABITS` (overall form: symbol edge, foliage geometry, where flowers sit) and `FLOWERS` (one flower of each form). A plant picks one of each by key. |
-| How a bed is drawn | `src/garden/beds.js` | Outline, mulch, instancing, seasons. Rarely needs touching. |
+| The plant list | `src/garden/plants.js` | One row per variety in a `group()` that shares a model and defaults: name, size, flower colour, overrides. The header documents every field. |
+| Growth forms and plan symbols | `src/garden/models.js` | `MODELS`: each form is a short function that calls shared generators (rosette, tuft, dome, stalks, bush, canes) and flower heads. |
+| Leaf and flower textures | `src/garden/plantTextures.js` | Painted on a canvas: brightness in red, which of the plant's two colours in green, shape in alpha. One texture serves every colour. |
+| How a bed is drawn | `src/garden/beds.js` | Outline, mulch, materials for the date, instancing. |
+| Library pictures | `src/garden/thumbs.js` | Studio renders of single plants. |
 
 In plan files a bed is `{type:"planting", x, y, rot, poly, smooth, mulch, plants:[{id, k, x, y}]}`: `k` is the catalog key and `x, y` are feet in the bed's own axes.
 
