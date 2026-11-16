@@ -212,25 +212,29 @@ class Plant {
   florets(c, axis, n, prof, size, cap = 0, sy = 1, len = 0){
     const a = perp(axis), b = V().crossVectors(axis, a), turn = this.rnd()*TAU;
     for(let i = 0; i < n; i++){
-      const th = turn + i*GOLD;
-      let q, nr, t = (i + .5)/n;
+      const th = turn + i*GOLD + (this.rnd() - .5)*.5;
+      let q, nr, age, k = 1;
+      const t = (i + .5)/n;
       if(len){
+        /* bigger clusters low on the cone, small ones crowding the tip */
         const rad = prof(t), ring = a.clone().multiplyScalar(Math.cos(th)).addScaledVector(b, Math.sin(th));
-        q = c.clone().addScaledVector(axis, len*(.06 + .9*t)).addScaledVector(ring, rad*.9);
-        nr = ring.addScaledVector(axis, .25 + .9*t*t).normalize();
+        q = c.clone().addScaledVector(axis, len*(.04 + .9*t)).addScaledVector(ring, rad*(.72 + .16*this.rnd()));
+        nr = ring.addScaledVector(axis, .35 + 1.1*t*t).normalize();
+        age = 1 - t; k = 1.12 - .5*t;
       } else {
         /* over the ball, leaving out the cap where the stalk comes in */
         const ph = Math.acos(1 - t*(2 - cap*.35)), sn = Math.sin(ph);
         nr = axis.clone().multiplyScalar(Math.cos(ph)).addScaledVector(a, sn*Math.cos(th)).addScaledVector(b, sn*Math.sin(th)).normalize();
         const rad = prof(t);
         q = V(c.x + nr.x*rad, c.y + nr.y*rad*sy, c.z + nr.z*rad);
+        age = .5 - .5*nr.dot(axis);
       }
-      const s = size*(.8 + .4*this.rnd());
+      const s = size*k*(.8 + .4*this.rnd());
       let up = axis.clone().addScaledVector(nr, -nr.dot(axis));
       if(up.lengthSq() < .02) up = perp(nr);
       up.normalize().applyAxisAngle(nr, this.rnd()*TAU);
-      /* young florets (first colour) toward the tip, older (second) toward the base */
-      const tex = (len ? t > .5 : nr.dot(axis) > .1) ? "flower:cluster-a" : "flower:cluster-b";
+      /* young florets take the first colour, old ones the second */
+      const tex = "flower:cluster-" + (age < .34 ? "a" : age < .67 ? "m" : "b");
       this.card("flower", tex, q.clone().addScaledVector(up, -s/2), up, nr, s, s, {normal:nr.clone().lerp(UP, .35).normalize(), ao:clamp(this.ao(q) + .25, 0, 1)});
     }
   }
@@ -269,18 +273,23 @@ class Plant {
         break;
       }
       case "mop": {
-        /* a ball of sterile florets: a floret-wrapped core with clusters standing proud of it */
-        const c = pos.clone().addScaledVector(dir, size*.34), rad = size*.46;
-        this.ball(F, o.fine ? "flower:florets-fine" : "flower:florets", c, rad*.8, .86);
-        this.florets(c, dir, 15, q=>rad*(.98 + .1*this.rnd()), size*(o.fine ? .36 : .44), 1.25, .86);
+        /* a domed ball of sterile florets: a floret-wrapped core with clusters
+           standing proud of it all over, so the outline is petalled */
+        const c = pos.clone().addScaledVector(dir, size*.3), rad = size*.47;
+        this.ball(F, o.fine ? "flower:florets-fine" : "flower:florets", c, rad*.78, .8);
+        /* crossed profiles give the head a petalled edge from any side */
+        this.cross(F, "flower:mop", c.clone().addScaledVector(dir, -size*.54), dir, size*1.1, size*1.08, 2, {normal:dir.clone().lerp(UP, .6).normalize()});
+        this.florets(c, dir, o.fine ? 18 : 26, ()=>rad*(.9 + .12*this.rnd()), size*(o.fine ? .34 : .42), 1.1, .82);
         break;
       }
       case "panicle": {
-        /* a cone of florets on a stalk: youngest at the tip, the base ageing first */
-        const base = pos.clone().addScaledVector(dir, -size*.06), fat = size*(o.fat ?? .3);
-        this.spindle(F, "flower:florets", base, dir, fat*.72, size*.94);
-        const prof = t=>fat*(.34 + 1.05*Math.sin(Math.PI*Math.pow(t, .62))*(1 - .5*t));
-        this.florets(base, dir, 20, prof, size*.34, 0, 1, size);
+        /* A cone of florets in tiers up a stalk, each cluster tipped out like a
+           small umbrella. The tip is youngest; the base ages first. */
+        const base = pos.clone().addScaledVector(dir, -size*.04), fat = size*(o.fat ?? .3);
+        this.spindle(F, "flower:florets", base, dir, fat*.62, size*.9);
+        const prof = t=>fat*(.38 + 1.02*Math.sin(Math.PI*Math.pow(t, .6))*(1 - .52*t));
+        this.cross(F, "flower:panicle", base.clone().addScaledVector(dir, -size*.03), dir, fat*2.5, size*1.06, 2, {normal:dir.clone().lerp(UP, .5).normalize()});
+        this.florets(base, dir, 30, prof, size*.36, 0, 1, size);
         break;
       }
       case "lilac": this.cross(F, "flower:lilac", pos.clone().addScaledVector(dir, -size*.1), dir, size*.55, size, 3, {normal:dir.clone().lerp(UP, .5).normalize()}); break;
@@ -641,6 +650,89 @@ class Plant {
       }
     }
   }
+  /* A hydrangea, built stem by stem. Every flower head ends a shoot of its own,
+     and under it the shoot carries big leaves in opposite pairs, each pair
+     turned a quarter round from the last. Leafy shoots without a head fill
+     the rest of the canopy. The leaves are single leaves, not sprigs: at this
+     size they are what the eye reads.
+     head: {type, size, n, …} as for head();  leaf: length of a leaf in feet */
+  hydrangea({profile, trunk = 0, head, leaf, nod = 0, lump = .08}){
+    const r = this.rnd, H = this.H, R = this.R, y0 = trunk, ch = Math.max(.3, H - y0);
+    const l1 = r()*TAU, l2 = r()*TAU, lk = 1/(1 + lump*.7);
+    const env = (u, az)=>R*profile(clamp(u, 0, 1))*(az == null ? 1 : lk*(1 + lump*(.6*Math.sin(az*2 + l1 + u*3) + .4*Math.sin(az*3 + l2 - u*5))));
+    const cm = y0 + ch*.42;
+    this.nrm = q=>V(q.x, (q.y - cm)*(R/ch)*.9 + R*.4, q.z).normalize();
+    this.ao = q=>{ const u = (q.y - y0)/ch, e = Math.max(.2, env(u)); return clamp(.1 + .76*Math.pow(Math.hypot(q.x, q.z)/e, 1.5) + .2*clamp(u, 0, 1), .1, 1); };
+    const wood = trunk ? "wood" : "stem", sr = clamp(H*.009, .014, .05);
+    const bez = (a, m, b, n)=>{ const pts = []; for(let k = 0; k <= n; k++){ const t = k/n, i = (1-t)*(1-t), j = 2*(1-t)*t, l = t*t; pts.push(V(a.x*i + m.x*j + b.x*l, a.y*i + m.y*j + b.y*l, a.z*i + m.z*j + b.z*l)); } return pts; };
+    if(trunk) this.tube("wood", [V(0, 0, 0), V(.03, trunk*.5, .02), V(0, trunk + ch*.14, 0)], Math.max(.09, H*.02), Math.max(.07, H*.015), 7);
+    /* the framework: stems from the crown that the shoots fork from */
+    const ns = clamp(Math.round(6 + R*1.6), 6, 11), mains = [];
+    for(let i = 0; i < ns; i++){
+      const az = i*GOLD + r()*.5, u = lerp(.45, .8, r()), top = polar(az, env(u, az)*lerp(.3, .6, r()), y0 + ch*u);
+      const a = polar(az, trunk ? .02 : Math.min(R*.14, .3)*r(), trunk ? y0 : 0), mid = a.clone().lerp(top, .5);
+      mid.x *= .55; mid.z *= .55; mid.y += ch*.1;
+      const pts = bez(a, mid, top, 5);
+      this.tube(wood, pts, sr*1.25, sr*.6, 4);
+      mains.push({az, pts});
+    }
+    const LL = leaf, LW = LL*.6;
+    /* one leaf: a stalk, then a blade that lifts, arches and droops at the tip */
+    const blade = (at, out, k)=>{
+      const L = LL*k*(.8 + .35*r()), side = V().crossVectors(out, UP);
+      if(side.lengthSq() < 1e-4) side.set(1, 0, 0);
+      side.normalize();
+      const lift = .35 + .3*r(), p0 = at.clone(), p1 = at.clone().addScaledVector(out, L*.5).addScaledVector(UP, L*.5*lift),
+            p2 = at.clone().addScaledVector(out, L*.98).addScaledVector(UP, L*(lift*.5 - .12 - .2*r()));
+      if(p2.y < .03) p2.y = .03;
+      this.ribbon("leaf", "leaf:hydrangea", [p0, p1, p2], LW*k*(L/(LL*k)), side.applyAxisAngle(out, (r() - .5)*.7), {cup:.3});
+    };
+    /* a shoot from the framework to `tip`, ending along `dir`, with `pairs` pairs of leaves below its end */
+    const shoot = (tip, dir, pairs, thick)=>{
+      const az = Math.atan2(tip.z, tip.x);
+      let best = mains[0], bd = 9;
+      for(const m of mains){ const d = Math.abs(((az - m.az)%TAU + TAU + Math.PI)%TAU - Math.PI); if(d < bd){ bd = d; best = m; } }
+      const want = y0 + (tip.y - y0)*lerp(.25, .5, r());
+      let f = best.pts[1]; for(const q of best.pts) if(q.y <= want) f = q;
+      const back = tip.clone().addScaledVector(dir, -Math.max(LL*1.4, tip.distanceTo(f)*.45));
+      const pts = bez(f, back.lerp(f, .15), tip, 5);
+      this.tube(wood, pts, thick, thick*.55, 3);
+      const axis = V().subVectors(pts[5], pts[4]).normalize(), a = perp(axis), b = V().crossVectors(axis, a), t0 = r()*TAU;
+      for(let j = 0; j < pairs; j++){
+        /* nodes crowd toward the end of the shoot */
+        const d = LL*(.22 + .5*j + .1*r()), len = tip.distanceTo(f), t = clamp(1 - d/Math.max(d + .01, len), .15, 1);
+        const g = t*5, i0 = Math.min(4, Math.floor(g)), at = pts[i0].clone().lerp(pts[i0+1], g - i0), th = t0 + j*Math.PI/2;
+        for(const sg of [1, -1]){
+          const out = a.clone().multiplyScalar(Math.cos(th)*sg).addScaledVector(b, Math.sin(th)*sg).addScaledVector(axis, .35).normalize();
+          blade(at, out, j ? 1 : .8);
+        }
+      }
+    };
+    /* flowering shoots: a head for every patch of the upper canopy */
+    const hn = head ? head.n : 0, z = head?.zone || [.3, 1];
+    for(let i = 0; i < hn; i++){
+      const u = lerp(z[0], z[1], Math.pow((i + .5)/hn, .8)), az = 1.3 + i*GOLD + r()*.3, hs = head.size*(.82 + .36*r());
+      const out = polar(az, 1), up = clamp((u - .25)*1.7, .1, 1.4) + .3 - nod;
+      const dir = V(out.x, up, out.z).normalize();
+      const tip = polar(az, env(u, az)*.92, y0 + ch*u).addScaledVector(dir, -hs*.55);
+      shoot(tip, dir, 4, sr*.7);
+      /* heavy heads bow the end of the stem */
+      const hd = nod ? dir.clone().lerp(V(out.x, -.15, out.z).normalize(), nod*r()).normalize() : dir;
+      this.head(head.type, tip, hd, hs, head);
+    }
+    /* leafy shoots: enough to close the canopy, more low down where there are no heads */
+    const area = Math.PI*R*(R + 1.6*ch), want = clamp(Math.round(3*area/(LL*LW)), 160, 1000);
+    const nv = Math.max(8, Math.round((want - hn*6)/7));
+    for(let i = 0; i < nv; i++){
+      const u = clamp(Math.pow((i + .5)/nv, 1.25), .03, .97), az = i*GOLD + r()*.5, out = polar(az, 1);
+      const dir = V(out.x, clamp((u - .3)*1.5, -.1, 1.2) + .25, out.z).normalize();
+      const tip = polar(az, env(u, az)*(i%3 ? .7 + .22*r() : .35 + .3*r()), Math.max(.15, y0 + ch*u));
+      shoot(tip, dir, 3, sr*.35);
+      /* the growing end: a last, smaller pair */
+      const sd = perp(dir).applyAxisAngle(dir, r()*TAU);
+      for(const sg of [1, -1]) blade(tip, dir.clone().multiplyScalar(.7).addScaledVector(sd, sg*.7).normalize(), .6);
+    }
+  }
   /* long canes arching up and over: weigela, bridalwreath, sumac */
   canes({n, foliage, heads, thick, droop = .5, reach = 1, fork = false, tips}){
     const r = this.rnd, H = this.H, R = this.R, sr = thick ?? clamp(H*.012, .012, .07);
@@ -840,17 +932,15 @@ export const MODELS = {
   panicle: {label:"Panicle hydrangeas", symbol:"cloud",
     build(P, p, o){
       const H = P.H, R = P.R, trunk = o.trunk || 0, ch = H - trunk;
-      const hs = o.bloom ?? clamp(.16*ch + .32, .5, 1.05);
-      P.bush({profile:trunk ? P_BALL : P_ROUND, trunk,
-        foliage:{tex:"leaf:ovate", size:clamp(ch*.2, .7, 1.25), fine:1},
-        heads:{type:"panicle", n:count((o.dense ? 10 : 7) + R*R*(o.dense ? 4.4 : 3.2), 8, 60), size:hs, zone:[.3, 1], up:.4, fat:o.fat}});
+      const hs = o.bloom ?? clamp(.17*ch + .4, .62, 1.2);
+      P.hydrangea({profile:trunk ? P_BALL : P_ROUND, trunk, leaf:clamp(ch*.095, .38, .6),
+        head:{type:"panicle", n:count((o.dense ? 9 : 6) + R*R*(o.dense ? 3.6 : 2.6), 7, 46), size:hs, zone:[.32, 1], fat:o.fat}});
     }},
   mophead: {label:"Mophead hydrangeas", symbol:"cloud",
     build(P, p, o){
-      const H = P.H, R = P.R, hs = o.bloom ?? clamp(.12*H + .3, .42, .95);
-      P.bush({profile:P_MOUND,
-        foliage:{tex:"leaf:ovate", size:clamp(H*.2, .7, 1.25), fine:1},
-        heads:{type:"mop", n:count(7 + R*R*3.6, 7, 70), size:hs, zone:[.35, 1], up:.5, fine:o.fine}});
+      const H = P.H, R = P.R, hs = o.bloom ?? clamp(.13*H + .36, .5, 1.05);
+      P.hydrangea({profile:P_MOUND, leaf:clamp(H*.11, .38, .62), nod:o.fine ? 0 : .5,
+        head:{type:"mop", n:count(6 + R*R*(o.fine ? 3.6 : 3), 6, 60), size:hs, zone:[.35, 1], fine:o.fine}});
     }},
   weigela: {label:"Arching shrubs", symbol:"cloud",
     build(P, p, o){

@@ -469,29 +469,74 @@ function cluster(o){
     }
   };
 }
-/* a handful of four-petalled sterile florets, overlapping, with gaps between:
-   one cluster on a hydrangea head. `age` sets how far toward the second colour. */
+/* One cluster on a hydrangea head: sterile florets of four broad sepals,
+   overlapping at every angle, some turned edge-on, the ones behind in shade,
+   with the tiny fertile buds showing in the gaps. `age` sets how far the
+   cluster has gone toward the plant's second colour. */
 function florets4(o){
   return (g, N, r)=>{
-    const {age = 0, n = 7} = o, pts = [[.5, .5]];
+    const {age = 0, n = 11} = o, pts = [];
     let guard = 0;
-    while(pts.length < n && guard++ < 400){
-      const x = .2 + r()*.6, y = .2 + r()*.6;
-      if(pts.every(q=>Math.hypot(q[0] - x, q[1] - y) > .2)) pts.push([x, y]);
+    while(pts.length < n && guard++ < 600){
+      const a = r()*TAU, d = Math.sqrt(r())*.33, x = .5 + Math.cos(a)*d, y = .5 + Math.sin(a)*d;
+      if(pts.every(q=>Math.hypot(q[0] - x, q[1] - y) > .13)) pts.push([x, y, r()]);
     }
-    pts.forEach(([x, y], i)=>{
-      const m = c01(age + (r() - .5)*.35), R = N*(.17 + r()*.05), rot = r()*TAU;
-      g.save(); g.translate(x*N, y*N); g.rotate(rot);
+    /* fertile buds: a stipple behind the florets */
+    for(let i = 0; i < 70; i++){
+      const a = r()*TAU, d = Math.sqrt(r())*.36;
+      g.fillStyle = ink(.42 + r()*.2, c01(age + .2)); g.beginPath(); g.arc(N*(.5 + Math.cos(a)*d), N*(.5 + Math.sin(a)*d), N*.014, 0, TAU); g.fill();
+    }
+    pts.sort((p, q)=>p[2] - q[2]);
+    pts.forEach(([x, y, z], i)=>{
+      const m = c01(age + (r() - .5)*.3), R = N*(.115 + r()*.045), rot = r()*TAU, lit = .6 + .4*(i/(pts.length - 1 || 1));
+      /* florets face every way: squash some toward edge-on */
+      const tilt = r() < .35 ? .45 + r()*.3 : .85 + r()*.15, ta = r()*TAU;
+      g.save(); g.translate(x*N, y*N); g.rotate(ta); g.scale(1, tilt); g.rotate(rot);
       for(let k = 0; k < 4; k++){
-        g.rotate(TAU/4);
-        /* a broad petal with a notch of shade toward the centre */
-        g.fillStyle = ink(.7 + .28*r() - (i ? 0 : .04), m); g.beginPath();
-        g.moveTo(0, 0); g.bezierCurveTo(R*.75, -R*.25, R*.7, -R*1.05, 0, -R); g.bezierCurveTo(-R*.7, -R*1.05, -R*.75, -R*.25, 0, 0); g.fill();
-        g.strokeStyle = "rgba(0,0,0,.14)"; g.lineWidth = N*.006; g.beginPath(); g.moveTo(0, -R*.12); g.lineTo(0, -R*.7); g.stroke();
+        g.rotate(TAU/4 + (r() - .5)*.12);
+        const l = lit*(.78 + .22*r());
+        g.fillStyle = ink(l, m); g.beginPath();
+        g.moveTo(0, 0); g.bezierCurveTo(R*.82, -R*.2, R*.78, -R*1.08, 0, -R*(.95 + .1*r())); g.bezierCurveTo(-R*.78, -R*1.08, -R*.82, -R*.2, 0, 0); g.fill();
+        /* a sepal overlaps its neighbour: shade down one edge, a faint midrib */
+        g.strokeStyle = "rgba(0,0,0,.13)"; g.lineWidth = N*.01; g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(-R*.82, -R*.2, -R*.78, -R*1.08, 0, -R); g.stroke();
+        g.strokeStyle = "rgba(255,255,255,.14)"; g.lineWidth = N*.006; g.beginPath(); g.moveTo(0, -R*.15); g.lineTo(0, -R*.78); g.stroke();
       }
-      g.fillStyle = ink(.5, m); g.beginPath(); g.arc(0, 0, R*.13, 0, TAU); g.fill();
+      g.fillStyle = ink(.45*lit + .2, c01(m + .25)); g.beginPath(); g.arc(0, 0, R*.14, 0, TAU); g.fill();
       g.restore();
     });
+  };
+}
+/* One hydrangea leaf: a broad pointed oval with a saw-toothed edge, a pale
+   midrib and curving side veins with the blade quilted between them. */
+function hydLeaf(){
+  return (g, N)=>{
+    const cx = N/2, y0 = N*.9, y1 = N*.03, L = y0 - y1, W = N*.44;
+    stemLine(g, cx, N, cx, y0 - 2, N*.03, .62);
+    const half = t=>Math.pow(Math.sin(Math.PI*Math.pow(t, .78)), .82)*(1 - .1*t);       // widest below the middle, drawn out to a point
+    const edge = s=>{
+      const pts = [];
+      for(let i = 0; i <= 60; i++){
+        const t = i/60, tooth = t > .12 && t < .97 ? (i%2 ? .035 : 0) : 0;
+        pts.push([cx + s*W*(half(t) + tooth*half(t)), y0 - L*t - (i%2 ? L*.006 : 0)]);
+      }
+      return pts;
+    };
+    const shape = ()=>{ g.beginPath(); g.moveTo(cx, y0); for(const [x, y] of edge(1)) g.lineTo(x, y); for(const [x, y] of edge(-1).reverse()) g.lineTo(x, y); g.closePath(); };
+    shape(); g.fillStyle = ink(.78); g.fill();
+    g.save(); shape(); g.clip();
+    g.fillStyle = "rgba(0,0,0,.12)"; g.fillRect(cx, 0, N, N);
+    /* quilting: each bay between two veins is a little lighter along its crest */
+    for(let i = 1; i <= 8; i++){
+      const t = .08 + .1*i, y = y0 - L*t;
+      for(const s of [1, -1]){
+        g.strokeStyle = "rgba(255,255,255,.1)"; g.lineWidth = L*.045;
+        g.beginPath(); g.moveTo(cx, y + L*.03); g.quadraticCurveTo(cx + s*W*half(t)*.55, y - L*.05, cx + s*W*half(t + .1)*.98, y - L*.19); g.stroke();
+        g.strokeStyle = "rgba(0,0,0,.26)"; g.lineWidth = N*.008;
+        g.beginPath(); g.moveTo(cx, y); g.quadraticCurveTo(cx + s*W*half(t)*.55, y - L*.085, cx + s*W*half(t + .1)*1.02, y - L*.215); g.stroke();
+      }
+    }
+    g.strokeStyle = "rgba(255,255,255,.3)"; g.lineWidth = N*.016; g.beginPath(); g.moveTo(cx, y0); g.lineTo(cx, y1 + L*.03); g.stroke();
+    g.restore();
   };
 }
 /* opaque florets for wrapping a ball or cone; colour runs from first (top) to second (bottom) */
@@ -666,6 +711,7 @@ const KINDS = {
   "leaf:ferny":      [512, compound({pairs:5, asp:.42, len:.16, three:true, taper:.4})],
   "leaf:peony":      [512, compound({pairs:3, asp:.34, len:.36, three:true, taper:.2})],
   /* single leaves */
+  "leaf:hydrangea":    [256, hydLeaf()],
   "leaf:hosta":        [512, broadLeaf({})],
   "leaf:hosta+edge":   [512, broadLeaf({variegation:"edge"})],
   "leaf:hosta+centre": [512, broadLeaf({variegation:"centre"})],
@@ -696,8 +742,9 @@ const KINDS = {
   "flower:lilac":        [256, cluster({shape:"cone", size:.045, petals:4, n:420, eye:.2, wide:.7})],
   "flower:florets":      [256, fill({size:.11})],
   "flower:florets-fine": [256, fill({size:.07})],
-  "flower:cluster-a":    [128, florets4({age:.12})],
-  "flower:cluster-b":    [128, florets4({age:.78})],
+  "flower:cluster-a":    [256, florets4({age:.08})],
+  "flower:cluster-m":    [256, florets4({age:.45})],
+  "flower:cluster-b":    [256, florets4({age:.82})],
   "flower:ruffles":      [256, fill({size:.12, ruffle:true})],
   "flower:plume":        [256, plume({})],
   "flower:plume-wide":   [256, plume({width:.34, dense:1.3})],

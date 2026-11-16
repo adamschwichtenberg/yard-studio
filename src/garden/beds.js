@@ -29,47 +29,92 @@ export const MULCHES = {
   soil:      {label:"Bare soil",           color:0x8a745f, simple:0x30261d},
   none:      {label:"Lawn (no mulch)",     color:null,   simple:null}
 };
-/* Rock surfaces: a small tiling picture of stones, painted once. Angular
-   chips for crushed limestone and slate, rounded cobbles for river rock. */
+/* Rock surfaces: a tiling picture of stones, painted once at 1024 px, with a
+   matching height picture so the sun picks out each stone. Crushed limestone
+   and slate are angular chips with flat, differently lit faces; river rock is
+   rounded cobbles. Small stones go down first and the big ones lie on them. */
 const ROCKS = {
-  limestone: {base:"#8f7a58", tones:["#d9c39a", "#cdb488", "#e2d2b0", "#bfa174", "#d2b98a", "#c4aa82"], round:false, size:.07, feet:2.6},
-  slate:     {base:"#1f2226", tones:["#4a4f56", "#3b4047", "#5a6068", "#33373d", "#444a52", "#2c3036"], round:false, size:.085, feet:3},
-  river:     {base:"#4a4640", tones:["#b9b2a4", "#8f8a80", "#c9b89a", "#6f6c68", "#a89480", "#d6d0c4", "#7c6a5a", "#9aa0a2"], round:true, size:.085, feet:3}
+  limestone: {base:"#5e4e36", tones:["#d9c39a", "#cdb488", "#e2d2b0", "#bfa174", "#d2b98a", "#c4aa82", "#e6d8b8", "#b89868"], round:false, size:.062, feet:3, facet:.2, grain:.1, rough:.95},
+  slate:     {base:"#101214", tones:["#4a4f56", "#3b4047", "#5a6068", "#33373d", "#444a52", "#2c3036", "#52565c"], round:false, size:.075, feet:3.4, facet:.34, grain:.05, rough:.6, rust:.1},
+  river:     {base:"#2e2a26", tones:["#b9b2a4", "#8f8a80", "#c9b89a", "#6f6c68", "#a89480", "#d6d0c4", "#7c6a5a", "#9aa0a2", "#b0a090", "#5e5a58"], round:true, size:.072, feet:3.4, facet:0, grain:.07, rough:.8}
 };
 const rockCache = new Map();
-function rockTexture(kind){
+function rockTextures(kind){
   let t = rockCache.get(kind);
   if(t) return t;
-  const K = ROCKS[kind], N = 512, c = document.createElement("canvas");
-  c.width = c.height = N;
-  const g = c.getContext("2d"), r = seeded(kind.length*977 + 5);
+  const K = ROCKS[kind], N = 1024, r = seeded(kind.length*977 + 5);
+  const mk = ()=>{ const c = document.createElement("canvas"); c.width = c.height = N; return c; };
+  const cc = mk(), hc = mk(), g = cc.getContext("2d"), h = hc.getContext("2d");
   g.fillStyle = K.base; g.fillRect(0, 0, N, N);
-  const n = Math.round(1.9/(K.size*K.size));
-  for(let i = 0; i < n; i++){
-    const x = r()*N, y = r()*N, s = N*K.size*(.55 + .7*r()), rot = r()*Math.PI, col = K.tones[Math.floor(r()*K.tones.length)];
-    const sides = 5 + Math.floor(r()*3), rad = []; for(let k = 0; k < sides; k++) rad.push(.6 + .4*r());
-    /* drawn at the wrapped positions too, so the tile repeats without a seam */
+  h.fillStyle = "#000"; h.fillRect(0, 0, N, N);
+  const grey = v=>{ const k = Math.round(255*Math.max(0, Math.min(1, v))); return `rgb(${k},${k},${k})`; };
+  const shadeHex = (hex, k)=>{ const n = parseInt(hex.slice(1), 16); return `rgb(${[n>>16 & 255, n>>8 & 255, n & 255].map(v=>Math.round(Math.max(0, Math.min(255, v*k)))).join(",")})`; };
+  const stone = (x, y, s, lift)=>{
+    const rot = r()*Math.PI*2, col = K.tones[Math.floor(r()*K.tones.length)], sx = .78 + .5*r(), sy = .62 + .3*r();
+    const nv = K.round ? 14 : 5 + Math.floor(r()*4), vs = [];
+    for(let k = 0; k < nv; k++){
+      const a = k/nv*Math.PI*2 + (K.round ? 0 : (r() - .5)*.5), rad = K.round ? .9 + .1*r() : .62 + .38*r();
+      vs.push([Math.cos(a)*s*.56*rad*sx, Math.sin(a)*s*.56*rad*sy]);
+    }
+    const cx0 = (r() - .5)*s*.22, cy0 = (r() - .5)*s*.18;            // the high point: off-centre, so the faces differ
+    const shades = vs.map((v, k)=>{
+      /* each face is lit by how it tilts toward the light, upper left */
+      const w = vs[(k + 1)%nv], mx = (v[0] + w[0])/2 - cx0, my = (v[1] + w[1])/2 - cy0, m = Math.hypot(mx, my) || 1;
+      const ca = Math.cos(rot), sa = Math.sin(rot), wx = (mx*ca - my*sa)/m, wy = (mx*sa + my*ca)/m;
+      return 1 + K.facet*(-wx*.7 - wy*.7) + (r() - .5)*.08;
+    });
+    const speck = [];
+    for(let k = 0; k < 26; k++) speck.push([(r() - .5)*s, (r() - .5)*s*.8, s*(.012 + r()*.03), r() > .5, r()]);
+    const rusty = K.rust && r() < K.rust, rx = (r() - .5)*s*.4, ry = (r() - .5)*s*.3;
     for(const ox of [-N, 0, N]) for(const oy of [-N, 0, N]){
       if(x + ox < -s || x + ox > N + s || y + oy < -s || y + oy > N + s) continue;
-      g.save(); g.translate(x + ox, y + oy); g.rotate(rot);
-      const path = k=>{
-        g.beginPath();
-        if(K.round) g.ellipse(0, 0, s*.62*k, s*.42*k, 0, 0, Math.PI*2);
-        else { for(let j = 0; j < sides; j++){ const a = j/sides*Math.PI*2; g[j ? "lineTo" : "moveTo"](Math.cos(a)*s*.58*rad[j]*k, Math.sin(a)*s*.46*rad[j]*k); } g.closePath(); }
+      const path = c=>{
+        c.beginPath();
+        if(K.round){
+          for(let k = 0; k <= nv; k++){ const a = vs[k%nv], b = vs[(k + 1)%nv], mx = (a[0] + b[0])/2, my = (a[1] + b[1])/2; if(!k) c.moveTo(mx, my); else c.quadraticCurveTo(a[0], a[1], mx, my); }
+        } else vs.forEach((v, k)=>c[k ? "lineTo" : "moveTo"](v[0], v[1]));
+        c.closePath();
       };
-      g.translate(s*.06, s*.08); path(1.04); g.fillStyle = "rgba(0,0,0,.45)"; g.fill(); g.translate(-s*.06, -s*.08);
-      path(1); g.fillStyle = col; g.fill();
-      g.save(); path(1); g.clip();
-      g.fillStyle = "rgba(255,255,255,.16)"; g.fillRect(-s, -s, s*2, s*.85);
-      g.fillStyle = "rgba(0,0,0,.14)"; g.fillRect(-s, s*.12, s*2, s);
-      g.restore(); g.restore();
+      for(const c of [g, h]){ c.save(); c.translate(x + ox, y + oy); c.rotate(rot); }
+      /* the stone and the shadow it drops on those beneath */
+      g.save(); g.shadowColor = "rgba(0,0,0,.7)"; g.shadowBlur = s*.22; g.shadowOffsetX = s*.07; g.shadowOffsetY = s*.09;
+      path(g); g.fillStyle = col; g.fill(); g.restore();
+      g.save(); path(g); g.clip();
+      if(K.round){
+        const gr = g.createRadialGradient(-s*.14, -s*.14, s*.04, 0, 0, s*.6);
+        gr.addColorStop(0, shadeHex(col, 1.2)); gr.addColorStop(.55, col); gr.addColorStop(1, shadeHex(col, .55));
+        g.fillStyle = gr; g.fillRect(-s, -s, s*2, s*2);
+      } else vs.forEach((v, k)=>{
+        const w = vs[(k + 1)%nv];
+        g.fillStyle = g.strokeStyle = shadeHex(col, shades[k]); g.lineWidth = 1;
+        g.beginPath(); g.moveTo(cx0, cy0); g.lineTo(v[0], v[1]); g.lineTo(w[0], w[1]); g.closePath(); g.fill(); g.stroke();
+      });
+      for(const [px, py, pr, lite, a] of speck){ g.fillStyle = lite ? `rgba(255,255,255,${K.grain*(.5 + a)})` : `rgba(0,0,0,${K.grain*(.6 + a)})`; g.beginPath(); g.arc(px, py, pr, 0, Math.PI*2); g.fill(); }
+      if(rusty){ const gr = g.createRadialGradient(rx, ry, 0, rx, ry, s*.22); gr.addColorStop(0, "rgba(190,110,40,.75)"); gr.addColorStop(1, "rgba(190,110,40,0)"); g.fillStyle = gr; g.fillRect(-s, -s, s*2, s*2); }
+      g.restore();
+      path(g); g.strokeStyle = "rgba(0,0,0,.38)"; g.lineWidth = Math.max(1, s*.025); g.stroke();
+      /* height: a dome for a cobble, a low peak for a chip */
+      path(h);
+      const hg = h.createRadialGradient(cx0, cy0, 0, 0, 0, s*.6);
+      hg.addColorStop(0, grey(lift)); hg.addColorStop(K.round ? .7 : .85, grey(lift*(K.round ? .72 : .86))); hg.addColorStop(1, grey(lift*.35));
+      h.fillStyle = hg; h.fill();
+      g.restore(); h.restore();
     }
+  };
+  /* three sizes: grit in the gaps, small stones, then the stones you see */
+  for(const [k, share, lift] of [[.3, 1.3, .35], [.6, 1.1, .65], [1, 1.25, 1]]){
+    const s0 = N*K.size*k, n = Math.round(share/(K.size*K.size*k*k));
+    for(let i = 0; i < n; i++) stone(r()*N, r()*N, s0*(.7 + .6*r()), lift*(.8 + .2*r()));
   }
-  t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(1/K.feet, 1/K.feet);          // shape UVs are in feet
-  t.anisotropy = 8;
+  const tex = (c, srgb)=>{
+    const m = new THREE.CanvasTexture(c);
+    if(srgb) m.colorSpace = THREE.SRGBColorSpace;
+    m.wrapS = m.wrapT = THREE.RepeatWrapping;
+    m.repeat.set(1/K.feet, 1/K.feet);          // shape UVs are in feet
+    m.anisotropy = 16;
+    return m;
+  };
+  t = {map:tex(cc, true), bump:tex(hc, false), rough:K.rough};
   rockCache.set(kind, t);
   return t;
 }
@@ -256,7 +301,10 @@ export function buildPlantingBed(bed, ctx){
     let mat;
     if(ctx.simple) mat = cached("ms"+bed.mulch, ()=>new THREE.MeshStandardMaterial({color:mulch.simple ?? 0x25301f, roughness:1, metalness:0}));
     else if(mulch.color == null && !mulch.rock) mat = cached("mnone", ()=>new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false}));
-    else if(mulch.rock) mat = cached("mr"+mulch.rock, ()=>new THREE.MeshStandardMaterial({map:rockTexture(mulch.rock), color:0xb8b8b8, roughness:.95, metalness:0}));
+    else if(mulch.rock) mat = cached("mr"+mulch.rock, ()=>{
+      const t = rockTextures(mulch.rock);
+      return new THREE.MeshStandardMaterial({map:t.map, bumpMap:t.bump, bumpScale:1.6, color:0xc4c4c4, roughness:t.rough, metalness:0});
+    });
     else mat = cached("m"+bed.mulch+(ctx.soilMap ? ctx.soilMap.uuid : ""), ()=>{
       const m = new THREE.MeshStandardMaterial({color:mulch.color, roughness:1, metalness:0});
       if(ctx.soilMap){
