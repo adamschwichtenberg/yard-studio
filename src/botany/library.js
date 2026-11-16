@@ -283,7 +283,7 @@ const DEFAULT_LEAF = 0x46702c;
 const DEFAULT_FALL = 0xb5782a;
 const DEFAULT_NEEDLE = { spruce: 0x2c4a2e, bluespruce: 0x7092a8, norway: 0x284a26, pine: 0x2e4d22, redpine: 0x2e4d22, arborvitae: 0x3f6a2e, juniper: 0x5f7a6c,
   weepingspruce: 0x3a5a4a, fir: 0x2a4a2e, whitepine: 0x3a6048, scotchpine: 0x4a6a5a, tamarack: 0x6a9a4a };
-const DEFAULT_BLOOM = { blossom: [0xb0305a, 0xe89ab4, 0xf2d6de], panicle: [0xc8dc8a, 0xf1f1e2, 0xd8a4a4] };
+const DEFAULT_BLOOM = { blossom: [0xb0305a, 0xe89ab4, 0xf2d6de], panicle: [0xc8dc8a, 0xf1f1e2, 0xd8a4a4], smoke: [0x9a7a86, 0xc8a8b4, 0xa89088] };
 
 export class TreeLibrary {
   constructor() {
@@ -504,7 +504,7 @@ export class TreeLibrary {
   #ornamentMesh(t, orn) {
     const n = orn.list.length;
     let mesh;
-    if (orn.type === 'blossom' || orn.type === 'panicle') {
+    if (orn.type === 'blossom' || orn.type === 'panicle' || orn.type === 'smoke') {
       const tex = flowerCard(orn.type, this.high);
       const colors = t.bloom || DEFAULT_BLOOM[orn.type];
       mesh = new THREE.InstancedMesh(crossGeometry(orn.type === 'panicle' ? 0.75 : 1), flowerMaterial(tex.map, tex.luma, colors), n);
@@ -627,7 +627,7 @@ function writeLeaves(mesh, season) {
 }
 
 /* Ornaments appear and go inside their window; flowers open and drop a few at a time. */
-const ORN_SIZE = { blossom: 0.42, panicle: 0.95, bract: 0.45, catkin: 0.28, strobile: 0.12, acorn: 0.14, drupe: 0.06, pome: 0.1, berry: 0.06, pod: 1.2, cone: 0.35 };
+const ORN_SIZE = { blossom: 0.42, panicle: 0.95, smoke: 1.8, bract: 0.45, catkin: 0.28, strobile: 0.12, acorn: 0.14, drupe: 0.06, pome: 0.1, berry: 0.06, pod: 1.2, cone: 0.35 };
 function writeOrnament(mesh, season) {
   const orn = mesh.userData.orn;
   const day = season.day ?? 60;
@@ -660,7 +660,7 @@ function writeOrnament(mesh, season) {
   for (let i = 0; i < orn.list.length; i++) {
     const o = orn.list[i];
     const k = o.rand < amount ? 1 : 0;
-    const up = orn.type === 'blossom' || orn.type === 'panicle' || orn.type === 'bract' ? 1 : -1;
+    const up = orn.type === 'blossom' || orn.type === 'panicle' || orn.type === 'smoke' || orn.type === 'bract' ? 1 : -1;
     const dir = o.dir.clone();
     if (up < 0) dir.set(dir.x * 0.3, -1, dir.z * 0.3).normalize();
     const x = Math.abs(dir.y) < 0.95 ? V().crossVectors(dir, V(0, 1, 0)).normalize() : V(1, 0, 0);

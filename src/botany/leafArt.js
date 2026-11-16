@@ -525,12 +525,66 @@ function paintJuniper(g, W, H, rand) {
     rand = s0;
   }
 }
+function paintArborvitae(g, W, H, rand) {
+  // Arborvitae: one flat spray. A central shoot with side branchlets leaving
+  // it alternately, each forking again, every axis a chain of small pressed
+  // scale leaves. The spray is widest a third of the way up and comes to a
+  // point; the tips are this year's growth, a lighter yellow-green.
+  const axes = [];
+  const grow = (x, y, ang, len, w, depth) => {
+    const n = Math.max(3, Math.round(len / (w * 1.15)));
+    const pts = [];
+    let a = ang;
+    for (let i = 0; i <= n; i++) {
+      pts.push([x, y, a, i / n]);
+      a += (rand() - 0.5) * 0.1 - Math.sign(ang) * 0.012;
+      x += Math.sin(a) * (len / n);
+      y -= Math.cos(a) * (len / n);
+    }
+    axes.push({ pts, w, depth });
+    if (depth > 0) {
+      const k = depth === 2 ? 9 : 4;
+      for (let j = 0; j < k; j++) {
+        const t = depth === 2 ? 0.07 + (0.8 * (j + 0.5)) / k : 0.22 + (0.6 * j) / k;
+        const q = pts[Math.min(n, Math.round(t * n))];
+        const side = j % 2 ? 1 : -1;
+        // longest branchlets low on the spray, shortening to the tip
+        const reach = depth === 2 ? Math.sin(Math.PI * Math.min(1, 0.28 + t * 0.78)) * 0.5 : 0.36 * (1 - t * 0.4);
+        grow(q[0], q[1], q[2] + side * (depth === 2 ? 0.62 - t * 0.2 : 0.5) + (rand() - 0.5) * 0.12, len * reach * (0.85 + rand() * 0.3), w * 0.82, depth - 1);
+      }
+    }
+  };
+  grow(W / 2, H * 0.995, (rand() - 0.5) * 0.05, H * 0.93, W * 0.03, 2);
+  const scale = (x, y, a, w, L, sat) => {
+    g.save();
+    g.translate(x, y);
+    g.rotate(a);
+    g.fillStyle = `hsl(${96 + rand() * 18}, ${sat}%, ${L}%)`;
+    g.beginPath();
+    g.moveTo(0, -w * 0.95);
+    g.quadraticCurveTo(w * 0.62, -w * 0.2, w * 0.3, w * 0.6);
+    g.lineTo(-w * 0.3, w * 0.6);
+    g.quadraticCurveTo(-w * 0.62, -w * 0.2, 0, -w * 0.95);
+    g.fill();
+    g.restore();
+  };
+  // A dark underlay first, so the scales sit on shadow and the spray is not see-through.
+  for (const ax of axes) for (const [x, y, a] of ax.pts) scale(x, y, a, ax.w * 1.5, 11 + rand() * 5, 30);
+  for (const ax of [...axes].sort((p, q) => q.depth - p.depth)) {
+    for (const [x, y, a, t] of ax.pts) {
+      const tip = ax.depth === 0 ? t : ax.depth === 1 ? t * 0.5 : 0;
+      scale(x, y, a, ax.w, 21 + tip * 13 + rand() * 9, 34 + tip * 12);
+      // the pressed pair of side scales, a shade lighter
+      g.fillStyle = `hsla(100, 30%, ${36 + tip * 12}%, 0.55)`;
+      g.fillRect(x - ax.w * 0.06, y - ax.w * 0.3, ax.w * 0.12, ax.w * 0.6);
+    }
+  }
+}
 export function shootCard(kind, high = false) {
   const ck = 'shoot:' + kind + (high ? '@hi' : '');
   if (cache.has(ck)) return cache.get(ck);
   let out;
-  if (kind === 'arborvitae') out = leafTexture(kind, high);
-  else {
+  {
     const H = high ? 512 : 256;
     const W = H;
     const c = document.createElement('canvas');
@@ -542,6 +596,7 @@ export function shootCard(kind, high = false) {
     else if (kind === 'whitepine') paintTuft(g, W, H, rand, true);
     else if (kind === 'tamarack') paintLarch(g, W, H, rand);
     else if (kind === 'juniper') paintJuniper(g, W, H, rand);
+    else if (kind === 'arborvitae') paintArborvitae(g, W, H, rand);
     else paintBottlebrush(g, W, H, rand);
     const map = new THREE.CanvasTexture(c);
     map.colorSpace = THREE.SRGBColorSpace;
@@ -554,7 +609,7 @@ export function shootCard(kind, high = false) {
 
 /** Flower textures for blossoms and panicles. */
 export function flowerCard(type, high = false) {
-  return leafTexture(type === 'panicle' ? 'bloom:hydrangea' : 'bloom:crabapple', high);
+  return leafTexture(type === 'panicle' ? 'bloom:hydrangea' : type === 'smoke' ? 'bloom:smoke' : 'bloom:crabapple', high);
 }
 
 /** Linden bract with its hanging flower cluster. */

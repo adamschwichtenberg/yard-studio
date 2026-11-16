@@ -5,9 +5,9 @@
    and a few model options. No variety has its own mesh.
 
    Built the way the trees are: alpha-tested cards carrying procedural leaf
-   and flower textures (plantTextures.js), tubes for stems, a dark inner mass
-   so shrubs do not read as see-through. Each plant comes out as a few merged
-   geometries, one per layer:
+   and flower textures (plantTextures.js), tubes for stems and twigs. Shrubs
+   are dense because foliage sits at every depth, not because of a solid
+   core. Each plant comes out as a few merged geometries, one per layer:
 
      role "leaf"    textured foliage, takes the plant's foliage colours
      role "flower"  textured blooms, takes its flower colours; drawn only in
@@ -15,7 +15,6 @@
      role "stem"    plain tubes in the stem colour: green stalks, red dogwood
                     canes. What is left of a shrub in winter.
      role "wood"    plain tubes in bark brown: the trunk of a patio tree
-     role "mass"    the dark core inside a shrub
 
    beds.js gives every layer a material for the date and instances it, so a
    kind of plant costs a handful of draw calls however often it repeats.
@@ -71,7 +70,7 @@ class Buf {
 class Plant {
   constructor(p){
     this.p = p; this.H = p.h; this.W = p.w; this.R = p.w/2;
-    this.rnd = seeded(hashKey(p.k));
+    this.rnd = seeded(hashKey(p.base || p.k));
     this.layers = new Map();
     /* foliage normals lean out of the plant as a whole, so it shades as one soft
        form; AO darkens the middle and the base */
@@ -356,60 +355,124 @@ class Plant {
     }
     return tips;
   }
-  /* a woody shrub filling an envelope. profile(u) is the radius, as a share of
-     the half-spread, at height fraction u of the canopy. */
-  bush({profile, foliage, heads, stems = {}, trunk = 0, mass = .7, open = 0}){
+  /* a sprig of leaves: a card three rows long whose tip bends away from `face`,
+     so foliage reads as shoots with a curve to them, not as flat plates */
+  sprig(role, tex, base, dir, face, w, h, o = {}){
+    const B = this.buf(role, tex), rnd = o.rnd ?? this.rnd();
+    let side = V().crossVectors(face, dir);
+    if(side.lengthSq() < 1e-6) side = perp(dir);
+    side.normalize();
+    const fn = V().crossVectors(dir, side).normalize(), bend = o.bend ?? .22, own = o.own ?? .4;
+    const i0 = B.count;
+    for(let j = 0; j <= 2; j++){
+      const v = j/2, c = base.clone().addScaledVector(dir, h*v).addScaledVector(fn, -bend*h*v*v);
+      /* the card's own facing, tipping back as it bends */
+      const cn = fn.clone().addScaledVector(dir, 2*bend*v).normalize();
+      for(const sg of [-1, 1]){
+        const q = c.clone().addScaledVector(side, sg*w/2);
+        const n = this.nrm(q).multiplyScalar(1 - own).addScaledVector(cn, own).normalize();
+        B.vert(q, n, sg < 0 ? 0 : 1, v, rnd, (o.ao ?? this.ao(q)));
+      }
+    }
+    for(let j = 0; j < 2; j++){ const k = i0 + j*2; B.idx.push(k, k+1, k+3, k, k+3, k+2); }
+  }
+  /* A woody shrub, built the way one grows: stems from the crown, twigs forking
+     off them to the edge of the canopy, and leafy shoots along the outer half of
+     every twig. Foliage sits at every depth, so the shrub is dense without a
+     solid core, and the bare framework is what stands in winter.
+     profile(u) is the canopy radius, as a share of the half-spread, at height
+     fraction u. */
+  bush({profile, foliage, heads, stems = {}, trunk = 0, open = 0, lump = .09}){
     const r = this.rnd, H = this.H, R = this.R, y0 = trunk, ch = Math.max(.3, H - y0);
-    const env = u=>R*profile(clamp(u, 0, 1));
+    /* no shrub is a smooth solid of revolution: the outline swells and dips */
+    const l1 = r()*TAU, l2 = r()*TAU, l3 = r()*TAU, lk = 1/(1 + lump*.7);
+    const swell = (az, u)=>lk*(1 + lump*(.55*Math.sin(az*2 + l1 + u*3) + .3*Math.sin(az*3 + l2 - u*5) + .25*Math.sin(az*5 + l3 + u*9)));
+    const env = (u, az)=>R*profile(clamp(u, 0, 1))*(az == null ? 1 : swell(az, u));
     /* canopy normals and AO are measured from the canopy, not the ground */
     const cm = y0 + ch*.42;
     this.nrm = q=>V(q.x, (q.y - cm)*(R/ch)*.9 + R*.4, q.z).normalize();
-    this.ao = q=>{ const u = (q.y - y0)/ch, e = Math.max(.2, env(u)); return clamp(.2 + .55*Math.hypot(q.x, q.z)/e + .25*clamp(u, 0, 1), .15, 1); };
+    this.ao = q=>{ const u = (q.y - y0)/ch, e = Math.max(.2, env(u)); return clamp(.08 + .78*Math.pow(Math.hypot(q.x, q.z)/e, 1.5) + .2*clamp(u, 0, 1), .1, 1); };
+    const wood = trunk ? "wood" : "stem";
+    const bez = (a, m, b, n)=>{ const pts = []; for(let k = 0; k <= n; k++){ const t = k/n, i = (1-t)*(1-t), j = 2*(1-t)*t, l = t*t; pts.push(V(a.x*i + m.x*j + b.x*l, a.y*i + m.y*j + b.y*l, a.z*i + m.z*j + b.z*l)); } return pts; };
+    const along = (pts, t)=>{ const f = clamp(t, 0, 1)*(pts.length - 1), i = Math.min(pts.length - 2, Math.floor(f)); return pts[i].clone().lerp(pts[i+1], f - i); };
 
     if(trunk){
       this.tube("wood", [V(0, 0, 0), V(.03, trunk*.5, .02), V(0, trunk + ch*.14, 0)], Math.max(.09, H*.02), Math.max(.07, H*.015), 7);
     }
-    /* main stems from the crown (or the top of the trunk) to the outer canopy */
-    const ns = stems.n ?? clamp(Math.round(5 + R*2), 5, 11), sr = stems.thick ?? clamp(H*.011, .012, .06);
+    /* main stems from the crown (or the top of the trunk) up into the canopy */
+    const ns = stems.n ?? clamp(Math.round(5 + R*1.6), 5, 10), sr = stems.thick ?? clamp(H*.011, .012, .06);
+    const mains = [];
     for(let i = 0; i < ns; i++){
-      const az = i*GOLD + r()*.5, u = lerp(.45, .92, r()), top = polar(az, env(u)*.86, y0 + ch*u);
-      const a = polar(az, trunk ? .02 : R*.07*r(), trunk ? y0 : 0);
-      const mid = a.clone().lerp(top, .5); mid.x *= .55 + open; mid.z *= .55 + open; mid.y += ch*.1;
-      const pts = [];
-      for(let k = 0; k <= 4; k++){ const t = k/4; pts.push(V(a.x*(1-t)*(1-t) + mid.x*2*(1-t)*t + top.x*t*t, a.y*(1-t)*(1-t) + mid.y*2*(1-t)*t + top.y*t*t, a.z*(1-t)*(1-t) + mid.z*2*(1-t)*t + top.z*t*t)); }
-      this.tube(trunk ? "wood" : "stem", pts, sr, sr*.35, 4);
-      /* twigs, so a bare shrub in winter still has a silhouette */
-      for(let k = 0; k < 3; k++){
-        const t0 = .45 + .18*k, q = pts[2].clone().lerp(pts[4], (t0 - .5)*2), ta = az + (k - 1)*.9 + (r() - .5);
-        const tip = q.clone().add(polar(ta, env(u)*.3, ch*(.1 + .12*r())));
-        this.tube(trunk ? "wood" : "stem", [q, q.clone().lerp(tip, .5).setY(lerp(q.y, tip.y, .65)), tip], sr*.4, sr*.15, 3);
+      const az = i*GOLD + r()*.5, u = lerp(.6, .97, (i + r())/ns), top = polar(az, env(u, az)*lerp(.3, .72, r()), y0 + ch*u);
+      const a = polar(az, trunk ? .02 : Math.min(R*.12, .25)*r(), trunk ? y0 : 0);
+      const mid = a.clone().lerp(top, .5); mid.x *= .5 + open; mid.z *= .5 + open; mid.y += ch*.12;
+      const pts = bez(a, mid, top, 5);
+      this.tube(wood, pts, sr, sr*.4, 4);
+      mains.push({az, pts, top:top.y});
+    }
+    /* twigs: one for every patch of canopy, forking off the nearest stem below it */
+    /* shoots small enough to read as foliage, and enough of them to close the
+       canopy: the count follows the canopy's surface, capped for the GPU */
+    const area = Math.PI*R*(R + 1.6*ch), cover = foliage.cover ?? 3, cap = foliage.max ?? 760;
+    let fs0 = foliage.size*(foliage.fine ?? .66);
+    if(cover*area/(fs0*fs0) > cap) fs0 = Math.sqrt(cover*area/cap);
+    const nt = stems.twigs ?? clamp(Math.round(area/(fs0*fs0)/3.2), 22, 110);
+    const twigs = [];
+    for(let j = 0; j < nt; j++){
+      const u = clamp(Math.pow((j + .5)/nt, foliage.low ?? .85), .03, .98), az = j*GOLD + r()*.5;
+      const tip = polar(az, env(u, az)*(.84 + .1*r()), y0 + ch*u);
+      let best = mains[0], bd = 1e9;
+      for(const m of mains){
+        let d = Math.abs(((az - m.az)%TAU + TAU + Math.PI)%TAU - Math.PI);
+        if(m.top < tip.y*.7) d += 2;
+        if(d < bd){ bd = d; best = m; }
       }
+      /* leave the stem lower down than the tip, so every twig climbs outward */
+      const want = y0 + (tip.y - y0)*lerp(.3, .6, r());
+      let t = 0; for(let k = 0; k <= 10; k++){ if(along(best.pts, k/10).y <= want) t = k/10; }
+      const from = along(best.pts, Math.max(t, .12));
+      const mid = from.clone().lerp(tip, .55); mid.y += ch*.07 + (tip.y - from.y)*.15; mid.x *= .86; mid.z *= .86;
+      const pts = bez(from, mid, tip, 3);
+      this.tube(wood, pts, sr*.38, sr*.12, 3);
+      twigs.push(pts);
     }
-    if(mass){
-      const prof = [];
-      for(let j = 0; j <= 6; j++){ const u = j/6; prof.push([y0 + ch*(.06 + .86*u), env(.06 + .86*u)*mass*(j === 0 || j === 6 ? .35 : 1)]); }
-      this.lathe("mass", prof);
-    }
-    /* foliage sprigs over the envelope, weighted to where it is widest */
-    const n = foliage.n, fs = foliage.size;
+    /* leafy shoots along the outer half of each twig, thickest at the tips */
+    const n = clamp(Math.round(cover*area/(fs0*fs0)), 90, cap), shell = foliage.shell ?? 3, hang = !!foliage.hang, rise = foliage.rise ?? .3, wild = foliage.wild ?? .55, bend = foliage.bend ?? .2;
     for(let i = 0; i < n; i++){
-      let u = (i + .5)/n;
-      u = clamp(Math.pow(u, foliage.low ?? .85), .02, .985);
-      const az = i*GOLD + r()*.6, e = env(u), depth = .72 + .28*r();
-      const up = clamp((u - .35)*1.5, -.25, 1);
-      const nrm = V(Math.cos(az), up, Math.sin(az)).normalize();
-      const s = fs*(.8 + .45*r());
-      const dir = nrm.clone().lerp(UP, foliage.rise ?? .3).add(V(r() - .5, r() - .5, r() - .5).multiplyScalar(foliage.wild ?? .7)).normalize();
-      const base = polar(az, e*depth, y0 + ch*u).addScaledVector(dir, -s*.55);
+      const s = fs0*(.75 + .5*r());
+      let q, dir, face;
+      if(i%5 < shell){
+        /* the canopy's skin: shoots laid over the outline like shingles, tips
+           lifting off it, so the shrub closes from every side */
+        const k = Math.floor(i/5)*shell + i%5, m = Math.ceil(n/5)*shell;
+        const u = clamp(Math.pow((k + .5)/m, foliage.low ?? .85), .02, .985), az = k*GOLD + r()*.4;
+        q = polar(az, env(u, az)*(.8 + .14*r()), y0 + ch*u);
+        const nr = V(Math.cos(az), clamp((u - .4)*1.7, -.25, 1.6), Math.sin(az)).normalize();
+        let tu = UP.clone().addScaledVector(nr, -nr.y);
+        if(tu.lengthSq() < .02) tu = polar(r()*TAU, 1);
+        tu.normalize();
+        const sd = V().crossVectors(nr, tu), phi = (hang ? Math.PI : 0) + (r() - .5)*(hang ? 1.2 : 2.4), tilt = .2 + .45*r();
+        dir = tu.multiplyScalar(Math.cos(phi)).addScaledVector(sd, Math.sin(phi)).multiplyScalar(Math.cos(tilt)).addScaledVector(nr, Math.sin(tilt))
+          .addScaledVector(UP, rise*.6).normalize();
+        face = nr.add(V(r() - .5, r() - .5, r() - .5).multiplyScalar(.5));
+      } else {
+        /* and shoots along the twigs inside it, for depth */
+        const pts = twigs[i%nt], t = 1 - .62*Math.pow(r(), 1.6);
+        q = along(pts, t);
+        const tw = V().subVectors(pts[3], pts[1]).normalize();
+        const out = V(q.x, 0, q.z); if(out.lengthSq() < 1e-4) out.set(1, 0, 0); out.normalize();
+        dir = tw.multiplyScalar(.55).addScaledVector(out, .45*(1 - rise)).addScaledVector(UP, rise)
+          .add(V(r() - .5, r() - .5, r() - .5).multiplyScalar(wild)).normalize();
+        face = out.multiplyScalar(.5 + .5*r()).addScaledVector(UP, .35 + .6*r()).add(V(r() - .5, 0, r() - .5).multiplyScalar(.9));
+      }
+      const base = q.clone().addScaledVector(dir, -s*.4).add(V(r() - .5, r() - .5, r() - .5).multiplyScalar(s*.25));
       if(base.y < .02) base.y = .02;
-      const face = V(-Math.sin(az), .1, Math.cos(az)).applyAxisAngle(nrm, (r() - .5)*2.4);
-      if(i%3 === 0) this.cross("leaf", foliage.tex, base, dir, s, s, 2);
-      else this.card("leaf", foliage.tex, base, dir, face, s, s);
+      this.sprig("leaf", foliage.tex, base, dir, face, s, s, {bend:bend*(.5 + r())});
     }
     if(heads){
       const hn = heads.n, z = heads.zone || [.45, 1];
       for(let i = 0; i < hn; i++){
-        const u = lerp(z[0], z[1], Math.pow((i + .5)/hn, .8)), az = 1.3 + i*GOLD + r()*.3, e = env(u);
+        const u = lerp(z[0], z[1], Math.pow((i + .5)/hn, .8)), az = 1.3 + i*GOLD + r()*.3, e = env(u, az);
         const up = clamp((u - .3)*1.6, 0, 1) + (heads.up ?? .35);
         const dir = V(Math.cos(az), up, Math.sin(az)).normalize();
         const pos = polar(az, e*(heads.out ?? .96), y0 + ch*u);
@@ -458,7 +521,7 @@ class Plant {
 const P_ROUND  = u=>Math.pow(Math.sin(Math.PI*Math.pow(u, .78)), .55);
 const P_MOUND  = u=>Math.pow(Math.sin(Math.PI*Math.pow(u, .5)), .5);
 const P_OVAL   = u=>.92*Math.pow(Math.sin(Math.PI*Math.pow(u, .85)), .45);
-const P_VASE   = u=>.3 + .7*Math.pow(Math.sin(Math.PI*Math.pow(clamp(u, 0, 1), 1.45)*.93), .7)*(u > .02 ? 1 : .6);
+const P_VASE   = u=>(.56 + .44*Math.sin(Math.PI/2*Math.min(1, u/.62)))*(u > .62 ? Math.sqrt(Math.max(.02, 1 - .9*Math.pow((u - .62)/.38, 2))) : 1);
 const P_COLUMN = u=>Math.pow(Math.sin(Math.PI*Math.pow(u, .62)), .22)*(1 - .25*u);
 const P_BALL   = u=>Math.sqrt(Math.max(0, 1 - Math.pow(2*u - 1, 2)));
 const P_FOUNTAIN = u=>.32 + .68*Math.pow(Math.sin(Math.PI*Math.pow(clamp(u, 0, 1), 1.15)*.96), .6);
@@ -535,8 +598,7 @@ export const MODELS = {
     build(P, p, o){
       const H = P.H, R = P.R, head = o.head || "peony";
       const hs = o.headSize ?? (head === "peony" ? clamp(H*.17, .38, .6) : head === "spike" ? H*.36 : .3);
-      P.bush({profile:P_ROUND, mass:.62,
-        foliage:{tex:o.leafTex || "leaf:peony", n:count(90 + R*R*40, 90, 200), size:clamp(H*.36, .5, 1.2)},
+      P.bush({profile:P_ROUND,         foliage:{tex:o.leafTex || "leaf:peony", size:clamp(H*.36, .5, 1.2), fine:.8, max:420, bend:.35},
         stems:{n:8, thick:.02},
         heads:{type:head, n:count((head === "peony" ? 6 : 9) + R*R*(head === "peony" ? 3 : 5), 6, 22), size:hs, zone:head === "peony" ? [.5, 1] : [.6, 1], up:head === "spike" ? .9 : .5, out:head === "spike" ? .7 : 1.02}});
     }},
@@ -549,8 +611,8 @@ export const MODELS = {
         P.rosette({tex:"leaf:fern", n:8, len:L*.8, lift:1.48, arch:.5, width:L*.26, cup:.1});
       }
       else {
-        P.lathe("mass", [[0, R*.5], [H*fh*.5, R*.55], [H*fh*.8, R*.25]]);
-        P.dome({tex:"leaf:ferny", n:count(34 + R*R*30, 34, 90), size:clamp(H*.5, .4, 1), rx:R*.9, ry:H*fh});
+        P.dome({tex:"leaf:ferny", n:count(14 + R*R*10, 14, 30), size:clamp(H*.45, .4, .9), rx:R*.5, ry:H*fh*.6, lift:.7});
+        P.dome({tex:"leaf:ferny", n:count(40 + R*R*36, 40, 110), size:clamp(H*.5, .4, 1), rx:R*.9, ry:H*fh});
         P.stalks({n:count(5 + R*R*9, 5, 16), h:[H*.6, H*.72], ring:R*.25, spread:R*.6, thick:.01,
           head:{type:"plume", size:H*.42, tex:o.arching ? "flower:plume-arch" : "flower:plume", wide:.42}});
       }
@@ -567,8 +629,8 @@ export const MODELS = {
   cushion: {label:"Cushions", symbol:"scallop",
     build(P, p, o){
       const H = P.H, R = P.R, fs = o.flowerSize ?? clamp(R*.2, .1, .2);
-      P.lathe("mass", [[0, R*.6], [H*.4, R*.62], [H*.7, R*.38], [H*.82, R*.1]]);
-      P.dome({tex:o.leafTex || "leaf:small", n:count(34 + R*R*34, 34, 110), size:clamp(H*.55, .3, .9), rx:R*.9, ry:H*.86});
+      P.dome({tex:o.leafTex || "leaf:small", n:count(20 + R*R*16, 20, 50), size:clamp(H*.5, .3, .8), rx:R*.55, ry:H*.55, lift:.7});
+      P.dome({tex:o.leafTex || "leaf:small", n:count(50 + R*R*50, 50, 170), size:clamp(H*.42, .26, .7), rx:R*.9, ry:H*.86});
       P.dots({n:count(20 + R*R*(o.sparse ? 14 : 34), 18, 110), size:fs, rx:R*.92, ry:H*.9, type:o.flower === "daisy" ? "daisy" : "single", tex:o.flowerTex, droop:o.flower === "daisy" ? .05 : -.15});
     }},
   mat: {label:"Groundcover mats", symbol:"mat",
@@ -618,31 +680,31 @@ export const MODELS = {
       const H = P.H, R = P.R, trunk = o.trunk || 0, ch = H - trunk;
       const hs = o.bloom ?? clamp(.16*ch + .32, .5, 1.05);
       P.bush({profile:trunk ? P_BALL : P_ROUND, trunk,
-        foliage:{tex:"leaf:ovate", n:count(90 + R*R*34, 90, 340), size:clamp(ch*.25, .6, 1.5)},
+        foliage:{tex:"leaf:ovate", size:clamp(ch*.2, .7, 1.25), fine:1},
         heads:{type:"panicle", n:count((o.dense ? 10 : 7) + R*R*(o.dense ? 4.4 : 3.2), 8, 60), size:hs, zone:[.3, 1], up:.4, fat:o.fat}});
     }},
   mophead: {label:"Mophead hydrangeas", symbol:"cloud",
     build(P, p, o){
       const H = P.H, R = P.R, hs = o.bloom ?? clamp(.12*H + .3, .42, .95);
       P.bush({profile:P_MOUND,
-        foliage:{tex:"leaf:ovate", n:count(90 + R*R*34, 90, 340), size:clamp(H*.26, .55, 1.5)},
+        foliage:{tex:"leaf:ovate", size:clamp(H*.2, .7, 1.25), fine:1},
         heads:{type:"mop", n:count(7 + R*R*3.6, 7, 70), size:hs, zone:[.35, 1], up:.5, fine:o.fine}});
     }},
   weigela: {label:"Arching shrubs", symbol:"cloud",
     build(P, p, o){
       const H = P.H, R = P.R;
       const fs = o.flowerSize ?? clamp(H*.06, .13, .22);
-      P.bush({profile:(o.droop ?? .55) > .7 ? P_WEEP : P_FOUNTAIN, mass:.6, open:.15,
-        foliage:{tex:o.leafTex || "leaf:ovate", n:count(80 + R*R*30, 80, 280), size:clamp(H*.28, .4, 1.2), rise:.1, wild:.9},
+      P.bush({profile:(o.droop ?? .55) > .7 ? P_WEEP : P_FOUNTAIN, open:.15,
+        foliage:{tex:o.leafTex || "leaf:ovate", size:clamp(H*.16, .5, .95), fine:1, rise:.1, wild:.7, bend:.35},
         heads:p.flower != null ? {type:"single", n:count((o.sparse ? 14 : 40) + R*R*(o.sparse ? 6 : 22), 14, 200), size:fs, zone:[.3, 1], up:.5, out:1.02, tex:o.flowerTex} : null});
     }},
   vase: {label:"Upright shrubs", symbol:"cloud",
     build(P, p, o){
       const H = P.H, R = P.R, head = o.head;
       const sizes = {flat:.46, berries:.4, plume:.9, spike:.6, single:.24, smoke:1};
-      P.bush({profile:P_VASE, open:.12, mass:.6,
+      P.bush({profile:P_VASE, open:.12,
         stems:{n:count(7 + R*2, 7, 13), thick:clamp(H*.009, .02, .06)},
-        foliage:{tex:o.leafTex || "leaf:ovate", n:count(80 + R*R*20, 80, 220), size:clamp(H*.17, .5, 1.05), low:1.15},
+        foliage:{tex:o.leafTex || "leaf:ovate", size:clamp(H*.15, .6, 1.05), fine:1, low:1.1},
         heads:head && p.flower != null ? {type:head, n:count(8 + R*R*(head === "plume" ? 2 : head === "smoke" ? 2.6 : 3.2), 8, head === "smoke" ? 90 : 40),
           size:(o.headSize ?? sizes[head])*(head === "plume" ? clamp(H/8, .6, 1.2) : head === "smoke" ? clamp(H*.14, .7, 1.6) : 1), out:head === "smoke" ? 1 : undefined,
           zone:head === "smoke" ? [.5, 1] : [.5, 1], up:head === "spike" ? .8 : head === "smoke" ? .7 : .45, tex:head === "plume" ? "flower:plume-wide" : head === "flat" ? "flower:umbel" : o.headTex, wide:head === "plume" ? .85 : undefined} : null});
@@ -663,28 +725,28 @@ export const MODELS = {
   spirea: {label:"Mounding shrubs", symbol:"cloud",
     build(P, p, o){
       const H = P.H, R = P.R, head = o.head ?? "flat";
-      P.bush({profile:o.low ? P_MOUND : P_ROUND, mass:.72,
-        foliage:{tex:o.leafTex || "leaf:small", n:count(100 + R*R*50, 100, 280), size:clamp(H*.36, .42, 1), rise:.15},
+      P.bush({profile:o.low ? P_MOUND : P_ROUND,
+        foliage:{tex:o.leafTex || "leaf:small", size:clamp(H*.2, .42, .75), fine:1, rise:.15},
         heads:head && p.flower != null ? {type:head, n:count(10 + R*R*(head === "single" ? 16 : 7), 10, 70), size:o.headSize ?? (head === "single" ? .14 : .26), zone:[.4, 1], up:.5, out:1, tex:o.headTex} : null});
     }},
   lilac: {label:"Lilacs", symbol:"cloud",
     build(P, p, o){
       const H = P.H, R = P.R, trunk = o.trunk || 0, ch = H - trunk;
       P.bush({profile:trunk ? P_BALL : P_OVAL, trunk,
-        foliage:{tex:"leaf:heart", n:count(80 + R*R*22, 80, 230), size:clamp(ch*.17, .5, 1)},
+        foliage:{tex:"leaf:heart", size:clamp(ch*.15, .6, 1), fine:1},
         heads:{type:"lilac", n:count(12 + R*R*4.5, 12, 60), size:o.bloom ?? clamp(ch*.1 + .28, .45, .85), zone:[.35, 1], up:.7}});
     }},
   dense: {label:"Small-leaved mounds", symbol:"box",
     build(P, p, o){
       const H = P.H, R = P.R;
-      P.bush({profile:o.round ? P_BALL : P_ROUND, mass:.74,
-        foliage:{tex:o.leafTex || "leaf:small", n:count(130 + R*R*70, 130, 320), size:clamp(H*.36, .36, .9), rise:.15}});
+      P.bush({profile:o.round ? P_BALL : P_ROUND, lump:.05,
+        foliage:{tex:o.leafTex || "leaf:small", size:clamp(H*.2, .4, .7), fine:1, rise:.2, cover:4.2, max:900, shell:4, wild:.4}});
     }},
   columnar: {label:"Columnar shrubs", symbol:"box",
     build(P, p, o){
       const H = P.H, R = P.R;
-      P.bush({profile:P_COLUMN, mass:.72, stems:{n:6},
-        foliage:{tex:o.leafTex || "leaf:small", n:count(110 + H*R*44, 120, 320), size:clamp(R*1.05, .4, .9), rise:.5, low:1, wild:.5}});
+      P.bush({profile:P_COLUMN, stems:{n:6},
+        foliage:{tex:o.leafTex || "leaf:small", size:clamp(R*.7, .4, .75), fine:1, rise:.6, low:1, wild:.4, cover:3.4}});
     }}
 };
 
@@ -701,7 +763,6 @@ MODELS.conifer = {label:"Evergreen shrubs", symbol:"box",
     if(form === "spreading"){
       /* main branches radiate along the ground, each carrying flat sprays that lift at the tips */
       const n = count(11 + R*4, 11, 22), s = clamp(R*.5, .45, 1.1);
-      P.lathe("mass", [[0, R*.7], [H*.4, R*.6], [H*.7, R*.25]]);
       for(let i = 0; i < n; i++){
         const az = i*GOLD + r()*.4, L = R*(.72 + .28*r()), out = polar(az, 1), side = V(-out.z, 0, out.x);
         const k = count(3 + L*2.4, 4, 10);
@@ -720,9 +781,9 @@ MODELS.conifer = {label:"Evergreen shrubs", symbol:"box",
     }
     const profile = {globe:P_BALL, flat:P_FLAT, cone:P_CONE, vase:P_SPREAD, mound:P_MOUND}[form] || P_BALL;
     const pine = tex === "leaf:pine", trunk = o.trunk || 0, ch = H - trunk;
-    P.bush({profile, trunk, mass:form === "vase" ? .62 : .8, open:form === "vase" ? .15 : 0,
+    P.bush({profile, trunk, open:form === "vase" ? .15 : 0,
       stems:{n:form === "cone" ? 3 : count(5 + R*2, 5, 10)},
-      foliage:{tex, n:count(120 + R*ch*40, 120, 380), size:clamp(Math.min(ch, R*2)*(pine ? .42 : .34), .34, 1.3),
+      foliage:{tex, size:clamp(Math.min(ch, R*2)*(pine ? .22 : .14), .28, .62), fine:1, cover:4, max:1000, shell:4, bend:.1,
                /* spruce branches hold level, pine candles and yew shoots reach up */
                rise:pine ? .7 : tex === "leaf:arborvitae" ? .8 : form === "vase" || o.reach ? .55 : form === "cone" ? .05 : .25, wild:pine ? .5 : tex === "leaf:arborvitae" ? .22 : .45, low:form === "cone" ? .7 : .85}});
     if(form === "cone") P.tube("wood", [V(0, 0, 0), V(0, H*.5, 0), V(0, H*.96, 0)], Math.max(.05, H*.014), .012, 5);
@@ -731,14 +792,16 @@ MODELS.conifer = {label:"Evergreen shrubs", symbol:"box",
 /* ---------- the layers of one catalog plant, at its real size in feet ---------- */
 const protoCache = new Map();
 export function plantProto(p){
-  let proto = protoCache.get(p.k);
+  /* a plan's own variety is rebuilt whenever its size changes */
+  const ck = p.custom ? p.base+"|"+p.h+"x"+p.w : p.k;
+  let proto = protoCache.get(ck);
   if(proto) return proto;
   const P = new Plant(p), model = MODELS[p.model] || MODELS.cushion;
   model.build(P, p, p.opt || {});
   const layers = [];
   for(const L of P.layers.values()) if(L.buf.count) layers.push({role:L.role, tex:L.tex, geometry:L.buf.geometry()});
   proto = {layers};
-  protoCache.set(p.k, proto);
+  protoCache.set(ck, proto);
   return proto;
 }
 

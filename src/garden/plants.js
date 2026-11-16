@@ -431,7 +431,30 @@ const ALIASES = {"russian-sage":"russian-sage-denim-n-lace", "hosta-patriot":"ho
 /* Plans can outlive the catalog: an unknown key still draws, as a grey mound. */
 const UNKNOWN = {k:"?", n:"Unknown plant", sci:"", cat:"perennial", model:"cushion", h:1.5, w:1.5, flower:null,
                  foliage:0x7a8274, sun:ANY, zone:[1,13], opt:{}, note:"This plant is not in the catalog."};
-export function plantByKey(k){ return BY_KEY.get(k) || BY_KEY.get(ALIASES[k]) || UNKNOWN; }
+/* A plan's own varieties. No catalogue holds every plant, so a plan can carry
+   copies of catalogue entries with their own name, size, colours and bloom
+   time:  {k:"my-…", base:<catalogue key>, n, h, w, foliage?, flower?, bloom?}
+   They draw on the base entry's growth form at the new size. */
+const CUSTOM = new Map();
+function customEntry(c){
+  const base = BY_KEY.get(c?.base) || BY_KEY.get(ALIASES[c?.base]);
+  if(!base || typeof c.k !== "string") return null;
+  const h = Math.max(.2, Math.min(30, +c.h || base.h)), w = Math.max(.3, Math.min(30, +c.w || base.w));
+  const p = {...base, k:c.k, n:String(c.n || base.n).slice(0, 80), h, w, custom:true, base:base.k,
+             note:"Your own variety, drawn on the form of "+base.n+"."};
+  p.opt = {...base.opt};
+  if(p.opt.trunk) p.opt.trunk *= h/base.h;
+  if(Number.isFinite(c.foliage)){ p.foliage = c.foliage; delete p.foliage2; }
+  if(base.flower != null && Number.isFinite(c.flower)){ p.flower = c.flower; delete p.mix; }
+  if(base.bloom && c.bloom && /^\d\d-\d\d$/.test(c.bloom.from) && /^\d\d-\d\d$/.test(c.bloom.to) && c.bloom.from < c.bloom.to) p.bloom = {from:c.bloom.from, to:c.bloom.to};
+  return p;
+}
+export function setCustomPlants(list){
+  CUSTOM.clear();
+  for(const c of Array.isArray(list) ? list : []){ const p = customEntry(c); if(p) CUSTOM.set(p.k, p); }
+}
+export function customPlants(){ return [...CUSTOM.values()]; }
+export function plantByKey(k){ return CUSTOM.get(k) || BY_KEY.get(k) || BY_KEY.get(ALIASES[k]) || UNKNOWN; }
 
 export function winterHabit(p){
   return p.winter || (p.cat === "evergreen" ? "evergreen" : p.cat === "shrub" ? "bare" : p.cat === "grass" ? "standing" : "dormant");

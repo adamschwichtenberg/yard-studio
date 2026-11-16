@@ -730,18 +730,19 @@ function placeOrnaments(nodes, depth, p) {
       const dir = V().subVectors(b, a).normalize();
       const outer = THREE.MathUtils.clamp(Math.hypot(b.x, b.z) / Math.max(0.3, envelope(b.y)), 0, 1);
       const height = (b.y - cb) / crownH;
-      let chance = { blossom: 0.9, panicle: 0.65, bract: 0.35, catkin: 0.3, strobile: 0.25, acorn: 0.3, drupe: 0.4, pome: 0.55, pod: 0.25 }[orn.type] ?? 0.3;
+      let chance = { blossom: 0.9, panicle: 0.65, smoke: 0.5, bract: 0.35, catkin: 0.3, strobile: 0.25, acorn: 0.3, drupe: 0.4, pome: 0.55, pod: 0.25 }[orn.type] ?? 0.3;
       if (orn.type === 'panicle') chance *= height > 0.35 ? 1 : 0.3;
       if (r() > chance * (0.5 + 0.5 * outer)) continue;
-      const hang = { blossom: false, panicle: false }[orn.type] === false ? false : true;
+      const hang = { blossom: false, panicle: false, smoke: false }[orn.type] === false ? false : true;
       const d = hang ? V(dir.x * 0.25, -1, dir.z * 0.25).addScaledVector(randUnit(r), 0.25).normalize()
-        : dir.clone().lerp(UP, orn.type === 'panicle' ? 0.6 : 0.3).addScaledVector(randUnit(r), 0.4).normalize();
+        : dir.clone().lerp(UP, orn.type === 'panicle' ? 0.6 : orn.type === 'smoke' ? 0.45 : 0.3).addScaledVector(randUnit(r), 0.4).normalize();
       const reps = orn.type === 'blossom' ? (bareWood ? 4 : 3) : orn.type === 'pome' ? 2 : 1;
       // The coverage pass clothes the crown out past the twig tips, so flowers
       // sit out at that leaf surface (fruit a little inside it) to be seen.
       // (Flowers that open on bare wood stay on the twigs.)
       const leafy = orn.to == null || orn.to > 8;
-      const reach = leafy ? (p.D * 1.3 + (p.leafLen || p.D) * 0.9) * (hang ? 0.6 : 1.15) : 0;
+      // Smoke sits down among the leaves, not out past them.
+      const reach = leafy ? (p.D * 1.3 + (p.leafLen || p.D) * 0.9) * (orn.type === 'smoke' ? 0.35 : hang ? 0.6 : 1.15) : 0;
       const out = V(b.x, 0, b.z).normalize().multiplyScalar(0.7).add(dir.clone().multiplyScalar(0.5)).add(V(0, hang ? 0 : 0.3, 0)).normalize();
       const at = b.clone().addScaledVector(out, reach);
       for (let k = 0; k < reps; k++) {
@@ -796,6 +797,9 @@ export function growConifer(p) {
   const nWhorls = Math.max(5, Math.round(crownH / whorl));
   const ascend = sp.ascend ?? { spruce: -0.12, bluespruce: -0.06, norway: 0.05 }[p.key] ?? (p.key === 'arborvitae' || p.key === 'juniper' ? 0.9 : 0.35);
   const flat = p.key === 'arborvitae' || p.key === 'juniper';
+  // Upright junipers are fastigiate: limbs leave the trunk low and climb
+  // steeply, and every spray of foliage stands up like a flame.
+  const upright = p.key === 'juniper';
   const shootCount = Math.max(1, p.target);
   const branches = [];
   for (let j = 0; j < nWhorls; j++) {
@@ -808,10 +812,16 @@ export function growConifer(p) {
       const a = (k / n) * Math.PI * 2 + j * GOLDEN + (r() - 0.5) * 0.4;
       const dir = V(Math.cos(a), 0, Math.sin(a));
       let len = L * (0.85 + 0.25 * r()) * (flat ? 0.9 : 1);
-      const start = V(0, y - (flat ? len * 0.4 : 0), 0);
+      const start = V(0, upright ? Math.max(cb * 0.6, y - len * 1.7) : y - (flat ? len * 0.4 : 0), 0);
       // Spruce: out and slightly down, tips lifting. Pines and cedars ascend.
       let end = start.clone().addScaledVector(dir, len).addScaledVector(UP, len * ascend + (p.key === 'norway' ? len * 0.12 : 0));
       let mid = start.clone().addScaledVector(dir, len * 0.55).addScaledVector(UP, len * (ascend - (flat ? 0 : 0.16)));
+      if (upright) {
+        // out a little, then straight up inside the outline
+        end = V(dir.x * len, y, dir.z * len);
+        mid = V(dir.x * len * 0.8, start.y + (y - start.y) * 0.45, dir.z * len * 0.8);
+        len = Math.hypot(len, y - start.y);
+      }
       if (sp.weep) {
         // Weeping spruce: a short limb that turns over and hangs against the trunk.
         const reach = L * (0.75 + 0.2 * r());
@@ -859,18 +869,21 @@ export function growConifer(p) {
     const perSec = Math.max(2, Math.round(budget / (nSec + 1)));
     const side = V().crossVectors(b.dir, UP).normalize();
     for (let s = 0; s <= nSec; s++) {
-      const t = 0.15 + (s / nSec) * 0.85;
+      // An upright limb is bare where it runs up beside the trunk: its foliage is all on the outer part.
+      const t0 = upright ? 0.38 : 0.15;
+      const t = t0 + (s / nSec) * (1 - t0);
       const seg = t * (b.pts.length - 1);
       const k = Math.min(b.pts.length - 2, Math.floor(seg));
       const at = V().lerpVectors(b.pts[k], b.pts[k + 1], seg - k);
       const along = V().subVectors(b.pts[k + 1], b.pts[k]).normalize();
       const sign = s % 2 ? 1 : -1;
-      const lenSec = (b.len * (sp.weep ? 0.12 : 0.45) * (1 - t * 0.7) + scaleSeg * 0.6) * (0.8 + 0.4 * r());
+      const lenSec = (b.len * (sp.weep ? 0.12 : upright ? 0.16 : 0.45) * (1 - t * 0.7) + scaleSeg * 0.6) * (0.8 + 0.4 * r());
       let dir2;
       if (s === nSec) dir2 = along.clone();
       // Norway spruce: most branchlets hang in curtains, the rest lie flat
       // along the limb so the crown still closes over from above.
       else if (pend && t > 0.25 && r() < pend) dir2 = V(along.x * 0.15, -1, along.z * 0.15).addScaledVector(side, sign * 0.1).normalize();
+      else if (upright) dir2 = along.clone().multiplyScalar(0.5).addScaledVector(side, sign * 0.45).addScaledVector(b.dir, 0.25).addScaledVector(UP, 1).normalize();
       else dir2 = along.clone().multiplyScalar(0.55).addScaledVector(side, sign * 0.8).addScaledVector(UP, flat ? 0.5 : 0.05).normalize();
       const end = at.clone().addScaledVector(dir2, lenSec);
       if (lenSec > 0.4 && s !== nSec) chains.push({ pts: [at, end], rs: [0.022, 0.01] });
@@ -878,7 +891,8 @@ export function growConifer(p) {
         const tt = (q + 0.5) / perSec;
         const pos = V().lerpVectors(at, end, tt).addScaledVector(randUnit(r), 0.05);
         // Shoot axis: along the branchlet, with a little splay.
-        const axis = dir2.clone().addScaledVector(randUnit(r), flat ? 0.35 : 0.3).normalize();
+        const axis = upright ? dir2.clone().multiplyScalar(0.35).addScaledVector(UP, 1).addScaledVector(randUnit(r), 0.28).normalize()
+          : dir2.clone().addScaledVector(randUnit(r), flat ? 0.35 : 0.3).normalize();
         // Arborvitae holds flat, vertical fans; juniper cords point every which way.
         const face = p.key === 'arborvitae' ? V().crossVectors(axis, V().crossVectors(UP, axis).normalize()).normalize()
           : UP.clone().addScaledVector(randUnit(r), p.key === 'juniper' ? 1.4 : 0.5).addScaledVector(axis, -UP.dot(axis)).normalize();

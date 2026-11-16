@@ -1,5 +1,11 @@
 # Handoff: smoke-tree plumes (plus notes on arborvitae, junipers, perennials)
 
+> **Status, Nov 16:** done on this branch. Smoke trees are a `smoketree` species in the botany engine (round leaves,
+> a `smoke` ornament). Upright junipers grow fastigiate with foliage standing vertical, arborvitae has a new spray
+> texture (`paintArborvitae` in `leafArt.js`), and bed shrubs are rebuilt on a twig framework with no core solid
+> (`bush()` in `src/garden/models.js`). Still open: clump trees, and removing the dead `src/trees/trees.js`.
+> The rest of this page is the original brief, kept for reference.
+
 Branch: `claude/yard-studio-v2-diorama`. Run `npm ci && npm run dev`, then open `/` (the app) or `/gallery.html` (every bed plant, rendered).
 
 ## Why this is needed

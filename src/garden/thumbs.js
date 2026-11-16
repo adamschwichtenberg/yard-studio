@@ -35,7 +35,7 @@ export function showSeason(p){
 const cache = new Map();
 /* a data URL of plant `p`; `season` defaults to its best day */
 export function plantThumb(p, {season, width = 320, height = 240, turn = .6} = {}){
-  const key = [p.k, season ? JSON.stringify(season) : "", width, height].join("|");
+  const key = [p.k, p.custom ? [p.h, p.w, p.foliage, p.flower] : "", season ? JSON.stringify(season) : "", width, height].join("|");
   let url = cache.get(key);
   if(url) return url;
   const {renderer, scene, camera, ground, holder} = studio();

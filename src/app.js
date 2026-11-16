@@ -15,7 +15,7 @@ import { Tour } from "./tour.js";
 import DEFAULT_PLAN from "./defaultPlan.json";
 import { LotMap } from "./lotmap.js";
 import { store, newPlanId, canUseFiles, pickSaveFile, pickOpenFile, filePermission, writeFile, readFile, fileName } from "./planstore.js";
-import { PLANTS, CATEGORIES, plantByKey, symbolColor, sunClass, SUN_LABEL, sunNeeds, bloomText, bedLegend, winterHabit } from "./garden/plants.js";
+import { PLANTS, CATEGORIES, plantByKey, symbolColor, sunClass, SUN_LABEL, sunNeeds, bloomText, bedLegend, winterHabit, setCustomPlants, customPlants } from "./garden/plants.js";
 import { symbolPath, MODELS } from "./garden/models.js";
 import { plantThumb } from "./garden/thumbs.js";
 import { MULCHES, bedOutline, starterOutline, plantRadius, plantAt, bedSeasonKey, buildPlantingBed } from "./garden/beds.js";
@@ -497,7 +497,7 @@ function baseState(){
     place:"Fargo, ND", tzMode:"zone", tzZone:"America/Chicago",
     date: isoToday(), minutes: 13*60,
     north:0, grid:5, snap:true, showGrid:true, simple:false, gridFrame:null,
-    plantView:"plants", plantLabels:true,
+    plantView:"plants", plantLabels:true, customPlants:[],
     yard:{w:120, h:90},
     boundary: rectPoly(120, 90),
     boundaryLabels:[], boundaryImage:null, boundaryImageDraft:null,
@@ -2599,11 +2599,11 @@ function setObsMode(m){
 }
 /* ---------- locking the layout while building ---------- */
 let lockToastT = 0;
-function lockedHint(){
+function lockedHint(own){
   const now = performance.now();
   if(now - lockToastT < 2500) return;
   lockToastT = now;
-  toast("Items are locked in place. Press L or the lock button to move them.");
+  toast(own ? "This bed is locked in place. Unlock it in its panel to move it." : "Items are locked in place. Press L or the lock button to move them.");
 }
 function setLocked(v){
   S.locked = !!v;
@@ -2681,6 +2681,10 @@ function loop(){
     renderer.shadowMap.needsUpdate = true;
     lastSunKey = sunKey; lastShadowStamp = shadowStamp;
   }
+  /* Plan symbols are flat colour, some of it white: with the bloom pass on, a
+     white-flowered plant would glow. Bloom is only for the sun, so it sits out
+     while symbols are showing. */
+  post.setBloom(!(plantMode() === "symbols" && S.objects.some(isPlanting)));
   post.render();
   updateLabels();
   updateShapeEditor();
@@ -3245,8 +3249,8 @@ canvas.addEventListener("pointerdown", e=>{
     select(hitObj.id);
     tapSel = {x:e.clientX, y:e.clientY, t:performance.now()};
     const g = groundAt(e.clientX, e.clientY);
-    if(g && !S.locked){ dragObj = hitObj; dragOff = {x:hitObj.x-g.x, y:hitObj.y-g.y}; mode = "drag"; return; }
-    if(S.locked) lockGrab = {x:e.clientX, y:e.clientY};
+    if(g && !S.locked && !hitObj.locked){ dragObj = hitObj; dragOff = {x:hitObj.x-g.x, y:hitObj.y-g.y}; mode = "drag"; return; }
+    if(S.locked || hitObj.locked) lockGrab = {x:e.clientX, y:e.clientY, own:!S.locked};
   }
   mode = activeView === "vplan" ? "pan" : "orbit";
   if(mode === "pan"){
@@ -3297,7 +3301,7 @@ canvas.addEventListener("pointermove", e=>{
     return;
   }
   if(!prev) return;
-  if(lockGrab && Math.hypot(e.clientX - lockGrab.x, e.clientY - lockGrab.y) > 6){ lockedHint(); lockGrab = null; }
+  if(lockGrab && Math.hypot(e.clientX - lockGrab.x, e.clientY - lockGrab.y) > 6){ lockedHint(lockGrab.own); lockGrab = null; }
   const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
   if(mode === "orbit" && activeView !== "vplan"){
     orbit.az -= dx*.3;
@@ -3480,6 +3484,7 @@ function updatePlantRing(){
 function setStamp(k){
   if(!design) return;
   design.stamp = k || null; design.sel = null;
+  if(design.edit && design.edit !== design.stamp) design.edit = null;
   stampGhost = dropHelper(stampGhost);
   if(design.stamp){
     const r = plantByKey(design.stamp).w/2;
@@ -3546,7 +3551,10 @@ function enterDesign(o){
   nodeEdit = false; activeNode = null;
   if(S.sel !== o.id) select(o.id);
   setTool("select");
-  design = {bedId:o.id, sel:null, stamp:null, cat:"all", q:"", view:"symbols", sunWasOpen:!$("sunpanel").classList.contains("min")};
+  /* where the camera was, to go back to when designing is done */
+  const back = design?.back || {view:activeView, orbit:{...orbit}};
+  design = {bedId:o.id, sel:null, stamp:null, edit:null, cat:"all", size:"all", colour:"", q:"", view:"symbols", back,
+            sunWasOpen:!$("sunpanel").classList.contains("min")};
   document.body.classList.add("designing");
   /* the sun card would sit on top of the bed; tuck it away while designing */
   if(design.sunWasOpen){ $("sunpanel").classList.add("min"); syncSunH(); }
@@ -3568,6 +3576,7 @@ function exitDesign(quiet){
   if(!design) return;
   const changed = plantMode() !== (S.plantView === "symbols" ? "symbols" : "plants");
   if(design.sunWasOpen){ $("sunpanel").classList.remove("min"); syncSunH(); }
+  const back = design.back;
   design = null;
   document.body.classList.remove("designing");
   plantRing = dropHelper(plantRing); stampGhost = dropHelper(stampGhost);
@@ -3575,7 +3584,92 @@ function exitDesign(quiet){
   if(changed) rebuildPlantings();
   syncLayers(); applyDesignVisibility();
   if(!quiet){ updateSelection(); panelFor = null; drawPanel(); }
+  /* back to the view and the spot the designer was opened from */
+  if(back && !restoreView){
+    if(back.view !== activeView) setView(back.view);
+    flyTo({...back.orbit}, 500);
+  }
   markDirty();
+}
+let restoreView = false;      // set while a plan loads: the camera is about to be reframed anyway
+
+/* ---------- a plan's own varieties ---------- */
+const customRec = k=>(S.customPlants || []).find(c=>c.k === k) || null;
+function customChanged(){
+  setCustomPlants(S.customPlants);
+  rebuildPlantings(); updatePlantRing(); scheduleCompute(); scheduleHist(); drawList();
+}
+/* make an editable copy of a catalogue plant and open its editor */
+function customizePlant(k){
+  if(!design) return;
+  let rec = customRec(k);
+  if(!rec){
+    const p = plantByKey(k);
+    if(p.k === "?") return;
+    S.customPlants ??= [];
+    rec = {k:"my-"+nid()+"-"+p.k, base:p.k, n:p.n.replace(/\s*\(my own\)$/, "")+" (my own)", h:p.h, w:p.w};
+    S.customPlants.push(rec);
+    setCustomPlants(S.customPlants);
+    /* the plant in hand becomes the new variety */
+    const pl = designPlant();
+    if(pl && pl.k === k) pl.k = rec.k;
+    if(design.stamp === k) design.stamp = rec.k;
+    rebuildPlantings(); scheduleHist(); drawList();
+  }
+  design.edit = rec.k;
+  panelFor = null; drawPanel();
+  props.querySelector(".custed")?.scrollIntoView({block:"start"});
+}
+function removeCustom(k){
+  const rec = customRec(k);
+  if(!rec) return;
+  /* plants of this variety go back to the catalogue plant it came from */
+  for(const o of S.objects) for(const pl of o.plants || []) if(pl.k === k) pl.k = rec.base;
+  S.customPlants = S.customPlants.filter(c=>c.k !== k);
+  if(design){ if(design.stamp === k) setStamp(null); design.edit = null; }
+  customChanged(); panelFor = null; drawPanel();
+}
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+function customEditorHTML(k){
+  const rec = customRec(k), p = plantByKey(k);
+  if(!rec || !p.custom) return "";
+  const base = plantByKey(rec.base), used = S.objects.reduce((n, o)=>n + (o.plants || []).filter(pl=>pl.k === k).length, 0);
+  const col = (lab, key, v)=>`<div class="field"><span class="lab">${lab}</span><span class="inp colr"><input type="color" data-cust="${key}" value="${hexCss(v)}" aria-label="${lab}"></span></div>`;
+  const month = (key, md)=>`<select data-cust="${key}" aria-label="${key === "from" ? "Bloom starts" : "Bloom ends"}">${MONTH_NAMES.map((m, i)=>`<option value="${i+1}" ${+md.slice(0,2) === i+1 ? "selected" : ""}>${m.slice(0,3)}</option>`).join("")}</select>`;
+  return `<div class="isec custed"><div class="fh"><h4>Your own variety</h4><span>${used} planted</span></div>
+    <p class="hint" style="margin:0 0 8px">Drawn on the form of ${escapeHTML(base.n)}. Set the size and colours of the plant you actually have.</p>
+    <div class="field"><span class="lab">Name</span><span class="inp" style="flex:1.8"><input type="text" data-cust="n" maxlength="80" value="${escapeHTML(p.n)}" aria-label="Name"></span></div>
+    <div class="field"><span class="lab">Height</span><span class="inp"><input type="number" inputmode="decimal" data-cust="h" min="${dl(.2, 1)}" max="${dl(30, 1)}" step="${dstep(.25)}" value="${dl(p.h, 2)}" aria-label="Height"><span class="u">${lu()}</span></span></div>
+    <div class="field"><span class="lab">Spread</span><span class="inp"><input type="number" inputmode="decimal" data-cust="w" min="${dl(.3, 1)}" max="${dl(30, 1)}" step="${dstep(.25)}" value="${dl(p.w, 2)}" aria-label="Spread"><span class="u">${lu()}</span></span></div>
+    ${col("Leaf colour", "foliage", p.foliage)}
+    ${base.flower != null ? col(base.bloomLabel ? "Bloom colour" : "Flower colour", "flower", symbolColor({...p, symbol:null})) : ""}
+    ${base.bloom ? `<div class="field"><span class="lab">${escapeHTML(base.bloomLabel || "Blooms")}</span><span class="months">${month("from", p.bloom.from)}<i>to</i>${month("to", p.bloom.to)}</span></div>` : ""}
+    <div class="btnrow"><button class="btn" data-act="custdone">Done</button><button class="btn danger" data-act="custdel" title="Plants of this variety go back to ${escapeHTML(base.n)}">Delete variety</button></div></div>`;
+}
+function customInput(el){
+  const rec = design ? customRec(design.edit) : null, key = el.dataset.cust;
+  if(!rec) return;
+  if(key === "n"){ const v = el.value.trim(); if(!v) return; rec.n = v.slice(0, 80); }
+  else if(key === "h" || key === "w"){
+    const v = fromDl(parseFloat(el.value));
+    if(!(v > 0)) return;
+    rec[key] = rnd(clamp(v, key === "h" ? .2 : .3, 30), 2);
+  }
+  else if(key === "foliage" || key === "flower") rec[key] = parseInt(el.value.slice(1), 16);
+  else if(key === "from" || key === "to"){
+    const cur = plantByKey(rec.k).bloom, m = String(clamp(+el.value, 1, 12)).padStart(2, "0");
+    const b = {from:cur.from, to:cur.to};
+    if(key === "from") b.from = m+"-01"; else b.to = m+"-28";
+    if(b.from >= b.to){ toast("The bloom has to end after it starts."); el.value = +cur[key].slice(0, 2); return; }
+    rec.bloom = b;
+  }
+  customChanged();
+  /* refresh what shows the variety, leaving the editor's boxes alone */
+  const o = designBed();
+  if(o){
+    const host = props.querySelector(".palette"); if(host) host.innerHTML = paletteRowsHTML(o);
+    const key2 = props.querySelector(".plegend"); if(key2) key2.outerHTML = legendHTML(o, true);
+  }
 }
 
 /* ---------- planting bed panels ---------- */
@@ -3621,10 +3715,17 @@ function plantCardHTML(bed, pl){
     ${h == null ? `<p class="hint">Measuring the sun on this spot…</p>`
       : `<div class="fit ${ok ? "ok" : "bad"}"><svg class="ic"><use href="#i-${ok ? "check" : "close"}"/></svg><span>This spot gets <b class="num">${h.toFixed(1)} h</b> of direct sun on ${day}: ${SUN_LABEL[cls].toLowerCase()}. ${ok ? "That suits it." : "It wants "+sunNeeds(p).toLowerCase()+"."}</span></div>`}
     ${p.note ? `<p class="profile">${escapeHTML(p.note)}</p>` : ""}
-    <div class="btnrow"><button class="btn" data-stamp="${escapeHTML(pl.k)}">Place more</button><button class="btn danger" data-act="delplant">Remove plant</button></div></div>`;
+    <div class="btnrow"><button class="btn" data-stamp="${escapeHTML(pl.k)}">Place more</button><button class="btn" data-custom="${escapeHTML(pl.k)}" title="Set your own size, colours and bloom time for this plant">${p.custom ? "Edit size & colour" : "Customize size & colour"}</button></div>
+    <div class="btnrow"><button class="btn danger" data-act="delplant">Remove plant</button></div></div>`;
 }
+const PAL_SIZES = [["all","Any height"],["xs","Under 1 ft"],["s","1 to 2 ft"],["m","2 to 4 ft"],["l","4 to 6 ft"],["xl","Over 6 ft"]];
+const PAL_SIZE_RANGE = {xs:[0, 1], s:[1, 2], m:[2, 4], l:[4, 6], xl:[6, 99]};
 function paletteMatches(p){
   if(design.cat !== "all" && p.cat !== design.cat) return false;
+  const sz = PAL_SIZE_RANGE[design.size];
+  if(sz && (p.h < sz[0] || p.h >= sz[1]) && !(p.h === sz[1] && sz[1] === 99)) return false;
+  if(design.colour === "foliage"){ if(p.flower != null) return false; }
+  else if(design.colour && !plantColours(p).includes(design.colour)) return false;
   if(!design.q) return true;
   const hay = (p.n+" "+(p.sci||"")+" "+p.cat+" "+(p.note||"")).toLowerCase();
   return design.q.split(/\s+/).every(w=>hay.includes(w));
@@ -3632,9 +3733,11 @@ function paletteMatches(p){
 function paletteRowsHTML(bed){
   const st = bedStats.get(bed.id), cls = st ? sunClass(st.avg, S.fullSun) : null;
   let rows = "", last = null;
-  for(const p of PLANTS){
-    if(!paletteMatches(p)) continue;
-    if(p.model !== last){ last = p.model; rows += `<div class="palhead">${escapeHTML(MODELS[p.model]?.label || "")}</div>`; }
+  const mine = customPlants().filter(paletteMatches);
+  for(const p of [...mine, ...PLANTS]){
+    if(!p.custom && !paletteMatches(p)) continue;
+    const head = p.custom ? "My plants" : MODELS[p.model]?.label || "";
+    if(head !== last){ last = head; rows += `<div class="palhead">${escapeHTML(head)}</div>`; }
     rows += `<button class="prow" data-stamp="${escapeHTML(p.k)}" aria-pressed="${design.stamp === p.k}">
       ${swatchSVG(p)}<span class="tx"><b>${escapeHTML(p.n)}</b><i>${plantSize(p)} · ${bloomText(p)}</i></span>
       ${cls && !p.sun.includes(cls) ? `<span class="pwarn" title="This bed averages ${SUN_LABEL[cls].toLowerCase()}; it wants ${sunNeeds(p).toLowerCase()}">${sunNeeds(p)}</span>` : ""}</button>`;
@@ -3648,14 +3751,19 @@ function designPanelHTML(o){
         <button data-plantview="plants" aria-pressed="${plantMode() !== "symbols"}">Plants</button></div>
       <label class="chk"><input type="checkbox" class="sw" data-plantlabels ${S.plantLabels ? "checked" : ""}>Numbers</label></div>`
     + (pl ? plantCardHTML(o, pl) : "")
-    + (stamp ? `<div class="isec stamping"><b>Placing ${escapeHTML(stamp.n)}</b><span>Click in the bed for each one. Esc when done.</span><button class="btn" data-stamp="">Stop</button></div>` : "")
+    + (stamp ? `<div class="isec stamping"><b>Placing ${escapeHTML(stamp.n)}</b><span>${plantSize(stamp)}. Click in the bed for each one. Esc when done.</span><button class="btn" data-stamp="">Stop</button>
+        <button class="btn sizeit" data-custom="${escapeHTML(stamp.k)}">${stamp.custom ? "Edit size & colour" : "Customize size & colour"}</button></div>` : "")
+    + (design.edit ? customEditorHTML(design.edit) : "")
     + `<div class="isec"><div class="fh"><h4>Plant palette</h4><span>Pick one, then click in the bed</span></div>
       <div class="btnrow" style="margin:0 0 10px"><button class="btn accent" data-act="plantlib">Browse the plant library</button></div>
       <div class="seg tiny pcats">${[{k:"all", label:"All"}, ...CATEGORIES].map(c=>`<button data-plantcat="${c.k}" aria-pressed="${design.cat === c.k}">${c.label}</button>`).join("")}</div>
+      <div class="pfilters"><select data-plantsize aria-label="Filter by height">${PAL_SIZES.map(([k, label])=>`<option value="${k}" ${design.size === k ? "selected" : ""}>${label}</option>`).join("")}</select>
+        <select data-plantcolour aria-label="Filter by flower colour"><option value="">Any colour</option>${COLOURS.map(([k, label])=>`<option value="${k}" ${design.colour === k ? "selected" : ""}>${label} flowers</option>`).join("")}<option value="foliage" ${design.colour === "foliage" ? "selected" : ""}>Foliage only</option></select></div>
       <label class="search psearch"><svg class="ic"><use href="#i-search"/></svg><input type="search" data-plantsearch placeholder="Search plants" value="${escapeHTML(design.q)}" aria-label="Search plants"></label>
       <div class="palette">${paletteRowsHTML(o)}</div></div>`
     + `<div class="isec"><div class="fh"><h4>Planting key</h4><span>${o.plants.length} plant${o.plants.length === 1 ? "" : "s"}</span></div>${legendHTML(o, true)}</div>`
     + `<p class="hint">Drag a plant to move it. Alt-drag copies it. Delete removes the selected plant. Plants can overlap and reach past the bed edge.</p>`
+    + `<div class="swrow"><span>Lock the bed in place</span><input type="checkbox" class="sw" data-key="locked" ${o.locked ? "checked" : ""} aria-label="Lock the bed in place"></div>`
     + `<div class="ifoot">${o.plants.length ? `<button class="btn danger" data-act="clearplants">Clear bed</button>` : ""}<span class="grow"></span><button class="btn solid" data-act="enddesign">Done designing</button></div>`;
 }
 function plantKeyHTML(o){
@@ -3670,6 +3778,8 @@ function plantingPanelHTML(o, nameRow){
     + `<div class="plkey">${plantKeyHTML(o)}</div>`
     + `<div class="bedins" style="margin-top:14px;border-top:1px solid var(--line-2)">${bedInsightsHTML(o)}</div>`
     + `<h4 style="margin-top:18px">Bed shape</h4>` + outlineHTML(o)
+    + `<div class="swrow"><span>Lock in place</span><input type="checkbox" class="sw" data-key="locked" ${o.locked ? "checked" : ""} aria-label="Lock in place"></div>`
+    + `<p class="hint" style="margin-top:2px">A locked bed cannot be dragged or reshaped by accident. You can still select it and design it.</p>`
     + `<div class="swrow"><span>Curved edge</span><input type="checkbox" class="sw" data-key="smooth" ${o.smooth ? "checked" : ""} aria-label="Curved edge"></div>`
     + `<div class="field"><span class="lab">Surface</span><span style="flex:1.4"><select data-key="mulch">${
         Object.entries(MULCHES).map(([k,v])=>`<option value="${k}" ${k === (o.mulch || "bark") ? "selected" : ""}>${v.label}</option>`).join("")}</select></span></div>`
@@ -3908,7 +4018,7 @@ function bloomLabel(o){
   const k = o.type === "tree" && !o.evergreen ? speciesFor(o) : null;
   const p = presetFor(o);
   if(p?.bt) return p.bt;
-  return k === "crabapple" ? "Blooms in spring" : k === "hydrangea" ? "Blooms midsummer to fall" : "";
+  return k === "crabapple" ? "Blooms in spring" : k === "hydrangea" ? "Blooms midsummer to fall" : k === "smoketree" ? "Smoke in summer" : "";
 }
 /* ---------- growth: planting year, size, and what to expect ---------- */
 function growthClass(g){ return g <= 1 ? "slow" : g < 2.05 ? "medium" : "fast"; }
@@ -4144,7 +4254,7 @@ function drawPanel(){
   const key = [o.id, nodeEdit, activeNode, o.poly?o.poly.length:0, o.type === "tree" ? o.name + (o.planted ? "|p" : "") : "",
     isPlanting(o) ? [o.plants.length, !!design].join(",") : ""].join("|");
   /* the designer's panel is all live state: redraw it unless the search box is in use */
-  if(design && panelFor === key && !props.querySelector("[data-plantsearch]:focus")) panelFor = null;
+  if(design && panelFor === key && !props.querySelector("[data-plantsearch]:focus,[data-cust]:focus")) panelFor = null;
   if(panelFor === key){
     if(o.type === "boundary" && !props.contains(document.activeElement)){
       panelFor = "init";
@@ -4255,7 +4365,19 @@ function drawPanel(){
       + `<div class="clearbox">${clearanceHTML(o)}</div>`;
   }
   if(!design) html += footHTML(o);
+  /* Redrawing the designer must not move the plant list under the pointer:
+     keep the list's own scroll, and keep it where it sat on screen. */
+  const pal0 = design ? props.querySelector(".palette") : null, body = $("inspbody");
+  const keep = pal0 ? {scroll:pal0.scrollTop, top:pal0.getBoundingClientRect().top, body:body.scrollTop} : null;
   props.innerHTML = html;
+  if(keep){
+    const pal = props.querySelector(".palette");
+    if(pal){
+      pal.scrollTop = keep.scroll;
+      body.scrollTop = keep.body;
+      body.scrollTop += pal.getBoundingClientRect().top - keep.top;
+    }
+  }
   syncRanges(props);
   if(o.type === "tree" || o.type === "bed" || o.type === "fence") setTimeout(()=>tourTip(o.type), 400);
 }
@@ -4319,6 +4441,14 @@ props.addEventListener("input", e=>{
     if(host) host.innerHTML = paletteRowsHTML(o);
     return;
   }
+  if(e.target.hasAttribute("data-plantsize") || e.target.hasAttribute("data-plantcolour")){
+    if(!design) return;
+    if(e.target.hasAttribute("data-plantsize")) design.size = e.target.value; else design.colour = e.target.value;
+    const host = props.querySelector(".palette");
+    if(host){ host.innerHTML = paletteRowsHTML(o); host.scrollTop = 0; }
+    return;
+  }
+  if(e.target.hasAttribute("data-cust")){ customInput(e.target); return; }
   if(e.target.hasAttribute("data-plantlabels")){
     S.plantLabels = e.target.checked; scheduleHist(); markDirty();
     return;
@@ -4405,12 +4535,21 @@ props.addEventListener("click", e=>{
     return;
   }
   if(design){
+    const cu = e.target.closest("[data-custom]");
+    if(cu){ customizePlant(cu.dataset.custom); return; }
     const st = e.target.closest("[data-stamp]");
     if(st){ setStamp(st.dataset.stamp === design.stamp ? null : st.dataset.stamp); return; }
     const pv = e.target.closest("[data-plantview]");
     if(pv){ setPlantView(pv.dataset.plantview); return; }
     const pc = e.target.closest("[data-plantcat]");
-    if(pc){ design.cat = pc.dataset.plantcat; panelFor = null; drawPanel(); return; }
+    if(pc){
+      /* filter in place: the rest of the panel stays put */
+      design.cat = pc.dataset.plantcat;
+      props.querySelectorAll("[data-plantcat]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.plantcat === design.cat));
+      const host = props.querySelector(".palette");
+      if(host){ host.innerHTML = paletteRowsHTML(selected()); host.scrollTop = 0; }
+      return;
+    }
   }
   const btn = e.target.closest("button[data-act]");
   if(!btn) return;
@@ -4419,6 +4558,8 @@ props.addEventListener("click", e=>{
   if(act === "design"){ enterDesign(o); return; }
   if(act === "plantlib"){ openLibrary("place", "plants"); return; }
   if(act === "enddesign"){ exitDesign(); return; }
+  if(act === "custdone" && design){ design.edit = null; panelFor = null; drawPanel(); return; }
+  if(act === "custdel" && design?.edit){ removeCustom(design.edit); return; }
   if(act === "delplant" && design?.sel != null){ removePlant(design.sel); return; }
   if(act === "clearplants" && isPlanting(o)){
     askUser("Clear this bed?", "This removes all "+o.plants.length+" plants from "+o.name+". The bed itself stays. Undo brings them back.",
@@ -4438,7 +4579,7 @@ props.addEventListener("click", e=>{
   }
   if(act === "resetgrid" && o.type === "boundary"){ resetGridReference(); return; }
   if(act === "nodes"){
-    if(S.locked && !nodeEdit){ lockedHint(); return; }
+    if((S.locked || o.locked) && !nodeEdit){ lockedHint(!S.locked); return; }
     nodeEdit = !nodeEdit;
     if(!nodeEdit) activeNode = null;
     else { exitDesign(true); setView("vplan"); }
@@ -5789,6 +5930,7 @@ function loadState(data, frame){
   camAnim = null;
   pointers.clear(); panGrab = null; pinch = null; mode = null; dragObj = null;
   hist.lock = true;
+  restoreView = true;
   try{
     S = Object.assign(baseState(), data);
     /* Presets that were renamed or replaced. */
@@ -5810,6 +5952,8 @@ function loadState(data, frame){
       }
     }
     if(S.plantView !== "symbols") S.plantView = "plants";
+    if(!Array.isArray(S.customPlants)) S.customPlants = [];
+    setCustomPlants(S.customPlants);
     if(design && !designBed()) exitDesign(true);
     ensureFenceSides();
     if(gridFrame().angle !== priorGridAngle){
@@ -5827,7 +5971,7 @@ function loadState(data, frame){
     scheduleCompute();
     if(frame) fitYard();
   } finally {
-    hist.lock = false;
+    hist.lock = false; restoreView = false;
   }
 }
 

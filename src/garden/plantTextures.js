@@ -104,6 +104,60 @@ function sprig(o){
     shoot(N/2, N*.99, (r() - .5)*.08, N*(branches ? .7 : .66), branches ? Math.round(n/branches) + 2 : n, 1);
   };
 }
+/* A woody shoot the way a shrub carries one: a leader with side shoots leaving
+   it at intervals, leaves set along each in pairs (`opp`) or alternately, some
+   turned edge-on, the ones behind in shade. Drawn in two passes, far leaves
+   first, so the card has depth of its own.
+     len    leaf length as a share of the card     asp   leaf width / length
+     gap    spacing of leaves along a shoot, in leaf lengths
+     sides  side shoots      sub    side shoots carry their own
+     lobes  three-lobed leaves (ninebark, currant, viburnum) */
+function twig(o){
+  return (g, N, r)=>{
+    const {len = .15, asp = .55, gap = .5, sides = 5, sub = false, opp = false, lobes = 0, edge = false, angle = .95, tip = .75, lean = .75} = o;
+    const shoots = [];
+    const grow = (x0, y0, ang, L, depth)=>{
+      /* a gentle curve: three points */
+      const bendA = ang + (r() - .5)*.35, xm = x0 + Math.sin(ang)*L*.5, ym = y0 - Math.cos(ang)*L*.5;
+      const x1 = xm + Math.sin(bendA)*L*.5, y1 = ym - Math.cos(bendA)*L*.5;
+      shoots.push({x0, y0, xm, ym, x1, y1, ang, bendA, L, depth});
+      if(depth === 0 || (sub && depth === 1)){
+        const k = depth ? 2 : sides;
+        for(let i = 0; i < k; i++){
+          const t = depth ? .35 + .3*i : .1 + .68*(i + .5)/k, sd = (i%2 ? 1 : -1)*(depth && ang < 0 ? -1 : 1);
+          const px = t < .5 ? x0 + (xm - x0)*t*2 : xm + (x1 - xm)*(t - .5)*2, py = t < .5 ? y0 + (ym - y0)*t*2 : ym + (y1 - ym)*(t - .5)*2;
+          grow(px, py, ang + sd*lean*(1 - t*.3) + (r() - .5)*.2, L*(depth ? .5 : .62*(1 - t*.55))*(.85 + r()*.3), depth + 1);
+        }
+      }
+    };
+    grow(N/2, N*.995, (r() - .5)*.06, N*(.93 - len*.8), 0);
+    const leaves = [];
+    for(const s of shoots){
+      const at = t=>t < .5 ? [s.x0 + (s.xm - s.x0)*t*2, s.y0 + (s.ym - s.y0)*t*2, s.ang] : [s.xm + (s.x1 - s.xm)*(t - .5)*2, s.ym + (s.y1 - s.ym)*(t - .5)*2, s.bendA];
+      const ll0 = N*len*(s.depth ? .88 : 1), step = ll0*gap/Math.max(1, s.L);
+      let k = 0;
+      for(let t = (s.depth ? .12 : .06) + step*r()*.5; t < .97; t += step*(.8 + r()*.4), k++){
+        const [x, y, a] = at(t);
+        for(const sd of opp ? [1, -1] : [k%2 ? 1 : -1]){
+          /* leaves near the tip are younger: smaller and held closer to the shoot */
+          const ll = ll0*(.72 + .28*Math.sin(Math.PI*Math.min(1, .15 + t)))*(.85 + r()*.3);
+          leaves.push({x, y, a:a + sd*(angle - t*.35) + (r() - .5)*.4, ll, w:asp*(r() < .3 ? .45 + r()*.3 : .85 + r()*.3), l:.5 + r()*.42, z:r()});
+        }
+      }
+      const [x, y, a] = at(1);
+      leaves.push({x, y, a:a + (r() - .5)*.3, ll:ll0*.9, w:asp, l:.82 + r()*.14, z:1});
+    }
+    /* far leaves, darker; then the wood; then the near leaves */
+    leaves.sort((p, q)=>p.z - q.z);
+    const cut = Math.floor(leaves.length*.4);
+    leaves.slice(0, cut).forEach(f=>leaf(g, f.x, f.y, f.ll, f.ll*f.w, f.a, f.l*.74, {edge, lobes, tip, vein:false}));
+    for(const s of shoots){
+      g.strokeStyle = ink(.4); g.lineCap = "round"; g.lineWidth = N*(s.depth === 0 ? .013 : s.depth === 1 ? .009 : .006);
+      g.beginPath(); g.moveTo(s.x0, s.y0); g.quadraticCurveTo(s.xm, s.ym, s.x1, s.y1); g.stroke();
+    }
+    leaves.slice(cut).forEach(f=>leaf(g, f.x, f.y, f.ll, f.ll*f.w, f.a, f.l, {edge, lobes, tip}));
+  };
+}
 /* a pinnate leaf: leaflets in pairs along a midrib; `sub` makes each one a small frond */
 function compound(o){
   return (g, N, r)=>{
@@ -522,19 +576,21 @@ function berries(){
 /* ---------- the catalogue of textures ---------- */
 const KINDS = {
   /* foliage sprigs */
-  "leaf:ovate":      [512, sprig({n:15, len:.19, asp:.5, branches:3})],
-  "leaf:ovate+edge": [512, sprig({n:15, len:.19, asp:.5, branches:3, edge:true})],
-  "leaf:heart":      [512, sprig({n:15, len:.17, asp:.74, branches:3})],
+  "leaf:ovate":      [512, twig({len:.17, asp:.56, gap:.62, sides:4, opp:true})],
+  "leaf:ovate+edge": [512, twig({len:.17, asp:.56, gap:.62, sides:4, opp:true, edge:true})],
+  "leaf:heart":      [512, twig({len:.16, asp:.8, gap:.66, sides:4, opp:true, tip:.6})],
   "leaf:lance":      [512, sprig({n:11, len:.3, asp:.24})],
   "leaf:lance+edge": [512, sprig({n:11, len:.3, asp:.24, edge:true})],
-  "leaf:lobed":      [512, sprig({n:12, len:.19, asp:.4, lobes:1, branches:3})],
-  "leaf:small":      [512, sprig({n:42, len:.14, asp:.52, branches:3})],
-  "leaf:small+edge": [512, sprig({n:42, len:.14, asp:.52, branches:3, edge:true})],
-  "leaf:fine":       [512, sprig({n:130, len:.1, asp:.5, branches:5})],
+  "leaf:lobed":      [512, twig({len:.16, asp:.5, gap:.7, sides:4, lobes:1})],
+  "leaf:small":      [512, twig({len:.085, asp:.6, gap:.5, sides:6, sub:true})],
+  "leaf:small+edge": [512, twig({len:.085, asp:.6, gap:.5, sides:6, sub:true, edge:true})],
+  "leaf:box":        [512, twig({len:.07, asp:.7, gap:.42, sides:7, sub:true, opp:true, lean:.6})],
+  "leaf:willow":     [512, twig({len:.17, asp:.24, gap:.34, sides:5, angle:.7})],
+  "leaf:fine":       [512, twig({len:.055, asp:.55, gap:.5, sides:8, sub:true})],
   "leaf:needle":     [512, sprig({n:110, len:.1, asp:.13, branches:5})],
   "leaf:carpet":     [256, carpet({})],
   /* conifers */
-  "leaf:spruce":     [512, conifer({shoots:9, needle:.05, spread:1.05, step:.011, fan:1.0, reach:.52})],
+  "leaf:spruce":     [512, conifer({shoots:10, needle:.042, spread:.95, step:.009, fan:.8, reach:.46, fork:true, width:.007})],
   "leaf:pine":       [512, conifer({shoots:5, needle:.17, tufts:true, fan:.7, reach:.42, width:.005})],
   "leaf:arborvitae": [512, conifer({shoots:9, scales:true, fan:.75, reach:.5})],
   "leaf:juniper":    [512, conifer({shoots:11, needle:.03, spread:.55, step:.014, fan:.5, reach:.5, fork:true, width:.007})],

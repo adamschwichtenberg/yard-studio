@@ -20,11 +20,59 @@ import { plantProto, symbolGeometry, seeded } from "./models.js";
 import { plantTexture } from "./plantTextures.js";
 
 export const MULCHES = {
-  bark:   {label:"Shredded bark", color:0x6b4a34, simple:0x3b2d22},
-  soil:   {label:"Bare soil",     color:0x8a745f, simple:0x30261d},
-  gravel: {label:"Pea gravel",    color:0xcfc6b4, simple:0x55534c},
-  none:   {label:"Lawn (no mulch)", color:null,   simple:null}
+  bark:      {label:"Mulch, dark brown",  color:0x6b4a34, simple:0x3b2d22},
+  barklight: {label:"Mulch, light brown", color:0xd9c7a4, simple:0x5a4634},
+  limestone: {label:"Buff limestone rock", rock:"limestone", simple:0x6e6452},
+  slate:     {label:"Slate rock (dark gray)", rock:"slate", simple:0x34373b},
+  river:     {label:"River rock",          rock:"river", simple:0x5c5953},
+  gravel:    {label:"Pea gravel",          color:0xcfc6b4, simple:0x55534c},
+  soil:      {label:"Bare soil",           color:0x8a745f, simple:0x30261d},
+  none:      {label:"Lawn (no mulch)",     color:null,   simple:null}
 };
+/* Rock surfaces: a small tiling picture of stones, painted once. Angular
+   chips for crushed limestone and slate, rounded cobbles for river rock. */
+const ROCKS = {
+  limestone: {base:"#8f7a58", tones:["#d9c39a", "#cdb488", "#e2d2b0", "#bfa174", "#d2b98a", "#c4aa82"], round:false, size:.07, feet:2.6},
+  slate:     {base:"#1f2226", tones:["#4a4f56", "#3b4047", "#5a6068", "#33373d", "#444a52", "#2c3036"], round:false, size:.085, feet:3},
+  river:     {base:"#4a4640", tones:["#b9b2a4", "#8f8a80", "#c9b89a", "#6f6c68", "#a89480", "#d6d0c4", "#7c6a5a", "#9aa0a2"], round:true, size:.085, feet:3}
+};
+const rockCache = new Map();
+function rockTexture(kind){
+  let t = rockCache.get(kind);
+  if(t) return t;
+  const K = ROCKS[kind], N = 512, c = document.createElement("canvas");
+  c.width = c.height = N;
+  const g = c.getContext("2d"), r = seeded(kind.length*977 + 5);
+  g.fillStyle = K.base; g.fillRect(0, 0, N, N);
+  const n = Math.round(1.9/(K.size*K.size));
+  for(let i = 0; i < n; i++){
+    const x = r()*N, y = r()*N, s = N*K.size*(.55 + .7*r()), rot = r()*Math.PI, col = K.tones[Math.floor(r()*K.tones.length)];
+    const sides = 5 + Math.floor(r()*3), rad = []; for(let k = 0; k < sides; k++) rad.push(.6 + .4*r());
+    /* drawn at the wrapped positions too, so the tile repeats without a seam */
+    for(const ox of [-N, 0, N]) for(const oy of [-N, 0, N]){
+      if(x + ox < -s || x + ox > N + s || y + oy < -s || y + oy > N + s) continue;
+      g.save(); g.translate(x + ox, y + oy); g.rotate(rot);
+      const path = k=>{
+        g.beginPath();
+        if(K.round) g.ellipse(0, 0, s*.62*k, s*.42*k, 0, 0, Math.PI*2);
+        else { for(let j = 0; j < sides; j++){ const a = j/sides*Math.PI*2; g[j ? "lineTo" : "moveTo"](Math.cos(a)*s*.58*rad[j]*k, Math.sin(a)*s*.46*rad[j]*k); } g.closePath(); }
+      };
+      g.translate(s*.06, s*.08); path(1.04); g.fillStyle = "rgba(0,0,0,.45)"; g.fill(); g.translate(-s*.06, -s*.08);
+      path(1); g.fillStyle = col; g.fill();
+      g.save(); path(1); g.clip();
+      g.fillStyle = "rgba(255,255,255,.16)"; g.fillRect(-s, -s, s*2, s*.85);
+      g.fillStyle = "rgba(0,0,0,.14)"; g.fillRect(-s, s*.12, s*2, s);
+      g.restore(); g.restore();
+    }
+  }
+  t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1/K.feet, 1/K.feet);          // shape UVs are in feet
+  t.anisotropy = 8;
+  rockCache.set(kind, t);
+  return t;
+}
 export const BED_Y = .05;       // mulch surface, just under the grid overlay
 const SYMBOL_Y = .1;
 
@@ -207,7 +255,8 @@ export function buildPlantingBed(bed, ctx){
     geo.rotateX(-Math.PI/2);
     let mat;
     if(ctx.simple) mat = cached("ms"+bed.mulch, ()=>new THREE.MeshStandardMaterial({color:mulch.simple ?? 0x25301f, roughness:1, metalness:0}));
-    else if(mulch.color == null) mat = cached("mnone", ()=>new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false}));
+    else if(mulch.color == null && !mulch.rock) mat = cached("mnone", ()=>new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false}));
+    else if(mulch.rock) mat = cached("mr"+mulch.rock, ()=>new THREE.MeshStandardMaterial({map:rockTexture(mulch.rock), color:0xb8b8b8, roughness:.95, metalness:0}));
     else mat = cached("m"+bed.mulch+(ctx.soilMap ? ctx.soilMap.uuid : ""), ()=>{
       const m = new THREE.MeshStandardMaterial({color:mulch.color, roughness:1, metalness:0});
       if(ctx.soilMap){

@@ -1037,3 +1037,17 @@ body.observe #coach{top:calc(var(--gut) + 150px)}
   .lmbtns{width:100%}
   .lmbtns .btn{flex:1}
 }
+
+/* bed designer: filters, own varieties */
+.pfilters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.pfilters select{width:100%;min-width:0}
+.stamping .sizeit{grid-column:1 / -1;grid-row:auto;margin-top:8px;justify-self:start}
+.custed .field{margin-top:8px}
+.custed .inp.colr{flex:0 0 96px;padding:3px;height:36px}
+.custed input[type=color]{flex:1;width:100%;min-width:0;height:28px;border:0;padding:0;background:none;cursor:pointer}
+.custed{scroll-margin-top:8px}
+.custed input[type=text]{width:100%}
+.custed .months{flex:1.4;display:flex;align-items:center;gap:8px}
+.custed .months select{flex:1;min-width:0}
+.custed .months i{font-style:normal;color:var(--faint);font-size:12px}
+.custed .btnrow{margin-top:12px}

@@ -74,6 +74,8 @@ export const LEAF = {
   redoak: { outline: 'lobed', lobes: 4.6, depth: 0.5, pointed: true, length: 6.5 * IN, width: 0.62, petiole: 1.5 * IN, petioleColor: '#8a3a2a', underside: '#b8bea4', margin: 'entire' },
   // Siberian elm: small, elliptic, singly serrate. 1–2.5 in.
   siberianelm: { wx: 0.62, outline: 'ovate', length: 1.8 * IN, width: 0.5, skew: 0.08, petiole: 0.2 * IN, petioleColor: '#4f4a2a', underside: '#a8b494', margin: 'serrate', veins: 'parallel' },
+  // Smoke tree: a rounded oval paddle with a smooth edge and a long stalk, 2–3 in.
+  smoke: { wx: 0.95, outline: 'round', length: 2.9 * IN, width: 0.8, petiole: 1.5 * IN, petioleColor: '#7a4a5a', underside: '#b4aca6', margin: 'entire' },
   // Japanese tree lilac: broad ovate, smooth edges, dark and slightly glossy. 3–6 in.
   lilac: { wx: 0.95, outline: 'ovate', length: 4.2 * IN, width: 0.7, petiole: 1 * IN, petioleColor: '#5a5a2a', underside: '#a8b494', margin: 'entire' },
   // Serviceberry: small oval, finely toothed. 1.5–3 in.
@@ -205,6 +207,10 @@ export const SPECIES = {
   buckeye: { leaf: 'buckeye', bark: 'oak', leader: false, angle: 45, tropism: 0.2, arrange: 'opposite', perShoot: 3, twiggy: 0.55, scaffolds: 4,
     pheno: { out: -7, drop: -14 },
     ornaments: [{ type: 'panicle', from: 10, to: 28, bloom: true, size: 1.3 }, { type: 'drupe', from: 100, to: 140, color: [0x8a6a3a, 0x5a3a20], size: 2.2 }] },
+  // Smoke tree: a low, rounded head on a short trunk. The "smoke" is the
+  // spent flower panicles: hair-fine stalks that billow among the leaves in summer.
+  smoketree: { leaf: 'smoke', bark: 'smooth', leader: false, angle: 48, tropism: 0.2, arrange: 'alternate', perShoot: 6, twiggy: 0.8, scaffolds: 5,
+    ornaments: [{ type: 'smoke', from: 40, to: 105, bloom: true }] },
   treelilac: { leaf: 'lilac', bark: 'cherry', leader: false, angle: 40, tropism: 0.3, arrange: 'opposite', perShoot: 4, twiggy: 0.7,
     ornaments: [{ type: 'panicle', from: 36, to: 52, bloom: true, size: 1.7 }] },
   serviceberry: { leaf: 'serviceberry', bark: 'smooth', leader: false, angle: 24, tropism: 0.45, arrange: 'alternate', perShoot: 5, twiggy: 0.75, stems: 4,
@@ -275,7 +281,7 @@ const GROWTH = {
   maple: 2.5, norwaymaple: 1.2, sugarmaple: 1.2, redmaple: 1.8, silvermaple: 3, boxelder: 2.5, jmaple: 0.9,
   linden: 1.7, littleleaf: 1.3, birch: 1.6, riverbirch: 2.2, alder: 2.5, aspen: 2.5, poplar: 4, columnaraspen: 2.5,
   hackberry: 1.7, hackberrycol: 1.6, elm: 2.2, siberianelm: 3, buroak: 1, whiteoak: 1.5, swampoak: 1.5,
-  pinoak: 2, redoak: 2, willow: 3, crabapple: 1.2, apple: 1.2, hydrangea: 1.5, locust: 2.2, ash: 2,
+  pinoak: 2, redoak: 2, willow: 3, crabapple: 1.2, apple: 1.2, hydrangea: 1.5, smoketree: 1.2, locust: 2.2, ash: 2,
   coffeetree: 1.4, buckeye: 1, treelilac: 1.2, serviceberry: 1.2, chokecherry: 2, plum: 1.4, hawthorn: 1,
   mtnash: 1.4, pagoda: 1, dogwood: 1, ironwood: 0.9, bluebeech: 0.9, ginkgo: 1.1, magnolia: 1.3, redbud: 1.6,
   sweetgum: 1.7, tulip: 2.5, blackgum: 1, broadleaf: 1.5,
@@ -292,6 +298,7 @@ export function phenology(key) {
 
 /* Name → profile, checked in order; the first match wins. */
 const BY_NAME = [
+  [/smoke ?tree|smoke ?bush|cotinus/, 'smoketree'],
   [/tamarack|larch|larix/, 'tamarack'],
 ];
 const CONIFER_BY_NAME = [

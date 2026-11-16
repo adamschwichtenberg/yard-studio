@@ -15,6 +15,8 @@ const VIEWS = [
 ];
 let view = new URLSearchParams(location.search).get("view") || "best";
 const only = new URLSearchParams(location.search).get("model");
+/* ?keys=a,b,c shows just those presets, large: for close inspection of a model */
+const keys = (new URLSearchParams(location.search).get("keys") || "").split(",").filter(Boolean);
 const bar = document.getElementById("bar"), host = document.getElementById("host");
 bar.innerHTML = VIEWS.map(v=>`<button data-v="${v.k}">${v.label}</button>`).join("");
 bar.addEventListener("click", e=>{ const b = e.target.closest("button"); if(b){ view = b.dataset.v; draw(); } });
@@ -44,9 +46,10 @@ function draw(){
   if(view === "tex") return drawTextures();
   const season = VIEWS.find(v=>v.k === view)?.season || undefined;
   host.innerHTML = "";
+  if(keys.length) host.classList.add("big");
   for(const [key, model] of Object.entries(MODELS)){
     if(only && only !== key) continue;
-    const list = PLANTS.filter(p=>p.model === key);
+    const list = PLANTS.filter(p=>p.model === key && (!keys.length || keys.includes(p.k)));
     if(!list.length) continue;
     host.insertAdjacentHTML("beforeend", `<h2>${model.label}<span>${key} · ${list.length}</span></h2><div class="grid" data-m="${key}"></div>`);
     const grid = host.lastElementChild;
@@ -54,7 +57,7 @@ function draw(){
       const f = document.createElement("figure");
       f.innerHTML = `<img alt=""><figcaption><b>${p.n}</b><i>${ft(p.h)} × ${ft(p.w)}</i></figcaption>`;
       grid.append(f);
-      queue.push(()=>{ f.firstChild.src = plantThumb(p, {season}); });
+      queue.push(()=>{ f.firstChild.src = keys.length ? plantThumb(p, {season, width:960, height:720}) : plantThumb(p, {season}); });
     }
   }
   pump();
