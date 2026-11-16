@@ -108,7 +108,7 @@ A planting bed is an in-ground bed of perennials, grasses, groundcovers and shru
 
 - **Plant library:** 197 perennials, grasses, groundcovers, shrubs and evergreen shrubs, each pictured in bloom from its own 3D model. Open it from **Add to yard → Perennial or shrub**, from **Plants** in the rail, or from the designer. Filter by type, sun, flower colour and height, or search.
 - **Shape:** any outline. Reshape it corner by corner like a driveway; **Curved edge** runs a smooth curve through the corners. Surface is bark, soil, gravel or lawn.
-- **Design this bed** (or double-click the bed) opens the designer:
+- **Edit this bed** (or double-click the bed) opens the designer:
   - The view drops to Plan and frames the bed. Trees whose canopy would cover it step aside while you work.
   - Pick a plant in the palette, then click in the bed once for each one. Esc stops placing.
   - Plants go exactly where you click. There is no grid, and circles may overlap or reach past the edge.

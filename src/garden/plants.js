@@ -79,7 +79,11 @@ group(ECH, [
   ["Coneflower 'Artisan Soft Orange'", 2, 1.5, 0xF0A060],
   ["Coneflower 'SunSeekers Mineola'", 1.3, 1.2, 0xEE8A2A, {opt:{droop:.2, tex:"flower:daisy-double"}, note:"Semi-double orange flowers on a compact plant."}],
   ["Coneflower 'Cheyenne Spirit'", 1.75, 1.5, 0xE2562A, {mix:[0xD7301F, 0xF2C230, 0xE86AA0], note:"A seed mix: each plant flowers in its own shade from scarlet through orange to yellow."}],
-  ["Coneflower 'SunMagic Yellow'", 1.5, 1.3, 0xF2C230]
+  ["Coneflower 'SunMagic Yellow'", 1.5, 1.3, 0xF2C230],
+  ["Coneflower 'Prairie Splendor'", 2, 1.5, 0xC8508C, {sci:"Echinacea purpurea 'Prairie Splendor'", zone:[3,8], bloom:["06-20","09-15"], opt:{droop:.2}, note:"Rose-magenta flowers that start two weeks ahead of most coneflowers and carry on to fall."}],
+  ["Coneflower 'Sombrero Salsa Red'", 2, 1.8, 0xC8321E, {k:"coneflower-salsa-red", flower2:0x7a3a1c, note:"Glowing red-orange flowers on sturdy, well-branched stems."}],
+  ["Coneflower 'SunSeekers Rainbow'", 1.6, 1.5, [0xE0507A, 0xF08A4A, 0xF2C860], {opt:{droop:.15}, note:"Each flower opens rose-pink and ages through orange to soft yellow, so one plant carries every shade at once."}],
+  ["Coneflower 'Kismet Red'", 1.5, 1.5, 0xC8201E, {note:"True red flowers in great numbers on a compact, long-blooming plant."}]
 ]);
 group({...ECH, sci:"Rudbeckia", zone:[3,9], bloom:["07-15","09-25"], foliage:0x47652f, flower2:0x1c120c, opt:{droop:.06},
        note:"Flat gold daisies with a dark eye, late summer into fall."}, [
@@ -90,12 +94,16 @@ group({...ECH, sci:"Rudbeckia", zone:[3,9], bloom:["07-15","09-25"], foliage:0x4
 group({...ECH, sci:"Leucanthemum × superbum", zone:[4,9], bloom:["06-20","08-15"], foliage:0x2f5a2e, flower2:0xE8C23A, winter:"dormant",
        opt:{droop:0, tex:"flower:daisy-fine"}, note:"Clean white daisies with a yellow eye in early summer."}, [
   ["Shasta Daisy 'Snowcap'", 1, 1.25, 0xF7F7F2],
-  ["Shasta Daisy 'Mt. Hood'", 1.7, 1.5, 0xF7F7F2, {opt:{droop:0, tex:"flower:daisy-double"}, note:"Fully double white flowers."}]
+  ["Shasta Daisy 'Mt. Hood'", 1.7, 1.5, 0xF7F7F2, {opt:{droop:0, tex:"flower:daisy-double"}, note:"Fully double white flowers."}],
+  ["Shasta Daisy 'Real Neat'", 1.3, 1.5, 0xF7F7F2, {sci:"Leucanthemum × superbum 'Real Neat'", zone:[5,9], note:"White petals rolled into flutes that flare at the tip, round a gold eye."}],
+  ["Shasta Daisy 'Real Sunbeam'", 1.7, 1.7, [0xF2DC6A, 0xF4E8A0, 0xF6F2DC], {sci:"Leucanthemum × superbum 'Real Sunbeam'", zone:[5,9], flower2:0xE0B020, opt:{droop:0, tex:"flower:daisy-double"}, note:"Semi-double flowers open sunny yellow and soften to cream as they age."}]
 ]);
 group({...ECH, opt:{droop:.05}}, [
   ["False Sunflower 'Tuscan Sun'", 2.5, 2, 0xF0B414, {sci:"Heliopsis helianthoides 'Tuscan Sun'", zone:[3,9], flower2:0xC98A10, bloom:["06-25","09-10"], note:"Golden daisies for most of the summer on a compact plant."}],
   ["Sneezeweed 'Mardi Gras'", 1.75, 1.5, 0xD8481E, {sci:"Helenium 'Mardi Gras'", flower2:0xF2C230, bloom:["07-10","09-01"], opt:{droop:.3, tex:"flower:daisy-tip"}, note:"Yellow petals splashed orange-red round a brown button."}],
-  ["Blanket Flower 'Arizona Sun'", 1.4, 1.2, 0xC8281E, {sci:"Gaillardia × grandiflora 'Arizona Sun'", zone:[3,9], flower2:0xF2C230, bloom:["06-10","09-25"], winter:"dormant", opt:{droop:.05, tex:"flower:daisy-tip"}, note:"Red daisies tipped in yellow from June to frost on a low mound."}]
+  ["Blanket Flower 'Arizona Sun'", 1.4, 1.2, 0xC8281E, {sci:"Gaillardia × grandiflora 'Arizona Sun'", zone:[3,9], flower2:0xF2C230, bloom:["06-10","09-25"], winter:"dormant", opt:{droop:.05, tex:"flower:daisy-tip"}, note:"Red daisies tipped in yellow from June to frost on a low mound."}],
+  ["Blanket Flower 'Barbican Yellow Red Ring'", 1.2, 1.2, 0xB8281E, {sci:"Gaillardia × grandiflora 'Barbican Yellow Red Ring'", zone:[3,9], flower2:0xF2C830, bloom:["06-10","09-25"], winter:"dormant", opt:{droop:.05, tex:"flower:daisy-tip"}, note:"Broad yellow petals with a red ring round the eye, June to frost, on a tidy mound."}],
+  ["Blanket Flower 'SpinTop Mariachi Copper Sun'", 1, 1.2, 0xD0602A, {sci:"Gaillardia aristata 'SpinTop Mariachi Copper Sun'", zone:[3,9], flower2:0xF0B840, bloom:["06-10","09-25"], winter:"dormant", opt:{droop:.05, tex:"flower:daisy-tip"}, note:"Fluted copper-orange petals tipped in gold on a low, uniform plant."}]
 ]);
 
 /* P2 — hostas and bold foliage */
@@ -118,6 +126,7 @@ group(SAL, [
   ["Salvia 'Caradonna'", 2, 1.5, 0x4A2D8F, {stem:0x2a1c3a, note:"Deep purple spikes on near-black stems."}],
   ["Salvia 'Sensation Deep Rose'", 1, 1, 0xC2478A],
   ["Salvia 'Lyrical White'", 1.6, 1.4, 0xF4F2EC],
+  ["Salvia 'Rose Marvel'", 1, 1, 0xC23A78, {sci:"Salvia nemorosa 'Rose Marvel'", bloom:["05-28","08-15"], note:"The largest flowers of any rose salvia, on a compact plant that reblooms without cutting back."}],
   ["Blazing Star 'Kobold'", 2, 1.25, 0xB07CC8, {sci:"Liatris spicata 'Kobold'", zone:[3,9], bloom:["07-10","08-25"], foliage:0x4f7a3a, opt:{density:"tight", leafTex:"leaf:blades", spike:.95}, note:"Fuzzy lavender wands above grassy foliage; a butterfly magnet."}],
   ["Cardinal Flower 'Queen Victoria'", 3, 1.25, 0xD21F2B, {sci:"Lobelia cardinalis 'Queen Victoria'", sun:FP, bloom:["07-15","09-15"], foliage:0x5a2430, stem:0x4a1c28, opt:{density:"tight", spike:1.2}, note:"Scarlet spikes over burgundy foliage. Wants moist soil."}],
   ["Catmint 'Walker's Low'", 2.5, 3, 0x9C8FD6, {sci:"Nepeta × faassenii 'Walker's Low'", k:"catmint-walkers-low", sun:FP, zone:[3,8], bloom:["05-25","09-05"], foliage:0x8e9c7c, opt:{density:"loose"}, note:"Grey-green mound under a long haze of lavender-blue."}],
@@ -141,10 +150,17 @@ const TALL = {model:"tallclump", cat:"perennial", sun:FP, zone:[4,8], foliage:0x
 group({...TALL, sci:"Monarda didyma", bloom:["07-01","08-20"], opt:{head:"shag"}, note:"Shaggy whorled flowers that hummingbirds work all day. Spreads into a colony."}, [
   ["Bee Balm 'Jacob Cline'", 4, 2.5, 0xD21F2B],
   ["Bee Balm 'Bubblegum Blast'", 2, 2.3, 0xE0468F],
-  ["Bee Balm 'Grand Parade'", 1.25, 1.5, 0xB070C0]
+  ["Bee Balm 'Grand Parade'", 1.25, 1.5, 0xB070C0],
+  ["Bee Balm 'Sugar Buzz Grape Gumball'", 1.8, 2, 0xA8388A, {sci:"Monarda 'Grape Gumball'", note:"Vibrant magenta-purple flowers on a mid-height plant with good mildew resistance."}]
 ]);
 group({...TALL, sci:"Phlox paniculata", bloom:["07-15","09-10"], opt:{head:"dome"}, note:"Big domed flower heads, fragrant in the evening, at the back of the border."}, [
   ["Garden Phlox 'David'", 3.5, 2.5, 0xF7F7F2],
+  ["Garden Phlox 'Pink Lightning'", 2.3, 1.6, 0xE8609A, {flower2:0xF8ECF0, note:"Bright pink flowers, each with a white star at its centre."}],
+  ["Garden Phlox 'Flame Purple'", 1.5, 1.25, 0x8A3AA8, {bloom:["07-05","09-05"], note:"A dwarf that needs no staking: fragrant purple flowers with a pale eye."}],
+  ["Garden Phlox 'Early Start Pink'", 1.4, 1.3, 0xE0508C, {bloom:["06-15","08-20"], note:"Flowers weeks ahead of other garden phlox: deep pink on a short, bushy plant."}],
+  ["Garden Phlox 'Coral Creme Drop'", 1.8, 1.5, 0xF07868, {sci:"Phlox paniculata 'Ditomdre'", note:"Candy Store series. Coral-pink flowers on a compact, mildew-resistant plant."}],
+  ["Garden Phlox 'Cotton Candy'", 1.8, 1.5, 0xF2B4CC, {sci:"Phlox paniculata 'Ditomfra'", note:"Candy Store series. Soft, clear pink flowers."}],
+  ["Garden Phlox 'Grape Lollipop'", 1.8, 1.5, 0x9A3A96, {sci:"Phlox paniculata 'Ditomsur'", note:"Candy Store series. Purple-magenta flowers."}],
   ["Garden Phlox 'Olympus'", 2, 2, 0xC987B0, {foliage:0x4f7a3a, foliage2:0xF0ECD0, opt:{head:"dome", leafTex:"leaf:lance+edge"}, note:"Rosy-mauve flowers over cream-edged leaves."}]
 ]);
 group(TALL, [
@@ -203,6 +219,8 @@ group({model:"heuchera", cat:"perennial", sci:"Heuchera", sun:PS, zone:[4,9], bl
   ["Coral Bells 'Lime Marmalade'", 1.3, 1.5, 0xF4F4EA, {foliage:0xB6D24A}],
   ["Coral Bells 'Caramel'", 1.4, 1.6, 0xF2E0D0, {sci:"Heuchera villosa 'Caramel'", foliage:0xD49A4A}],
   ["Coral Bells 'Forever Red'", 1.2, 1.2, 0xF4F0E8, {foliage:0x9a1f28}],
+  ["Coral Bells 'Black Forest Cake'", 1.2, 1.2, 0xC82840, {foliage:0x2a1a1c, note:"Dark chocolate leaves with cherry-red flowers above them."}],
+  ["Coral Bells 'Primo Black Pearl'", 1, 1.7, 0xF0E0E4, {foliage:0x161014, sun:ANY, note:"Jet-black, scalloped leaves with rosy undersides that hold their colour in full sun."}],
   ["Coral Bells 'Sugar Plum'", 1.5, 1.3, 0xE88AB0, {foliage:0x6a3a5a, foliage2:0xB8B0C0, opt:{silver:true}, note:"Plum leaves frosted with silver; pink flowers."}]
 ]);
 group({model:"heuchera", cat:"perennial", sci:"Aquilegia", sun:FP, zone:[3,9], bloom:["05-15","06-20"], foliage:0x6f8f6a,
@@ -222,7 +240,8 @@ group(CUSH, [
   ["Dianthus 'Electric Red'", .8, 1, 0xD21F2B, {sci:"Dianthus 'Electric Red'", sun:FULL, bloom:["05-25","07-15"], foliage:0x7f9a94, flower2:0xB01828, winter:"evergreen", opt:{leafTex:"leaf:needle", flowerSize:.11}, note:"Clove-scented red flowers over a blue-grey cushion."}],
   ["Coreopsis 'Moonbeam'", 1.5, 1.75, 0xF2E68A, {sci:"Coreopsis verticillata 'Moonbeam'", sun:FULL, zone:[3,9], bloom:["06-15","09-10"], flower2:0xE8C84A, opt:{leafTex:"leaf:needle", flowerSize:.13, flowerTex:"flower:daisy"}, note:"Pale yellow stars all summer over thread-fine foliage."}],
   ["Baby's Breath 'Summer Sparkles'", 2.5, 3, 0xF7F7F2, {sci:"Gypsophila paniculata 'Summer Sparkles'", sun:FULL, zone:[3,9], bloom:["06-20","08-15"], foliage:0x7f9a8a, flower2:0xF7F7F2, opt:{leafTex:"leaf:needle", flowerSize:.09}, note:"A cloud of tiny white flowers."}],
-  ["Bellflower 'Rapido Blue'", .5, 1, 0x5A5AC8, {sci:"Campanula carpatica 'Rapido Blue'", zone:[3,8], bloom:["06-01","08-10"], flower2:0x7a7ad8, opt:{flowerSize:.13}, note:"Up-facing violet-blue bells on a low mound."}]
+  ["Bellflower 'Rapido Blue'", .5, 1, 0x5A5AC8, {sci:"Campanula carpatica 'Rapido Blue'", zone:[3,8], bloom:["06-01","08-10"], flower2:0x7a7ad8, opt:{flowerSize:.13}, note:"Up-facing violet-blue bells on a low mound."}],
+  ["Balloon Flower 'Astra Blue'", .7, .8, 0x5A5AC8, {sci:"Platycodon grandiflorus 'Astra Blue'", zone:[3,8], bloom:["06-20","08-20"], flower2:0x7a7ad8, opt:{flowerSize:.2, sparse:true}, note:"Puffed buds pop open into wide, starry violet-blue flowers on a dwarf plant. Late to emerge in spring."}]
 ]);
 
 /* P11 — groundcover mats */
@@ -319,6 +338,8 @@ group(WEI, [
   ["Weigela 'Spilled Wine'", 2.5, 3, 0xC8327A, {foliage:0x4a1f2a, note:"Dark red, wavy foliage and magenta flowers on a low, spreading plant."}],
   ["Weigela 'Shining Sensation'", 5.5, 4, 0xE86A9A, {foliage:0x5a2530, note:"Glossy burgundy leaves with pink flowers."}],
   ["Weigela 'Red Prince'", 5.5, 5, 0xC81E2E],
+  ["Weigela 'Minuet'", 2.5, 3, 0xD03A6A, {zone:[3,7], foliage:0x4a5a34, note:"A very hardy dwarf: ruby-red flowers with a lilac throat over purple-tinged leaves."}],
+  ["Weigela 'Rainbow Sensation'", 3.5, 3.5, 0xF0A0BC, {sci:"Weigela florida 'Kolmagira'", foliage:0x5f8a4a, foliage2:0xE8E0A0, opt:{leafTex:"leaf:ovate+edge"}, note:"Green leaves edged in creamy yellow, with soft pink flowers in late spring."}],
   ["Weigela 'My Monet'", 1.5, 2, 0xE88AB0, {foliage:0x6f9a5a, foliage2:0xF2E6DC, opt:{leafTex:"leaf:ovate+edge"}, note:"A dwarf with green, cream and pink variegated leaves."}],
   ["Weigela 'Midnight Sun'", 1.25, 1.5, 0xE06A8A, {foliage:0xC8642A, fall:0xB8281E, opt:{sparse:true}, note:"A tiny mound of orange and red foliage."}],
   ["Forsythia 'Northern Gold'", 6, 6, 0xF2D21E, {sci:"Forsythia 'Northern Gold'", zone:[3,8], bloom:["04-25","05-12"], fall:0x8a7a3a, opt:{droop:.4, flowerSize:.15}, note:"Golden-yellow flowers on bare branches, the first big show of spring. Bud-hardy in the north."}],
