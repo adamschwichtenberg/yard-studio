@@ -593,6 +593,20 @@ class Plant {
         }
       }
     }
+    /* the crown: shoots standing over the top of the plant, following its
+       outline, so a globe or a flat-topped bun closes over instead of showing
+       its limbs from above */
+    const capR = env(.8), nC = clamp(Math.round(Math.PI*capR*capR/(sl*sl*.1)), 10, 130);
+    for(let i = 0; i < nC; i++){
+      const az = i*GOLD + r()*.4, rr = capR*Math.sqrt((i + .5)/nC)*.92, out = polar(az, 1);
+      let u = 1; while(u > .7 && env(u, az) < rr*1.05) u -= .02;
+      /* they lie outward like the spokes of a rosette, tips lifting, so they are
+         seen broadside from above as well as from the side */
+      const tip = polar(az, rr, y0 + ch*Math.min(u, .99)), rise = .3 + .5*r();
+      const dir = V(out.x, rise, out.z).add(V(r() - .5, 0, r() - .5).multiplyScalar(.3)).normalize();
+      put(tip.clone().addScaledVector(dir, -sl*.8), dir, .8 + .3*r());
+      if(i%3 === 0) put(tip.clone().addScaledVector(UP, -sl*.6), V(out.x*.3, 1, out.z*.3).normalize(), .7);
+    }
     /* the leader's own shoots: the tree's top */
     if(leader) for(let i = 0; i < 7; i++){ const a = i*GOLD; put(V(0, top - sl*.2 - i*sl*.22, 0), V(Math.cos(a)*.6, i ? .55 : 2, Math.sin(a)*.6).normalize(), .9); }
     for(const [base, dir, k] of cards) this.cross("leaf", shoot.tex, base, dir, sw*k, sl*k, 2, {normal:this.nrm(base).lerp(dir, .35).normalize()});
@@ -626,8 +640,17 @@ class Plant {
       const pts = [];
       for(let k = 0; k <= 7; k++){ const t = k/7, m = 1 - t; pts.push(V(a.x*m*m + mid.x*2*m*t + b.x*t*t, Math.max(.02, a.y*m*m + mid.y*2*m*t + b.y*t*t), a.z*m*m + mid.z*2*m*t + b.z*t*t)); }
       this.tube("stem", pts, sr, sr*.3, 4);
-      leafy(pts, .2 + .15*r(), 1);
+      /* leafy almost to the ground: a ninebark is clothed to its base */
+      leafy(pts, .05 + .08*r(), 1);
       tips.push(pts[7]);
+      /* short shoots low on the cane fill the bottom of the shrub */
+      for(let k = 0; k < 2; k++){
+        const t = .1 + .28*(k + r())/2, j = Math.min(6, Math.floor(t*7)), q = pts[j].clone().lerp(pts[j+1], t*7 - j);
+        const L = H*(.12 + .1*r()), la = az + (r() - .5)*2.4, d = V(Math.cos(la)*.85, .5 + .3*r(), Math.sin(la)*.85).normalize();
+        const e = q.clone().addScaledVector(d, L), sp = [q, q.clone().lerp(e, .5).addScaledVector(UP, L*.05), e];
+        this.tube("stem", sp, sr*.4, sr*.15, 3);
+        leafy(sp, .05, .95);
+      }
       /* side shoots off the upper cane, climbing */
       const ns = 2 + Math.floor(r()*3);
       for(let k = 0; k < ns; k++){

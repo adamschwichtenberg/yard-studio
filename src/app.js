@@ -332,6 +332,12 @@ const PRESETS = [
   sci:"Picea pungens 'Fat Albert'", note:"A dense, broad, perfectly formed blue pyramid. Slow; a living Christmas tree."},
  {gn:"Spruces", n:"Meyer Spruce", s:"pyramidal", h:50, w:28, ev:true, d:.92, leaf:0x5a7f86,
   sci:"Picea meyeri", note:"Blue-green, softer-needled alternative to Colorado spruce that stands up to winter wind and holds its shape."},
+ {gn:"Spruces", n:"Blue Totem Spruce", gr:0.6, z:[2,8], s:"columnar", h:15, w:4, ev:true, d:.94, leaf:0x6a90ac,
+  sci:"Picea pungens 'Blue Totem'", note:"A tight, narrow column of powder-blue needles: blue spruce colour in a footprint a few feet wide."},
+ {gn:"Spruces", n:"Motala Norway Spruce", gr:0.8, z:[3,7], s:"columnar", h:12, w:2.5, ev:true, d:.93, leaf:0x2a4a24,
+  sci:"Picea abies 'Motala'", note:"A very slender dark green spire, hardly wider than a fence post, with short branches held close to the trunk."},
+ {gn:"Spruces", n:"Gold Drift Weeping Norway Spruce", gr:0.5, z:[3,7], s:"columnar", h:9, w:5, ev:true, d:.9, leaf:0xb0b048,
+  sci:"Picea abies 'Gold Drift'", note:"A weeping Norway spruce with golden-yellow needles, brightest in full sun. Its height is the height it is staked to; from there it cascades to the ground."},
  {gn:"Firs", n:"Concolor Fir", z:[3,7], s:"pyramidal", h:45, w:22, ev:true, d:.90, leaf:0x7a98a0,
   sci:"Abies concolor", note:"Soft, silvery blue-green needles on a full, even pyramid. Softer to the touch and more heat tolerant than blue spruce."},
  {gn:"Firs", n:"Balsam Fir", z:[2,6], s:"pyramidal", h:45, w:18, ev:true, d:.90, leaf:0x2a4a2e,
@@ -348,6 +354,8 @@ const PRESETS = [
   sci:"Pinus sylvestris", note:"Twisted blue-green needles and bright orange bark on the upper trunk. Matures into an open, flat-topped crown."},
  {gn:"Pines", n:"Hyland Splendor Mugo Pine", s:"pyramidal", h:16, w:9, ev:true, d:.9, leaf:0x2f5230,
   sci:"Pinus mugo 'Hydak'", note:"NDSU's upright mugo: faster than Tannenbaum and darker green through winter."},
+ {gn:"Pines", n:"Compact Gem Bosnian Pine", gr:0.4, z:[4,8], s:"pyramidal", h:12, w:6, ev:true, d:.92, leaf:0x24451f,
+  sci:"Pinus heldreichii 'Compact Gem'", note:"A dense, dark green pyramid of stiff, glossy needles. Slow, tidy, and tolerant of road salt and poor soil."},
  {gn:"Junipers & arborvitae", n:"Techny Arborvitae", gr:1, z:[2,7], s:"pyramidal", h:18, w:10, ev:true, d:.95, leaf:0x3a6428,
   sci:"Thuja occidentalis 'Techny'", note:"Broad, dense pyramid of flat, bright-green sprays that stay green in winter. Hardy to zone 3."},
  {gn:"Junipers & arborvitae", n:"Emerald Green Arborvitae", gr:0.7, z:[3,7], s:"columnar", h:14, w:4, ev:true, d:.95, leaf:0x3f6e2c,
@@ -369,7 +377,9 @@ const PRESETS = [
  {gn:"Junipers & arborvitae", n:"Medora Juniper", s:"columnar", h:11, w:3, ev:true, d:.95, leaf:0x5a7a78,
   sci:"Juniperus scopulorum 'Medora'", note:"North Dakota selection. A slender blue-green column, slow growing, good as a specimen."},
  {gn:"Junipers & arborvitae", n:"Skyrocket Juniper", s:"columnar", h:15, w:3, ev:true, d:.95, leaf:0x66808a,
-  sci:"Juniperus scopulorum 'Skyrocket'", note:"About the narrowest juniper there is: a silvery-blue rocket for screens and accents."}
+  sci:"Juniperus scopulorum 'Skyrocket'", note:"About the narrowest juniper there is: a silvery-blue rocket for screens and accents."},
+ {gn:"Junipers & arborvitae", n:"Jantar Amber Gold Arborvitae", gr:0.7, z:[3,8], s:"columnar", h:15, w:3.5, ev:true, d:.95, leaf:0xb9b03c,
+  sci:"Thuja occidentalis 'Jantar'", note:"A narrow column the shape of Emerald Green in bright golden yellow, turning amber in winter."}
 ];
 /* Deciduous first, then evergreen; genera in the order they appear above. */
 function presetGroups(){
@@ -6381,7 +6391,7 @@ const TOUR_STEPS = [
      <p>Nothing to add? Choose <b>Skip</b>.</p>`, next:"Skip",
    done:()=>builtCount() > (tourMark.built ?? 0)},
   {part:"3 · Plant your trees", title:"Open the tree library", target:"#railPlants",
-   body:`<p>143 hardy trees, from maples and lindens to spruces and junipers, each grown to its species' shape.</p>
+   body:`<p>148 hardy trees, from maples and lindens to spruces and junipers, each grown to its species' shape.</p>
      <p>Open <b>Plants</b>.</p>`,
    enter:()=>{ tourMark.trees = treeCount(); },
    done:()=>!$("library").hidden},

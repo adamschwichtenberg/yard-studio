@@ -369,7 +369,7 @@ export function speciesFor(t) {
   if (t.evergreen) {
     for (const [re, key] of CONIFER_BY_NAME) if (re.test(n)) return key;
     if (/norway spruce/.test(n) && t.shape !== 'columnar') return 'norway';
-    if (/blue spruce|pungens/.test(n)) return 'bluespruce';
+    if (/blue.*spruce|pungens/.test(n)) return 'bluespruce';
     return 'spruce';
   }
   if (/aspen/.test(n)) return narrow ? 'columnaraspen' : 'aspen';

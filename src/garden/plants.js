@@ -445,6 +445,14 @@ group({...EVG, sci:"Picea pungens", foliage:0x5c839c, opt:{form:"flat", leafTex:
   ["Dwarf Blue Spruce 'Sester Dwarf'", 7, 4.5, null, {sci:"Picea pungens 'Sester Dwarf'", zone:[2,7], opt:{form:"cone", leafTex:"leaf:spruce"}, note:"A perfect, slow, miniature Colorado spruce: classic cone, stunning blue."}],
   ["Dwarf Norway Spruce 'Pumila'", 3.5, 3.5, null, {sci:"Picea abies 'Pumila'", sun:FP, foliage:0x2f5228, opt:{form:"mound", leafTex:"leaf:spruce"}, note:"A nest-type spruce: rounded when young, spreading with age, with short dark needles."}]
 ]);
+group({...EVG, opt:{form:"globe", leafTex:"leaf:spruce"}}, [
+  ["Blue Spruce 'Roundabout'", 2, 2.5, null, {sci:"Picea pungens 'Roundabout'", zone:[2,7], foliage:0x6a94ae, k:"spruce-roundabout", note:"An Iseli introduction: a tight, round ball of bright blue needles that stays small without shearing."}],
+  ["Korean Fir 'Ice Breaker'", 1.5, 2.5, null, {sci:"Abies koreana 'Ice Breaker'", zone:[5,7], sun:FP, foliage:0xb4c6c2, k:"fir-ice-breaker", note:"A miniature bun. Each needle curls back to show its white underside, so the whole plant looks frosted."}],
+  ["Dahurian Larch 'Romberg Park'", 2.5, 3, null, {sci:"Larix gmelinii 'Romberg Park'", cat:"shrub", zone:[2,6], foliage:0x6f9a4a, fall:0xd8b030, winter:"bare", k:"larch-romberg-park", note:"A dwarf globe larch: soft, bright green needles that turn gold in fall and drop, leaving a twiggy ball for winter."}]
+]);
+group({...EVG, sci:"Thuja occidentalis", opt:{form:"cone", leafTex:"leaf:arborvitae"}}, [
+  ["Arborvitae 'Primo'", 4, 1.25, null, {sci:"Thuja occidentalis 'IslPrim'", zone:[3,8], foliage:0x2f5a2a, winterFoliage:0x4a5a30, k:"arborvitae-primo", note:"A slow, narrow, sculptural little column of dark green, tightly layered foliage. About four feet in ten years."}]
+]);
 group({...EVG, sci:"Taxus × media", sun:ANY, zone:[4,7], foliage:0x24481f, opt:{form:"mound", leafTex:"leaf:yew", reach:true}}, [
   ["Yew 'Dark Green'", 4, 6.5, null, {sci:"Taxus × media 'Dark Green'", note:"For hedges and foundations, in sun or shade, as long as the soil drains. Red berries in summer."}],
   ["Yew 'Taunton'", 3.5, 5, null, {sci:"Taxus × media 'Tauntonii'", note:"A slow, spreading yew that takes shade and resists winter burn. Easy to prune."}]
