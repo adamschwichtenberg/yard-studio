@@ -365,6 +365,50 @@ body.inspoff #layers{max-width:calc(100vw - var(--leftX) - var(--sunW) - 40px)}
 .chips span{padding:6px 11px;border-radius:999px;border:1px solid var(--line-3);font-size:12.5px}
 .sub{font-size:11.5px;color:var(--faint)}
 
+/* planting beds: plant numbers, palette, key */
+.lbl.pno{width:20px;height:20px;padding:0;border-radius:50%;text-align:center;line-height:17px;
+  background:#F6F2E7;color:#1c1a17;border:1.5px solid #1c1a17;font-family:var(--serif);font-size:13.5px;
+  -webkit-backdrop-filter:none;backdrop-filter:none}
+.lbl.pno.on{background:var(--brass);border-color:#1D1606}
+.sw-plants{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--text);background:rgba(199,99,160,.55)}
+.psw{width:34px;height:34px;flex:none;display:block}
+.prow{display:flex;align-items:center;gap:11px;width:100%;padding:7px 8px;border-radius:10px;text-align:left;color:var(--text)}
+button.prow{cursor:pointer}
+button.prow:hover{background:var(--ghost)}
+button.prow[aria-pressed="true"]{background:var(--brass-dim);box-shadow:inset 0 0 0 1px var(--brass-line)}
+.prow .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.prow .tx b{font-weight:500;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .tx i{font-style:normal;font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .ct{font-size:12px;color:var(--dim);flex:none}
+.pwarn{flex:none;padding:3px 8px;border-radius:999px;font-size:10.5px;color:var(--warn);background:rgba(230,201,142,.1);white-space:nowrap}
+.plegend,.palette{display:flex;flex-direction:column;gap:1px;margin:0 -8px}
+.palette{max-height:min(46vh,430px);overflow-y:auto;margin-top:8px}
+.plkey .warn{font-size:12px;color:var(--warn);line-height:1.45;margin-top:8px}
+.dview{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.dview .seg{flex:1}
+.dview .seg button{flex:1}
+.dview .chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-2);cursor:pointer}
+.pcats{flex-wrap:wrap}
+.pcats button{flex:1 1 auto}
+.psearch{height:38px;padding:0 12px;margin-top:8px;display:flex;align-items:center;gap:9px;border:1px solid var(--line-3);border-radius:10px;background:#171E1B;color:var(--faint)}
+.psearch:focus-within{border-color:var(--brass-line)}
+.psearch .ic{width:14px;height:14px}
+.psearch input{flex:1;min-width:0;border:0;outline:none;background:none;color:var(--text);font:inherit;font-size:13px}
+.plantcard .prow{padding:0;margin-bottom:10px}
+.plantcard .prow .tx b{font-family:var(--serif);font-weight:400;font-size:21px;white-space:normal}
+.plantcard .prow .tx i{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--dim)}
+.plantcard .psw{width:44px;height:44px}
+.chips.sm span{padding:4px 9px;font-size:11.5px;color:var(--text-2)}
+.fit{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:12.5px;line-height:1.5;color:var(--text-2)}
+.fit .ic{width:13px;height:13px;stroke-width:1.8;margin-top:3px;flex:none}
+.fit.ok .ic{color:var(--leaf-2)} .fit.bad{color:var(--warn)} .fit.bad .ic{color:var(--danger)}
+.fit b{font-weight:400}
+.stamping{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;background:var(--brass-dim)}
+.stamping b{font-weight:500;font-size:13px;color:var(--brass-2)}
+.stamping span{grid-column:1;font-size:11.5px;color:var(--text-2)}
+.stamping .btn{grid-column:2;grid-row:1 / span 2;min-height:34px}
+body.designing #insphead h2{font-size:28px}
+
 /* older inspector blocks, restyled */
 .stat{background:var(--raised);border:1px solid #242D29;border-radius:14px;padding:14px;margin:12px 0}
 .stat .big{font-family:var(--serif);font-size:32px;color:var(--brass-2);line-height:1.05}
@@ -458,8 +502,9 @@ body.photo #gl{pointer-events:none}
 #libhead .search:focus-within{border-color:var(--brass-line)}
 #libhead .search input{flex:1;min-width:0;border:0;outline:none;background:none;color:var(--text);font:inherit;font-size:13.5px}
 #libmain{display:flex;gap:32px;flex:1;min-height:0}
-#libfilters{width:236px;flex:none;display:flex;flex-direction:column;gap:22px;overflow-y:auto}
-#libfilters h2{margin:0;font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--label)}
+#libfilters,#plantfilters{width:236px;flex:none;display:flex;flex-direction:column;gap:22px;overflow-y:auto}
+#libfilters[hidden],#plantfilters[hidden]{display:none}
+#libfilters h2,#plantfilters h2{margin:0;font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--label)}
 .fgroup{display:flex;flex-direction:column;gap:9px}
 .fgroup .fh{margin:0}
 .fgroup .fh span{font-family:var(--mono);font-size:12px;color:var(--text)}
@@ -479,7 +524,21 @@ body.photo #gl{pointer-events:none}
 #libshade input,.fgroup .chk input{accent-color:var(--brass);margin:0}
 #libshade i{width:28px;height:10px;border-radius:3px;display:block}
 .sh1{background:rgba(143,184,202,.35)} .sh2{background:rgba(143,184,202,.6)} .sh3{background:var(--sky)}
-#libfilters .grow{flex:1}
+#libfilters .grow,#plantfilters .grow{flex:1}
+#libkind{align-self:flex-start;background:var(--well)}
+#libkind button{height:30px;padding:0 12px}
+#pltype,#plheight{background:var(--well);flex-wrap:wrap}
+#pltype button,#plheight button{flex:1 1 auto;height:32px}
+#plsun{display:flex;flex-direction:column;gap:6px}
+#plcolor{display:flex;flex-wrap:wrap;gap:6px}
+#plcolor button{display:flex;align-items:center;gap:7px;height:30px;padding:0 10px 0 8px;border-radius:999px;border:1px solid var(--line-3);color:var(--text-2);font-size:12px;cursor:pointer}
+#plcolor button i{width:12px;height:12px;border-radius:50%;display:block;border:1px solid rgba(0,0,0,.35)}
+#plcolor button[aria-pressed="true"]{border-color:var(--brass);color:var(--text);background:var(--brass-dim)}
+.lcard .pthumb{display:block;width:100%;aspect-ratio:4/3;border-radius:10px;background:linear-gradient(#222b30,#161c19);object-fit:cover}
+.lcard .mt .wr{color:var(--warn)}
+.lcard p.nt{margin:0;font-size:12px;line-height:1.45;color:var(--dim)}
+.palhead{margin:12px 8px 4px;font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--label)}
+.palhead:first-child{margin-top:2px}
 .libnote{padding:14px;display:flex;flex-direction:column;gap:6px;border:1px solid #242D29;border-radius:14px;background:#171E1B;font-size:12.5px;color:var(--text-2)}
 .libnote:empty{display:none}
 .libnote b{font-family:var(--serif);font-weight:400;font-size:17px;line-height:1.25;color:var(--text)}

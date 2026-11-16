@@ -15,6 +15,10 @@ import { Tour } from "./tour.js";
 import DEFAULT_PLAN from "./defaultPlan.json";
 import { LotMap } from "./lotmap.js";
 import { store, newPlanId, canUseFiles, pickSaveFile, pickOpenFile, filePermission, writeFile, readFile, fileName } from "./planstore.js";
+import { PLANTS, CATEGORIES, plantByKey, symbolColor, sunClass, SUN_LABEL, sunNeeds, bloomText, bedLegend, winterHabit } from "./garden/plants.js";
+import { symbolPath, MODELS } from "./garden/models.js";
+import { plantThumb } from "./garden/thumbs.js";
+import { MULCHES, bedOutline, starterOutline, plantRadius, plantAt, bedSeasonKey, buildPlantingBed } from "./garden/beds.js";
 
 const DEG = Math.PI/180;
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
@@ -37,6 +41,13 @@ const SHAPES = {
   vase:      {label:"Vase (elm, serviceberry)",      base:.36,
               r:u=>u<.72 ? .16+.84*Math.pow(Math.sin(Math.PI/2*u/.72),1.25) : Math.sqrt(Math.max(0,1-Math.pow((u-.72)/.28,2)))},
   weeping:   {label:"Weeping (willow)",             base:.16, r:u=>Math.pow(Math.sin(Math.PI*(.18+.78*u)),.42)},
+  /* Arborvitae and upright junipers: foliage to the ground, fullest low down,
+     drawn in to a soft point. Spire is the narrow hedge form, teardrop the
+     broad one. */
+  spire:     {label:"Evergreen spire (arborvitae, juniper)", base:.02,
+              r:u=>u<.22 ? .86+.14*Math.sin(Math.PI/2*u/.22) : Math.pow(Math.max(0,1-Math.pow((u-.22)/.78,1.7)),.7)},
+  teardrop:  {label:"Evergreen teardrop (broad arborvitae)", base:.02,
+              r:u=>u<.18 ? .84+.16*Math.sin(Math.PI/2*u/.18) : Math.pow(Math.max(0,1-Math.pow((u-.18)/.82,1.45)),.8)},
   /* Fastigiate: an upright column with a rounded top, for columnar
      broadleaves (birch, oak, aspen, poplar). Widest a little below the middle. */
   fastigiate:{label:"Columnar broadleaf (birch, oak)", base:.08,
@@ -74,14 +85,46 @@ const PRESETS = [
   sci:"Acer negundo", note:"Native maple with three-leaflet leaves. Fast, weak-wooded, often several trunks. Common along fencelines and in older lots."},
  {gn:"Maples", n:"Bloodgood Japanese Maple", z:[5,8], s:"round", h:18, w:18, ev:false, d:.82, leaf:0x6a1a24, fall:0xb0201a,
   sci:"Acer palmatum 'Bloodgood'", note:"Deep red-purple, finely cut leaves on a low, layered crown. Zone 5–8: not hardy on the northern plains."},
+ {gn:"Maples", n:"Celebration Maple", s:"oval", h:50, w:25, ev:false, d:.85, leaf:0x4a7a30, fall:0xc8401e,
+  sci:"Acer × freemanii 'Celzam'", note:"Seedless Freeman maple with a strong central leader and a narrower crown. Red and orange in fall."},
+ {gn:"Maples", n:"Emerald Lustre Norway Maple", s:"round", h:55, w:50, ev:false, d:.95, leaf:0x2f5a26, fall:0xd8b030,
+  sci:"Acer platanoides 'Emerald Lustre'", note:"Big, glossy deep-green leaves on a broad oval crown. Heavy shade; golden yellow in fall."},
+ {gn:"Maples", n:"Sugar Maple", s:"oval", h:45, w:32, ev:false, d:.88, leaf:0x3f6a2a, fall:0xe07a1e,
+  sci:"Acer saccharum", note:"Dense oval crown and the classic fall show of red, orange and yellow."},
+ {gn:"Maples", n:"Inferno Sugar Maple", s:"oval", h:40, w:30, ev:false, d:.88, leaf:0x3f6a2a, fall:0xd8401e,
+  sci:"Acer saccharum 'Jeferno'", note:"Canadian selection picked for hardiness. Bright orange and red in fall."},
+ {gn:"Maples", n:"Apollo Sugar Maple", s:"fastigiate", h:30, w:12, ev:false, d:.9, leaf:0x3a642a, fall:0xe08a1e,
+  sci:"Acer saccharum 'Barrett Cole'", note:"A dense, narrow column of sugar maple for tight spaces."},
+ {gn:"Maples", n:"Flame Amur Maple", s:"round", h:20, w:20, ev:false, d:.8, leaf:0x46702c, fall:0xc8201a,
+  sci:"Acer ginnala 'Flame'", note:"Small, rounded, fine-textured. Brilliant red in fall. Very hardy."},
+ {gn:"Maples", n:"Ruby Slippers Amur Maple", s:"oval", h:18, w:15, ev:false, d:.8, leaf:0x3f6a2a, fall:0xe0701e,
+  bloom:[0xc8283a, 0xd8304a, 0xb04030], bk:"crabapple", bw:[30, 62], sci:"Acer ginnala 'Ruby Slippers'",
+  note:"Small oval tree covered in ruby-red winged seeds in early summer. Orange in fall."},
+ {gn:"Maples", n:"Hot Wings Tatarian Maple", s:"round", h:25, w:19, ev:false, d:.78, leaf:0x3f6a2a, fall:0xd8601e,
+  bloom:[0xd8283a, 0xe8304a, 0xb84030], bk:"crabapple", bw:[45, 95], sci:"Acer tataricum 'GarAnn'",
+  note:"Bright red winged seeds through summer read like a second bloom. Yellow to red in fall."},
  {gn:"Lindens", n:"Redmond Linden", gr:1.8, z:[3,8], s:"linden", h:55, w:35, ev:false, d:.90, leaf:0x3f6a2a, fall:0xb89a3a,
   sci:"Tilia americana 'Redmond'", note:"American linden. Broad pyramidal, very dense. Handles wind and alkaline soil."},
  {gn:"Lindens", n:"Greenspire Linden", gr:1.3, z:[3,7], s:"linden", h:45, w:30, ev:false, d:.88, leaf:0x3f6a2a, fall:0xb8a040,
   sci:"Tilia cordata 'Greenspire'", note:"Littleleaf linden. Tight pyramidal form, dense shade, narrower than Redmond."},
+ {gn:"Lindens", n:"Boulevard Linden", s:"linden", h:60, w:30, ev:false, d:.9, leaf:0x3f6a2a, fall:0xc0a038,
+  sci:"Tilia americana 'Boulevard'", note:"A narrow, pyramidal American linden with ascending branches: height without the width."},
+ {gn:"Lindens", n:"Front Yard Linden", s:"linden", h:65, w:40, ev:false, d:.9, leaf:0x3f6a2a, fall:0xc0a038,
+  sci:"Tilia americana 'Bailyard'", note:"Symmetrical from youth; broadly pyramidal, rounding out with age. Dense shade."},
+ {gn:"Lindens", n:"Harvest Gold Linden", s:"linden", h:32, w:25, ev:false, d:.85, leaf:0x4a7a30, fall:0xe0b428,
+  sci:"Tilia mongolica 'Harvest Gold'", note:"A smaller, upright linden with peeling bark and superb golden fall colour."},
  {gn:"Birches", n:"Parkland Pillar Birch", gr:1.5, z:[3,7], s:"fastigiate", h:40, w:8, ev:false, d:.86, leaf:0x4e7a2e, fall:0xd0a630,
   sci:"Betula platyphylla 'Jefpark'", note:"Columnar white-barked birch. A dense, narrow column of small leaves: solid shade in a tiny footprint. Bronze birch borer resistant."},
  {gn:"Birches", n:"River Birch", z:[4,9], s:"oval", h:40, w:30, ev:false, d:.80, leaf:0x46702c, fall:0xc8a040,
   sci:"Betula nigra", note:"Often multi-stemmed, with peeling cinnamon bark. Full oval crown of small leaves and moderate shade. Likes moist soil."},
+ {gn:"Birches", n:"Dakota Pinnacle Birch", s:"fastigiate", h:35, w:9, ev:false, d:.7, leaf:0x4a7a2e, fall:0xd8b030, bark:"paperbirch",
+  sci:"Betula platyphylla 'Fargo'", note:"Narrow, white-barked column selected in Fargo. Golden yellow in fall."},
+ {gn:"Birches", n:"Northern Tribute River Birch", s:"oval", h:35, w:32, ev:false, d:.62, leaf:0x46702c, fall:0xc8a040, bark:"riverbirch",
+  sci:"Betula nigra 'Dickinson'", note:"Ivory bark peeling to copper-bronze. Takes alkaline, compacted and dry soil better than other river birches."},
+ {gn:"Birches", n:"Prairie Dream Paper Birch", s:"oval", h:40, w:25, ev:false, d:.65, leaf:0x4a7a2e, fall:0xdcb428, bark:"paperbirch",
+  sci:"Betula papyrifera 'Varen'", note:"Snow-white peeling bark, from the Killdeer Mountains of North Dakota. Resists bronze birch borer."},
+ {gn:"Birches", n:"Prairie Dream Paper Birch clump", s:"oval", h:40, w:28, ev:false, d:.65, leaf:0x4a7a2e, fall:0xdcb428, bark:"paperbirch", clump:true,
+  sci:"Betula papyrifera 'Varen'", note:"Prairie Dream grown as a three-stem clump."},
  {gn:"Oaks", n:"Bur Oak", z:[3,8], s:"spreading", h:60, w:55, ev:false, d:.78, leaf:0x3e5c28, fall:0x8a6a30,
   sci:"Quercus macrocarpa", note:"The prairie oak. Massive, wide crown on stout limbs; deep shade once mature. Slow, very long-lived, zone 3."},
  {gn:"Oaks", n:"Crimson Spire Oak", z:[4,8], s:"fastigiate", h:45, w:15, ev:false, d:.85, leaf:0x3f6030, fall:0x9a3a24,
@@ -92,16 +135,32 @@ const PRESETS = [
   sci:"Quercus ellipsoidalis", note:"Upper-Midwest native with deeply cut, bristle-tipped leaves; scarlet to russet in fall. Handles alkaline soil far better than pin oak."},
  {gn:"Oaks", n:"Northern Red Oak", z:[3,8], s:"round", h:60, w:50, ev:false, d:.82, leaf:0x3e6028, fall:0x8a2a1c,
   sci:"Quercus rubra", note:"Fast for an oak, with a broad rounded crown and deep shade. Russet-red in fall. Best in slightly acid soil."},
+ {gn:"Oaks", n:"Prairie Stature Oak", s:"oval", h:45, w:30, ev:false, d:.8, leaf:0x3a6a30, fall:0x8a2a3a, lk:"whiteoak",
+  sci:"Quercus × bimundorum 'Prairie Stature'", note:"NDSU hybrid of bur and English oak. Stately pyramidal crown; reddish-purple in fall."},
+ {gn:"Oaks", n:"Regal Prince Oak", s:"fastigiate", h:45, w:16, ev:false, d:.85, leaf:0x3a6430, fall:0xc8a438, lk:"whiteoak",
+  sci:"Quercus × warei 'Long'", note:"Columnar hybrid oak with glossy, mildew-resistant leaves. Yellow in fall."},
  {gn:"Elms", n:"Prairie Expedition elm", gr:2.5, z:[3,9], s:"vase", h:50, w:40, ev:false, d:.70, leaf:0x3f6a2a, fall:0xb09a3a,
   sci:"Ulmus americana 'Lewis & Clark'", note:"Vase shape with a high crown, so shade lands well out from the trunk."},
  {gn:"Elms", n:"Siberian elm", z:[3,9], s:"round", h:50, w:40, ev:false, d:.70, leaf:0x46702c, fall:0xb0a040, warn:"Invasive",
   sci:"Ulmus pumila", note:"Common volunteer in older plains yards: small leaves on a rangy, brittle crown. Invasive; here to model trees you already have."},
+ {gn:"Elms", n:"Accolade Elm", s:"vase", h:70, w:40, ev:false, d:.72, leaf:0x356428, fall:0xd0a830,
+  sci:"Ulmus 'Morton'", note:"Glossy dark leaves on a classic arching vase. Excellent Dutch elm disease resistance."},
+ {gn:"Elms", n:"Cathedral Elm", s:"vase", h:45, w:50, ev:false, d:.75, leaf:0x4a7a34, fall:0xd0b038,
+  sci:"Ulmus 'Cathedral'", note:"Broadly vase-shaped, wider than tall, with large leaves like an American elm."},
+ {gn:"Elms", n:"Princeton Elm", s:"vase", h:65, w:45, ev:false, d:.72, leaf:0x3f6a2a, fall:0xc8a838,
+  sci:"Ulmus americana 'Princeton'", note:"American elm selected in the 1920s. Vigorous, upright vase."},
+ {gn:"Elms", n:"Triumph Elm", s:"oval", h:60, w:40, ev:false, d:.78, leaf:0x346228, fall:0xc8a838,
+  sci:"Ulmus 'Triumph'", note:"Shiny dark foliage on a somewhat upright crown. An NDSU-recommended elm."},
+ {gn:"Elms", n:"Valley Forge Elm", s:"vase", h:65, w:60, ev:false, d:.7, leaf:0x3f6a2a, fall:0xd0b038,
+  sci:"Ulmus americana 'Valley Forge'", note:"The most disease-resistant American elm, with the full classic spreading vase."},
  {gn:"Hackberries", n:"Common Hackberry", z:[2,9], s:"spreading", h:50, w:45, ev:false, d:.75, leaf:0x4a6a30, fall:0xb0a040,
   sci:"Celtis occidentalis", note:"Tough native with an elm-like, arching crown and warty grey bark. Medium-dense shade."},
  {gn:"Hackberries", n:"Prairie Sentinel Hackberry", z:[3,9], s:"fastigiate", h:45, w:12, ev:false, d:.78, leaf:0x4a6a30, fall:0xb0a040,
   sci:"Celtis occidentalis 'JFS-KSU1'", note:"Columnar hackberry from Kansas State. All of hackberry's toughness in a 12 ft wide column."},
  {gn:"Honeylocusts", n:"Thornless Honeylocust", z:[4,9], s:"spreading", h:45, w:40, ev:false, d:.75, leaf:0x5a8030, fall:0xd0b030,
   sci:"Gleditsia triacanthos var. inermis", note:"Fine, feathery leaflets. A mature crown casts moderate shade that is still soft enough for lawn to grow underneath."},
+ {gn:"Honeylocusts", n:"Northern Acclaim Honeylocust", s:"oval", h:40, w:32, ev:false, d:.45, leaf:0x5a8030, fall:0xdcb428,
+  sci:"Gleditsia triacanthos var. inermis 'Harve'", note:"NDSU's hardy, thornless, seedless honeylocust. Symmetrical and upright; dappled shade."},
  {gn:"Poplars & aspens", n:"Quaking Aspen", z:[1,7], s:"oval", h:40, w:20, ev:false, d:.58, leaf:0x5a7a30, fall:0xd8b030,
   sci:"Populus tremuloides", note:"Narrow oval, white bark, leaves that flutter in the slightest breeze. Light shade; suckers freely."},
  {gn:"Poplars & aspens", n:"Swedish Columnar Aspen", gr:2, z:[2,8], s:"fastigiate", h:40, w:8, ev:false, d:.72, leaf:0x4e7030, fall:0xc8a030,
@@ -112,14 +171,42 @@ const PRESETS = [
   sci:"Populus × canescens 'Tower'", note:"Hardy columnar poplar used for windbreaks and privacy. Fast, narrow shadow."},
  {gn:"Poplars & aspens", n:"Siouxland Cottonwood", gr:4, z:[2,9], s:"spreading", h:75, w:50, ev:false, d:.72, leaf:0x46702c, fall:0xd0b030,
   sci:"Populus deltoides 'Siouxland'", note:"Cottonless eastern cottonwood from South Dakota. Enormous and fast, with fluttering triangular leaves. Needs room."},
+ {gn:"Poplars & aspens", n:"Prairie Gold Aspen", s:"oval", h:40, w:17, ev:false, d:.6, leaf:0x5a7a30, fall:0xe0b828, bark:"aspen",
+  sci:"Populus tremuloides 'Prairie Gold'", note:"A quaking aspen from Nebraska that takes prairie heat, drought and humidity."},
+ {gn:"Poplars & aspens", n:"Summer Shimmer Aspen", s:"oval", h:35, w:17, ev:false, d:.6, leaf:0x6a8a3a, fall:0xdcb428, bark:"aspen",
+  sci:"Populus tremuloides 'Summer Shimmer'", note:"Narrow when young, rounding with age. Light green leaves, silver beneath."},
+ {gn:"Poplars & aspens", n:"Robusta Poplar", s:"oval", h:75, w:45, ev:false, d:.78, leaf:0x46702c, fall:0xc8b040,
+  sci:"Populus × canadensis 'Robusta'", note:"Seedless cottonwood that can put on four feet a year. Big shade, fast."},
  {gn:"Willows", n:"Weeping Willow", z:[3,8], s:"weeping", h:40, w:40, cb:10, ev:false, d:.72, leaf:0x6a8a36, fall:0xc0b040,
   sci:"Salix alba 'Tristis'", note:"Golden weeping willow. Broad dome of hanging streamers; wants room and moist ground."},
+ {gn:"Willows", n:"Prairie Reflection Laurel Willow", s:"round", h:37, w:25, ev:false, d:.85, leaf:0x2f6228, fall:0xa8a040, lk:"broadleaf", bark:"willow",
+  sci:"Salix pentandra 'Silver Lake'", note:"NDSU laurel-leaf willow. Dense, rounded and very glossy; not a weeper."},
  {gn:"Crabapples", n:"Prairifire Crabapple", bt:"Blooms in spring", z:[4,8], s:"round", h:20, w:20, ev:false, d:.72, leaf:0x6a2a34, leaf2:0x33402a, fall:0x8a4a2a,
   bloom:[0x9c1848, 0xd8306e, 0xe0628e], sci:"Malus 'Prairifire'",
   note:"Deep pink-red blossoms for about two weeks in spring, then reddish-purple leaves maturing to dark green. Disease resistant."},
  {gn:"Crabapples", n:"Snowdrift Crabapple", z:[4,8], s:"round", h:20, w:20, ev:false, d:.72, leaf:0x5a8a3a, fall:0xa8802a,
   bloom:[0xc8505a, 0xffffff, 0xf4f2ee], bt:"White blossoms in spring", fruit:[0xe0561e, 0xc83a1a], sci:"Malus 'Snowdrift'",
   note:"Red buds open to pure white blossoms for about two weeks in spring, over fresh, light green leaves. Orange-red fruit hangs into winter."},
+ {gn:"Crabapples", n:"Adams Crabapple", s:"round", h:20, w:20, ev:false, d:.72, leaf:0x46702c, fall:0xd0581e,
+  bloom:[0xc02a5a, 0xe86a9a, 0xf0a8c0], sci:"Malus 'Adams'", note:"Clear pink single flowers; red-tinted spring leaves; orange-red in fall. Fruit hangs on into winter."},
+ {gn:"Crabapples", n:"Courageous Crabapple", s:"oval", h:22, w:17, ev:false, d:.72, leaf:0x4a6030, fall:0xd0701e,
+  bloom:[0xb02a5a, 0xd85a90, 0xe89ab8], sci:"Malus 'DurLawrence'", note:"Broad and upright, with rosy-pink bloom over bronze-red new leaves. Almost fruitless. Zone 2."},
+ {gn:"Crabapples", n:"Green Wall Crabapple", s:"fastigiate", h:20, w:6, ev:false, d:.78, leaf:0x34602a, fall:0x8a6a30,
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], sci:"Malus 'Jefwall'", note:"A strongly upright column of glossy green with white flowers and tiny red fruit."},
+ {gn:"Crabapples", n:"Ivory Spear Crabapple", s:"fastigiate", h:18, w:7, ev:false, d:.8, leaf:0x34602a, fall:0xc0a038,
+  bloom:[0xe89ab8, 0xf6f2ea, 0xf4f0e6], sci:"Malus 'JFS KW214MX'", note:"Pink buds open white on a dense, narrow column. Bright red fruit into late fall."},
+ {gn:"Crabapples", n:"Red Splendor Crabapple", s:"round", h:22, w:20, ev:false, d:.7, leaf:0x4a5a30, fall:0xa0502a,
+  bloom:[0xc8386a, 0xe878a4, 0xf0b0c8], sci:"Malus 'Red Splendor'", note:"Single pink flowers, glossy reddish-green leaves and red fruit that feeds birds into winter."},
+ {gn:"Crabapples", n:"Rejoice Crabapple", s:"oval", h:20, w:14, ev:false, d:.74, leaf:0x4a4a32, fall:0x8a4a2a,
+  bloom:[0xb02a5a, 0xd8508a, 0xe888b0], sci:"Malus 'Rejzam'", note:"Rose-pink semi-double flowers on an upright crown with a burgundy cast to the leaves."},
+ {gn:"Crabapples", n:"Royal Raindrops Crabapple", s:"oval", h:20, w:15, ev:false, d:.74, leaf:0x5a2a3a, fall:0xc02a20,
+  bloom:[0x9c1850, 0xd02a78, 0xe0609a], sci:"Malus 'Royal Raindrops'", note:"Magenta flowers and deep purple cut leaves all season; scarlet in fall."},
+ {gn:"Crabapples", n:"Royal Raindrops Crabapple clump", s:"round", h:20, w:17, ev:false, d:.74, leaf:0x5a2a3a, fall:0xc02a20, clump:true,
+  bloom:[0x9c1850, 0xd02a78, 0xe0609a], sci:"Malus 'Royal Raindrops'", note:"Royal Raindrops grown as a multi-stem clump."},
+ {gn:"Crabapples", n:"Sparkling Sprite Crabapple", s:"round", h:12, w:12, ev:false, d:.85, leaf:0x4a7a30, fall:0xc0a038,
+  bloom:[0xe89ab8, 0xf6f2ea, 0xf4f0e6], sci:"Malus 'JFS-KW207'", note:"A top-grafted dwarf with a dense round head smothered in white from pink buds."},
+ {gn:"Crabapples", n:"Starlite Crabapple", s:"oval", h:20, w:15, ev:false, d:.74, leaf:0x2f5a26, fall:0xc0a038,
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], sci:"Malus 'Jeflite'", note:"White flowers in mid-May, glossy disease-resistant leaves and tiny red fruit that stays on."},
  {gn:"Apples", n:"Honeycrisp Apple", z:[3,7], s:"round", h:18, w:18, ev:false, d:.74, leaf:0x4e7a32, fall:0x9a8a30,
   bloom:[0xd88aa0, 0xf6e4ea, 0xfaf4f2], bt:"Blossoms in spring, apples in fall",
   sci:"Malus domestica 'Honeycrisp'", note:"University of Minnesota apple. Pink-budded white blossoms in spring, then large red-and-yellow apples ripening in September."},
@@ -141,9 +228,15 @@ const PRESETS = [
  {gn:"Buckeyes", n:"Ohio Buckeye", z:[3,7], s:"round", h:40, w:35, ev:false, d:.85, leaf:0x46702c, fall:0xd07a28,
   bloom:[0xa8b060, 0xd8d890, 0xc8c080], bt:"Flower spikes in late spring",
   sci:"Aesculus glabra", note:"Native buckeye: first to leaf out and first to colour and drop, often bare by mid-September. Nuts are toxic."},
+ {gn:"Buckeyes", n:"Early Glow Buckeye", s:"round", h:30, w:20, ev:false, d:.85, leaf:0x34602a, fall:0xc0281e, lk:"broadleaf",
+  bloom:[0xc8d070, 0xdce08a, 0xc8c070], bk:"hydrangea", bw:[12, 26], sci:"Aesculus 'Early Glow'", note:"Upright greenish-yellow flower clusters in May and bright red fall colour that comes early."},
  {gn:"Lilacs", n:"Ivory Silk Japanese Tree Lilac", z:[3,7], s:"round", h:25, w:20, ev:false, d:.80, leaf:0x3e6028, fall:0x8a7a3a,
   bloom:[0xd8d0a8, 0xf6f0d8, 0xd8d0b0], bt:"Cream flowers in June",
   sci:"Syringa reticulata 'Ivory Silk'", note:"The boulevard lilac. Big cream flower plumes in June, after the shrub lilacs, and glossy cherry-like bark."},
+ {gn:"Lilacs", n:"Japanese Tree Lilac clump", s:"round", h:25, w:25, ev:false, d:.8, leaf:0x3a6a2a, fall:0x8a8a3a, lk:"broadleaf", bark:"cherry", clump:true,
+  bloom:[0xe8e4c0, 0xf6f2dc, 0xe0d8b0], bk:"hydrangea", bw:[40, 56], sci:"Syringa reticulata", note:"Multi-stemmed small tree with foot-long plumes of creamy white, fragrant flowers in June."},
+ {gn:"Lilacs", n:"Snowdance Tree Lilac", s:"round", h:18, w:20, ev:false, d:.82, leaf:0x346228, fall:0x8a8a3a, lk:"broadleaf", bark:"cherry",
+  bloom:[0xe8e4c0, 0xf6f2dc, 0xe0d8b0], bk:"hydrangea", bw:[38, 54], sci:"Syringa reticulata 'Snowdance'", note:"Shorter and wider than other tree lilacs, with very heavy bloom and almost no seed."},
  {gn:"Serviceberries", n:"Autumn Brilliance Serviceberry", z:[3,8], s:"oval", h:20, w:15, ev:false, d:.62, leaf:0x46702c, fall:0xd05a20,
   bloom:[0xe0d8d8, 0xfafaf6, 0xf0e8e8], bt:"White flowers in early spring",
   sci:"Amelanchier × grandiflora 'Autumn Brilliance'", note:"Multi-stem small tree. White flowers just before the leaves, purple berries in June the birds love, orange-red fall colour."},
@@ -156,15 +249,25 @@ const PRESETS = [
  {gn:"Cherries & plums", n:"Princess Kay Plum", z:[3,6], s:"oval", h:18, w:12, ev:false, d:.60, leaf:0x46702c, fall:0xc05a2a,
   bloom:[0xeeeee4, 0xffffff, 0xf2ecea], bt:"White flowers in spring",
   sci:"Prunus nigra 'Princess Kay'", note:"Canada plum found in Minnesota. Fragrant white double flowers on bare dark branches, then red fruit and orange fall colour."},
+ {gn:"Cherries & plums", n:"Amur Chokecherry", s:"round", h:25, w:27, ev:false, d:.68, leaf:0x46702c, fall:0xd8b030, lk:"crabapple", bark:"cherry",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"crabapple", bw:[10, 22], sci:"Prunus maackii", note:"Small tree with glistening golden-bronze, peeling bark. White flower clusters in spring. Zone 2."},
+ {gn:"Cherries & plums", n:"Klondike Amur Chokecherry", s:"oval", h:22, w:17, ev:false, d:.7, leaf:0x46702c, fall:0xd8b030, lk:"crabapple", bark:"cherry",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"crabapple", bw:[10, 22], sci:"Prunus maackii 'Klondike'", note:"An improved Amur cherry with stronger branching, less frost cracking and immunity to black knot."},
+ {gn:"Cherries & plums", n:"Ming Amur Chokecherry", s:"oval", h:22, w:15, ev:false, d:.7, leaf:0x46702c, fall:0xe0b828, lk:"crabapple", bark:"cherry",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"crabapple", bw:[10, 22], sci:"Prunus maackii × kerrasis 'Ming'", note:"Strong central leader, peeling red-bronze bark and bright yellow fall colour."},
  {gn:"Hawthorns", n:"Toba Hawthorn", z:[3,7], s:"round", h:20, w:15, ev:false, d:.75, leaf:0x3e6a2a, fall:0x9a6a2a,
   bloom:[0xf0f0e8, 0xf6dce4, 0xe8a8bc], bt:"Flowers in late May",
   sci:"Crataegus × mordenensis 'Toba'", note:"Manitoba-bred hawthorn. White flowers that age to pink in late May, a few red haws, few thorns."},
  {gn:"Hawthorns", n:"Thornless Cockspur Hawthorn", z:[4,7], s:"spreading", h:20, w:25, ev:false, d:.80, leaf:0x3a6428, fall:0xa03a1e,
   bloom:[0xe8e8e0, 0xfafaf4, 0xf0ece8], bt:"White flowers in late spring",
   sci:"Crataegus crus-galli var. inermis", note:"Wide, flat-topped crown of glossy leaves. White flowers, red fruit into winter, orange-red fall colour."},
+ {gn:"Hawthorns", n:"Winter King Hawthorn", s:"spreading", h:20, w:25, ev:false, d:.68, leaf:0x34602a, fall:0x9a5a2a, lk:"crabapple", bark:"hawthorn",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"crabapple", bw:[18, 30], sci:"Crataegus viridis 'Winter King'", note:"Silvery bark and bold, angular branching. White clusters in spring; fruit holds into winter."},
  {gn:"Mountain ash", n:"Showy Mountain Ash", z:[2,6], s:"oval", h:25, w:20, ev:false, d:.60, leaf:0x46702c, fall:0xc05020,
   bloom:[0xe0d8b8, 0xf8f4e8, 0xe8e0c8], bt:"White flowers, orange berries",
   sci:"Sorbus decora", note:"North-woods native. Feathery leaves, flat white flower clusters in late spring and heavy orange-red berry clusters into winter."},
+ {gn:"Mountain ash", n:"European Mountain Ash", s:"oval", h:25, w:22, ev:false, d:.6, leaf:0x4a7a30, fall:0xd0581e, lk:"locust",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"crabapple", bw:[16, 28], sci:"Sorbus aucuparia", note:"Fine, ferny leaves; flat white flower clusters in spring and orange-red berries in fall."},
  {gn:"Dogwoods", n:"Pagoda Dogwood", z:[3,7], s:"spreading", h:20, w:25, ev:false, d:.66, leaf:0x46702c, fall:0x8a2a3a,
   bloom:[0xe0dcc0, 0xf8f6e8, 0xe8e4d0], bt:"Cream flowers in June",
   sci:"Cornus alternifolia", note:"Native understory tree with branches in flat, horizontal tiers. Creamy flower clusters in June, blue-black fruit. Likes part shade."},
@@ -175,6 +278,8 @@ const PRESETS = [
   sci:"Ostrya virginiana", note:"Shade-tolerant native with birch-like leaves, shreddy bark and hop-like seed clusters. Slow, very hard wood, very tough."},
  {gn:"Hornbeams", n:"Blue Beech (Musclewood)", z:[3,9], s:"round", h:25, w:25, ev:false, d:.80, leaf:0x46702c, fall:0xc0501e,
   sci:"Carpinus caroliniana", note:"Small native tree with smooth, fluted grey trunks like flexed muscle. Takes shade; orange-red in fall."},
+ {gn:"Hornbeams", n:"Rising Fire Hornbeam", s:"fastigiate", h:30, w:15, ev:false, d:.82, leaf:0x3f6a2a, fall:0xd8501e, lk:"elm", bark:"smooth",
+  sci:"Carpinus caroliniana 'Uxbridge'", note:"A columnar American hornbeam that turns red and orange. Tolerates shade."},
  {gn:"Ginkgos", n:"Autumn Gold Ginkgo", z:[4,8], s:"oval", h:45, w:30, ev:false, d:.72, leaf:0x5a8a3a, fall:0xe8c020,
   sci:"Ginkgo biloba 'Autumn Gold'", note:"Fan-shaped leaves turn butter-gold, then drop almost all at once, often in a single day. Male clone: no smelly fruit."},
  {gn:"Ginkgos", n:"Princeton Sentry Ginkgo", z:[4,8], s:"fastigiate", h:40, w:15, ev:false, d:.72, leaf:0x5a8a3a, fall:0xe8c020,
@@ -187,6 +292,10 @@ const PRESETS = [
  {gn:"Redbuds", n:"Eastern Redbud", z:[5,9], s:"spreading", h:25, w:30, ev:false, d:.72, leaf:0x46702c, fall:0xc8a030,
   bloom:[0x8a2060, 0xd060a0, 0xe090c0], bt:"Magenta flowers on bare wood",
   sci:"Cercis canadensis", note:"Magenta-pink flowers straight on bare branches in spring, then heart-shaped leaves. Zone 5–9; a northern seed source helps in zone 4."},
+ {gn:"Redbuds", n:"Northern Redbud", s:"spreading", h:25, w:20, ev:false, d:.65, leaf:0x4a7a34, fall:0xd0b038, lk:"linden", cb:5,
+  bloom:[0xb04a9a, 0xd870b4, 0xe0a0c8], bk:"crabapple", bw:[0, 12], sci:"Cercis canadensis (Minnesota strain)", note:"Rosy-pink flowers along bare branches before the heart-shaped leaves. Wants shelter and part sun."},
+ {gn:"Redbuds", n:"Northern Redbud clump", s:"spreading", h:25, w:22, ev:false, d:.65, leaf:0x4a7a34, fall:0xd0b038, lk:"linden", cb:4, clump:true,
+  bloom:[0xb04a9a, 0xd870b4, 0xe0a0c8], bk:"crabapple", bw:[0, 12], sci:"Cercis canadensis (Minnesota strain)", note:"The northern redbud grown multi-stemmed."},
  {gn:"Sweetgums", n:"American Sweetgum", z:[5,9], s:"oval", h:60, w:40, ev:false, d:.82, leaf:0x3e6a2a, fall:0x9a1e3a,
   sci:"Liquidambar styraciflua", note:"Star-shaped leaves that turn purple, red and orange late into fall. Spiky gumballs underfoot. Zone 5–9."},
  {gn:"Tulip trees", n:"Tulip Tree", z:[5,9], s:"oval", h:80, w:40, ev:false, d:.80, leaf:0x46702c, fall:0xd8b030,
@@ -194,6 +303,20 @@ const PRESETS = [
   sci:"Liriodendron tulipifera", note:"Tall, straight native with square-tipped leaves and green-and-orange tulip flowers in June. Clear yellow fall. Zone 5–9."},
  {gn:"Tupelos", n:"Black Gum", z:[5,9], s:"oval", h:45, w:25, ev:false, d:.82, leaf:0x3a6028, fall:0xb01a1a,
   sci:"Nyssa sylvatica", note:"Glossy leaves and some of the best scarlet fall colour of any tree, on horizontal branches. Zone 5–9."},
+ {gn:"Pears", n:"Prairie Gem Pear", s:"round", h:22, w:18, ev:false, d:.85, leaf:0x3a6a2a, fall:0xdcb428, lk:"crabapple",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"crabapple", bw:[0, 10], sci:"Pyrus ussuriensis 'MorDak'", note:"NDSU's ornamental pear: a dense round crown of leathery leaves, white in spring, gold in fall."},
+ {gn:"Maackias", n:"Summerfrost Amur Maackia", s:"round", h:18, w:14, ev:false, d:.7, leaf:0x5a6a3a, fall:0x8a8a3a, lk:"locust",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"hydrangea", bw:[50, 64], sci:"Maackia amurensis 'Summerfrost'", note:"Silvery new leaves mature olive green. Upright white flower spikes in early summer; coppery peeling bark."},
+ {gn:"Smoke trees", n:"Royal Purple Smoke Tree", s:"round", h:15, w:12, cb:4.5, ev:false, d:.82, leaf:0x5c2238, fall:0xc8281e, lk:"aspen", bark:"smooth",
+  bloom:[0x6a3a52, 0x8c5c72, 0x7c6268], bk:"smoke", bw:[40, 105], sci:"Cotinus coggygria 'Royal Purple'",
+  note:"A small tree on a short trunk with a broad, rounded head of reddish-purple leaves that hold their colour all season. Airy pinkish-purple smoke in summer; scarlet in fall. Zone 4."},
+ {gn:"Smoke trees", n:"Golden Spirit Smoke Tree", s:"round", h:10, w:8, cb:3.5, ev:false, d:.8, leaf:0xb4c43a, fall:0xe0642a, lk:"aspen", bark:"smooth",
+  bloom:[0xb09a80, 0xcdb69e, 0xa8927a], bk:"smoke", bw:[40, 105], sci:"Cotinus coggygria 'Ancot'",
+  note:"Round chartreuse-gold leaves on a small, rounded tree, with a pale haze of smoke in summer. Coral, orange and red in fall."},
+ {gn:"Catalpas", n:"Northern Catalpa", s:"oval", h:55, w:38, ev:false, d:.8, leaf:0x4a7a34, fall:0xb8b040, lk:"linden",
+  bloom:[0xe6e2cc, 0xf6f4ea, 0xf2efe4], bk:"hydrangea", bw:[46, 60], sci:"Catalpa speciosa", note:"Huge heart-shaped leaves on an irregular oval crown, with big white flower clusters in late June. Takes heat, drought and alkaline soil."},
+ {gn:"Katsuras", n:"KoolKat Katsura", s:"oval", h:37, w:22, ev:false, d:.78, leaf:0x5a7f5a, fall:0xe0a040, lk:"aspen",
+  sci:"Cercidiphyllum japonicum 'Kooldak'", note:"Round leaves emerge bronze, turn blue-green, then yellow and apricot. Goes dormant early, which is what makes it hardy."},
  // ---- Evergreen
  {gn:"Spruces", n:"Norway Spruce", z:[2,7], s:"pyramidal", h:60, w:28, ev:true, d:.92, leaf:0x284a26,
   sci:"Picea abies", note:"Big, dark pyramid with branchlets that hang in curtains. Fast for a spruce; a year-round windbreak."},
@@ -205,6 +328,10 @@ const PRESETS = [
   sci:"Picea glauca var. densata", note:"Dense conifer that shades year round, including the low winter sun."},
  {gn:"Spruces", n:"Weeping White Spruce", z:[2,6], s:"columnar", h:30, w:8, ev:true, d:.90, leaf:0x4a6a5a,
   sci:"Picea glauca 'Pendula'", note:"Narrow white spruce whose branches hang straight down against the trunk: a dark, slim column with a leader that wanders at the top."},
+ {gn:"Spruces", n:"Fat Albert Blue Spruce", s:"pyramidal", h:27, w:13, ev:true, d:.95, leaf:0x6f94ae,
+  sci:"Picea pungens 'Fat Albert'", note:"A dense, broad, perfectly formed blue pyramid. Slow; a living Christmas tree."},
+ {gn:"Spruces", n:"Meyer Spruce", s:"pyramidal", h:50, w:28, ev:true, d:.92, leaf:0x5a7f86,
+  sci:"Picea meyeri", note:"Blue-green, softer-needled alternative to Colorado spruce that stands up to winter wind and holds its shape."},
  {gn:"Firs", n:"Concolor Fir", z:[3,7], s:"pyramidal", h:45, w:22, ev:true, d:.90, leaf:0x7a98a0,
   sci:"Abies concolor", note:"Soft, silvery blue-green needles on a full, even pyramid. Softer to the touch and more heat tolerant than blue spruce."},
  {gn:"Firs", n:"Balsam Fir", z:[2,6], s:"pyramidal", h:45, w:18, ev:true, d:.90, leaf:0x2a4a2e,
@@ -219,6 +346,8 @@ const PRESETS = [
   sci:"Pinus strobus", note:"Soft, long blue-green needles in fives. Grows into a tall tree with layered, horizontal branches. Salt-sensitive: keep it back from the street."},
  {gn:"Pines", n:"Scotch Pine", z:[2,7], s:"round", h:50, w:30, cb:20, ev:true, d:.62, leaf:0x4a6a5a,
   sci:"Pinus sylvestris", note:"Twisted blue-green needles and bright orange bark on the upper trunk. Matures into an open, flat-topped crown."},
+ {gn:"Pines", n:"Hyland Splendor Mugo Pine", s:"pyramidal", h:16, w:9, ev:true, d:.9, leaf:0x2f5230,
+  sci:"Pinus mugo 'Hydak'", note:"NDSU's upright mugo: faster than Tannenbaum and darker green through winter."},
  {gn:"Junipers & arborvitae", n:"Techny Arborvitae", gr:1, z:[2,7], s:"pyramidal", h:18, w:10, ev:true, d:.95, leaf:0x3a6428,
   sci:"Thuja occidentalis 'Techny'", note:"Broad, dense pyramid of flat, bright-green sprays that stay green in winter. Hardy to zone 3."},
  {gn:"Junipers & arborvitae", n:"Emerald Green Arborvitae", gr:0.7, z:[3,7], s:"columnar", h:14, w:4, ev:true, d:.95, leaf:0x3f6e2c,
@@ -226,7 +355,21 @@ const PRESETS = [
  {gn:"Junipers & arborvitae", n:"Spartan Juniper", gr:1.2, z:[4,9], s:"columnar", h:18, w:5, ev:true, d:.95, leaf:0x3a5c36,
   sci:"Juniperus chinensis 'Spartan'", note:"Narrow columnar evergreen. Thin but solid shadow, year round. Rated zone 4, marginal in 4a."},
  {gn:"Junipers & arborvitae", n:"Moonglow Juniper", z:[3,7], s:"pyramidal", h:20, w:10, ev:true, d:.92, leaf:0x7a929a,
-  sci:"Juniperus scopulorum 'Moonglow'", note:"Broad pyramidal blue-green evergreen. Dense year-round shade in a compact footprint."}
+  sci:"Juniperus scopulorum 'Moonglow'", note:"Broad pyramidal blue-green evergreen. Dense year-round shade in a compact footprint."},
+ {gn:"Junipers & arborvitae", n:"Holmstrup Arborvitae", s:"columnar", h:8, w:3, ev:true, d:.95, leaf:0x447a2e,
+  sci:"Thuja occidentalis 'Holmstrup'", note:"A compact, bright green column with tightly layered foliage. Slow and tidy."},
+ {gn:"Junipers & arborvitae", n:"North Pole Arborvitae", s:"columnar", h:12, w:4, ev:true, d:.95, leaf:0x2f5a28,
+  sci:"Thuja occidentalis 'Art Boe'", note:"Narrow, dark green column from Faribault, Minnesota. Resists winter burn."},
+ {gn:"Junipers & arborvitae", n:"Pyramidal Arborvitae", s:"columnar", h:18, w:4, ev:true, d:.93, leaf:0x447a2e,
+  sci:"Thuja occidentalis 'Pyramidalis'", note:"Fast, narrow cone of soft bright green. Needs little trimming."},
+ {gn:"Junipers & arborvitae", n:"Rushmore Arborvitae", s:"columnar", h:25, w:6, ev:true, d:.95, leaf:0x2a5226,
+  sci:"Thuja occidentalis 'Rushmore'", note:"Dense, deep green and upright: a tall hedge or screen that shrugs off wind and winter burn."},
+ {gn:"Junipers & arborvitae", n:"Technito Arborvitae", s:"pyramidal", h:6, w:6, ev:true, d:.96, leaf:0x2f5a28,
+  sci:"Thuja occidentalis 'Bailjohn'", note:"A smaller, denser Techny that keeps its dark green through winter and needs less pruning."},
+ {gn:"Junipers & arborvitae", n:"Medora Juniper", s:"columnar", h:11, w:3, ev:true, d:.95, leaf:0x5a7a78,
+  sci:"Juniperus scopulorum 'Medora'", note:"North Dakota selection. A slender blue-green column, slow growing, good as a specimen."},
+ {gn:"Junipers & arborvitae", n:"Skyrocket Juniper", s:"columnar", h:15, w:3, ev:true, d:.95, leaf:0x66808a,
+  sci:"Juniperus scopulorum 'Skyrocket'", note:"About the narrowest juniper there is: a silvery-blue rocket for screens and accents."}
 ];
 /* Deciduous first, then evergreen; genera in the order they appear above. */
 function presetGroups(){
@@ -327,6 +470,22 @@ function fromPreset(name, x, y){
   if(d.cb != null) o.crownBase = d.cb;
   return o;
 }
+/* The planting bed in the starting yard: tall at the back, low along the front. */
+function starterPlanting(x, y){
+  const rows = [
+    ["karl-foerster", [-6,1.6],[-4.3,2],[5.5,1.8]], ["hydrangea-little-lime", [.5,1.2]],
+    ["russian-sage-denim-n-lace", [-2.5,1.4],[3.3,1.6]], ["coneflower-magnus", [-5.2,-.3],[-3.8,-.5],[-4.5,.6]],
+    ["rudbeckia-goldsturm", [2.2,-.4],[3.6,-.2],[5,.1]], ["catmint-walkers-low", [-7,-1.2],[-1.5,-1.6],[6.6,-1.4]],
+    ["salvia-may-night", [0,-1.4],[1.2,-1.8],[-.2,-2.6]], ["sedum-autumn-joy", [7.6,.6],[-8,.4]],
+    ["creeping-thyme", [-3.5,-2.8],[2.8,-3],[4.6,-2.4]], ["daylily-stella", [-6,-2.2],[8.2,-.6]]
+  ];
+  const plants = [];
+  for(const [k, ...at] of rows) for(const [px, py] of at) plants.push({id:nid(), k, x:px, y:py});
+  return {id:nid(), type:"planting", name:"Perennial border", x, y, rot:0, poly:starterOutline(20, 8), smooth:true, mulch:"bark", plants};
+}
+/* What a species carries beyond its crown: borrowed foliage (`lk`), a flower
+   form and season (`bk`, `bw` in days after leaf-out), bark (`bark`) and a
+   multi-stem habit (`clump`). */
 function isoToday(){
   const d = new Date();
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
@@ -338,6 +497,7 @@ function baseState(){
     place:"Fargo, ND", tzMode:"zone", tzZone:"America/Chicago",
     date: isoToday(), minutes: 13*60,
     north:0, grid:5, snap:true, showGrid:true, simple:false, gridFrame:null,
+    plantView:"plants", plantLabels:true,
     yard:{w:120, h:90},
     boundary: rectPoly(120, 90),
     boundaryLabels:[], boundaryImage:null, boundaryImageDraft:null,
@@ -393,9 +553,20 @@ let nodeEdit = false;
 
 const isPoly = o => !!(o && o.poly);
 const isPaved = o => !!(o && Object.hasOwn(PAVING,o.type));
-const isOutlineType = o => o.type === "structure" || o.type === "deck" || isPaved(o);
+const isOutlineType = o => o.type === "structure" || o.type === "deck" || o.type === "planting" || isPaved(o);
 /* fences are open runs of posts, not closed outlines */
 const isOpenPath = o => o?.type === "fence";
+const isPlanting = o => !!(o && o.type === "planting");
+/* raised beds and planting beds both get sun-hour readings */
+const isBed = o => !!(o && (o.type === "bed" || o.type === "planting"));
+/* the rectangle, in a bed's own axes, that its sun readings are sampled over */
+function bedFrame(o){
+  if(o.type !== "planting") return {cx:0, cy:0, w:o.w, h:o.h, outline:null};
+  const outline = bedOutline(o), b = bbox(outline);
+  return {cx:b.cx, cy:b.cy, w:Math.max(.5, b.w), h:Math.max(.5, b.h), outline};
+}
+/* a planting bed's drawn edge (curved if smoothed) in yard coordinates */
+function outlineWorld(o){ return isPlanting(o) ? worldPoly({...o, poly:bedOutline(o)}) : worldPoly(o); }
 function ensureFenceSides(){
   const n = S.boundary.length;
   if(!Array.isArray(S.fence.sides)) S.fence.sides = [];
@@ -653,8 +824,8 @@ function fallAmount(t){
    and the hemisphere). Panicle hydrangeas flower from midsummer into fall.
    Crabapples keep calendar dates instead (27 April to late May, see species.js). */
 const BLOOM_WINDOWS = {crabapple:{from:0, to:16}, hydrangea:{from:62, to:150}};
-function bloomState(kind){
-  const w = BLOOM_WINDOWS[kind];
+function bloomState(kind, win){
+  const w = win ? {from:win[0], to:win[1]} : BLOOM_WINDOWS[kind];
   if(!w || !leafOn()) return null;
   const day = mdDay(seasonMD()) - mdDay(S.leafOut);
   const end = Math.min(w.to, mdDay(S.leafDrop) - mdDay(S.leafOut) - 2);
@@ -832,6 +1003,24 @@ function treeDiscs(t, u, cot){
   }
   return out;
 }
+/* Shrubs and tall perennials cast shade too. Anything under this height is
+   left out: it only shades its own feet. */
+const PLANT_SHADE_MIN = 2.5;
+function plantShadeDensity(p, leaves){
+  const full = p.cat === "evergreen" ? .88 : p.cat === "shrub" ? .8 : p.cat === "grass" ? .5 : .6;
+  if(leaves) return full;
+  const w = winterHabit(p);
+  return w === "evergreen" ? full : w === "dormant" ? 0 : w === "standing" ? .3 : .15;
+}
+function plantDiscs(bed, pl, p, u, cot){
+  const s = pl.s || 1, h = p.h*s, R = p.w/2*s, y0 = (p.opt?.trunk || 0)*s, ch = h - y0;
+  const q = rot2(pl.x, pl.y, (bed.rot||0)*DEG), cx = bed.x + q.x, cy = bed.y + q.y, out = [];
+  for(const [f, k] of [[.2, .8], [.5, 1], [.8, .7]]){
+    const z = y0 + ch*f, r = R*k;
+    out.push({x:cx + u.x*z*cot, y:cy + u.y*z*cot, r2:r*r});
+  }
+  return out;
+}
 function sweptRect(cx, cy, w, h, rotDeg, height, u, cot){
   const L = Math.min(800, height*cot), a = -rotDeg*DEG;
   const d = rot2(u.x*L, u.y*L, a);
@@ -891,6 +1080,13 @@ function casters(minutes){
       const dens = o.evergreen ? (g.density ?? .9) : (leafOn(o) ? (g.density ?? .85) : .12);
       if(dens <= .02) continue;
       trees.push({discs: treeDiscs(g, u, cot), dens});
+    } else if(o.type === "planting"){
+      for(const pl of o.plants || []){
+        const p = plantByKey(pl.k);
+        if(p.h*(pl.s || 1) < PLANT_SHADE_MIN) continue;
+        const dens = plantShadeDensity(p, leafOn());
+        if(dens > .02) trees.push({discs: plantDiscs(o, pl, p, u, cot), dens, bed:o.id});
+      }
     } else if((o.type === "structure" || o.type === "deck") && o.poly && o.poly.length > 2){
       /* a raised deck throws real shade; a ground-level patio does not */
       const H = o.type === "deck" ? deckHeight(o) : o.height;
@@ -907,7 +1103,9 @@ function casters(minutes){
   }
   return {sp, u, cot, trees, rects, polys};
 }
-function sunFraction(c, px, py){
+/* `ownBed`: a bed's sun reading ignores its own plants, so a spot is not
+   called shady because of the plant that is meant to grow there. */
+function sunFraction(c, px, py, ownBed){
   let f = 1;
   for(let i=0;i<c.polys.length;i++){
     if(inPolyShadow(c.polys[i].ps, px, py)){ f *= (1 - c.polys[i].dens); if(f < .01) return 0; }
@@ -917,6 +1115,7 @@ function sunFraction(c, px, py){
   }
   for(let i=0;i<c.trees.length;i++){
     const T = c.trees[i], ds = T.discs;
+    if(ownBed != null && T.bed === ownBed) continue;
     for(let j=0;j<ds.length;j++){
       const d = ds[j], dx = px-d.x, dy = py-d.y;
       if(dx*dx + dy*dy <= d.r2){ f *= (1 - T.dens); break; }
@@ -949,7 +1148,16 @@ function scheduleCompute(){
     mask[r*cols+q] = pointInPoly(S.boundary, x0+q*cell, y0+r*cell) ? 1 : 0;
 
   const NB = 11;
-  const bedAcc = S.objects.filter(o=>o.type==="bed").map(bd=>({b:bd, grid:new Float32Array(NB*NB), series:new Float32Array(times.length)}));
+  const bedAcc = S.objects.filter(isBed).map(bd=>{
+    const fr = bedFrame(bd), mask = new Uint8Array(NB*NB);
+    let inside = 0;
+    for(let iy=0; iy<NB; iy++) for(let ix=0; ix<NB; ix++){
+      const on = !fr.outline || pointInPoly(fr.outline, fr.cx + (ix/(NB-1) - .5)*fr.w, fr.cy + (iy/(NB-1) - .5)*fr.h);
+      if(on){ mask[iy*NB+ix] = 1; inside++; }
+    }
+    if(!inside){ mask.fill(1); inside = NB*NB; }
+    return {b:bd, fr, mask, inside, grid:new Float32Array(NB*NB), series:new Float32Array(times.length)};
+  });
   computeJob = {
     i:0, times, stepH:stepMin/60, raf:0, NB, bedAcc, wantHeat:S.heat,
     heat:{cols, rows, cell, x0, y0, mask, data:new Float32Array(cols*rows), max:0}
@@ -977,13 +1185,13 @@ function computeTick(){
       }
     }
     for(const acc of J.bedAcc){
-      const b = acc.b, a = b.rot*DEG, N = J.NB;
+      const b = acc.b, a = (b.rot||0)*DEG, N = J.NB, fr = acc.fr;
       for(let iy=0; iy<N; iy++){
-        const ly = (iy/(N-1) - .5)*b.h;
+        const ly = fr.cy + (iy/(N-1) - .5)*fr.h;
         for(let ix=0; ix<N; ix++){
-          const p = rot2((ix/(N-1) - .5)*b.w, ly, a);
-          const f = sunFraction(c, b.x+p.x, b.y+p.y);
-          if(f > 0){ acc.grid[iy*N+ix] += J.stepH*f; acc.series[ti] += f/(N*N); }
+          const p = rot2(fr.cx + (ix/(N-1) - .5)*fr.w, ly, a);
+          const f = sunFraction(c, b.x+p.x, b.y+p.y, b.id);
+          if(f > 0){ acc.grid[iy*N+ix] += J.stepH*f; if(acc.mask[iy*N+ix]) acc.series[ti] += f/acc.inside; }
         }
       }
     }
@@ -996,7 +1204,11 @@ function computeTick(){
   bedStats = new Map();
   for(const acc of J.bedAcc){
     let sum=0, mn=99, mxb=0, good=0;
-    for(const v of acc.grid){ sum+=v; if(v<mn) mn=v; if(v>mxb) mxb=v; if(v>=S.fullSun) good++; }
+    for(let i=0;i<acc.grid.length;i++){
+      if(!acc.mask[i]) continue;
+      const v = acc.grid[i];
+      sum+=v; if(v<mn) mn=v; if(v>mxb) mxb=v; if(v>=S.fullSun) good++;
+    }
     /* hour-by-hour share of the bed in sun, for the insights strip */
     const hours = [];
     for(let i=0;i<J.times.length;i++){
@@ -1006,8 +1218,9 @@ function computeTick(){
       h.f += acc.series[i]; h.n++;
     }
     for(const h of hours) h.f /= h.n;
-    bedStats.set(acc.b.id, {avg:sum/acc.grid.length, min:mn, max:mxb,
-                            pct:Math.round(100*good/acc.grid.length), grid:acc.grid, N:J.NB, hours});
+    bedStats.set(acc.b.id, {avg:sum/acc.inside, min:mn, max:mxb,
+                            pct:Math.round(100*good/acc.inside), grid:acc.grid, N:J.NB, hours,
+                            fr:acc.fr, mask:acc.mask, inside:acc.inside});
   }
   computeJob = null;
   onComputeDone();
@@ -1839,12 +2052,41 @@ function refreshHeat(){
 function disposeTree(root){
   root.traverse(n=>{
     if(n.geometry && !n.geometry.userData.shared) n.geometry.dispose();
+    if(n.isInstancedMesh) n.dispose();
     if(n.material?.userData?.uniforms) n.material.dispose();
   });
+}
+/* What beds.js needs to know to draw a planting bed right now. */
+const toneCache = new Map();
+function toneColor(hex){
+  const exposure = renderer.toneMappingExposure || 1, key = hex+"|"+exposure;
+  let c = toneCache.get(key);
+  if(!c){
+    c = preToneMap([hex>>16 & 255, hex>>8 & 255, hex & 255], exposure).map(v=>toLin(v)*HEAT_GAIN);
+    toneCache.set(key, c);
+  }
+  return c;
+}
+/* The designer has its own symbols/plants switch, so opening it never edits the plan. */
+const plantMode = ()=>(design ? design.view : S.plantView) === "symbols" ? "symbols" : "plants";
+const plantSeason = ()=>({md:seasonMD(), growing:leafOn(), fall:fallAmount()});
+function gardenCtx(){
+  return {simple:!!S.simple, mode:plantMode(), season:plantSeason(),
+          tone:toneColor, toneKey:renderer.toneMappingExposure || 1, soilMap:TEX.soil};
+}
+function rebuildPlantings(onlyIfSeasonChanged){
+  const season = onlyIfSeasonChanged ? plantSeason() : null;
+  for(const o of S.objects){
+    if(!isPlanting(o)) continue;
+    if(season && meshes.get(o.id)?.userData.seasonKey === bedSeasonKey(o, season)) continue;
+    rebuildObject(o);
+  }
+  markDirty();
 }
 function buildFor(o, draft){
   return o.type === "tree" ? buildTree(o, draft)
        : o.type === "bed" ? buildBed(o)
+       : o.type === "planting" ? buildPlantingBed(o, gardenCtx())
        : o.type === "deck" ? buildDeck(o)
        : isPaved(o) ? buildPaved(o)
        : o.type === "fence" ? buildFenceObj(o)
@@ -1860,6 +2102,7 @@ function rebuildObject(o, draft = false){
   objGroup.add(m);
   meshes.set(o.id, m);
   shadowStamp++;
+  if(design) applyDesignVisibility();
   if(activeView === "vplan") applyCamera();
 }
 function rebuildAll(){
@@ -1867,6 +2110,7 @@ function rebuildAll(){
   meshes.clear();
   for(const o of S.objects) rebuildObject(o);
   buildFence();
+  applyDesignVisibility();
   markDirty();
 }
 function placeObject(o){
@@ -1920,7 +2164,7 @@ function updateSelection(){
     } else {
       const pts = [];
       if(o.poly){
-        const w = worldPoly(o);
+        const w = outlineWorld(o);
         for(let i=0,j=w.length-1;i<w.length;j=i++){
           if(isOpenPath(o) && i === 0) continue;
           pts.push(w[j].x,0,w[j].y, w[i].x,0,w[i].y);
@@ -1939,8 +2183,11 @@ function updateSelection(){
       selRing.position.y = OVER + .11;
     }
     selRing.renderOrder = 4;
+    /* while designing, the bed's own edge is enough; keep the ring off the plants */
+    selRing.visible = !(design && design.bedId === o.id);
     helperGroup.add(selRing);
   }
+  updatePlantRing();
   markDirty();
 }
 function localOf(o, gx, gy){
@@ -2197,6 +2444,7 @@ function setView(v, recenter){
   camAnim = null;
   ["vplan","v3d","veye"].forEach(id=>document.getElementById(id).setAttribute("aria-pressed", id === v));
   applyCamera();
+  applyDesignVisibility();
   const b = gridBounds(), span = Math.max(b.w, b.h), center = gridToWorld({x:b.cx,y:b.cy});
   // keep wherever the person has panned to unless they explicitly ask to reframe
   const base = recenter ? {tx:center.x, tz:center.y, az:-gridFrame().angle} : {tx:orbit.tx, tz:orbit.tz};
@@ -2449,8 +2697,10 @@ function project(x, y, z){
   _v.set(x, y, z).project(camera);
   return {x:(_v.x*.5+.5)*window.innerWidth, y:(-_v.y*.5+.5)*window.innerHeight, z:_v.z};
 }
+const camRight = new THREE.Vector3();
 function updateLabels(){
   let n = 0;
+  camRight.setFromMatrixColumn(camera.matrixWorld, 0);
   const take = cls=>{
     let el = labelPool[n];
     if(!el){ el = document.createElement("div"); labelHost.appendChild(el); labelPool.push(el); }
@@ -2458,7 +2708,7 @@ function updateLabels(){
     return el;
   };
   for(const o of S.objects){
-    if(o.type !== "bed") continue;
+    if(!isBed(o) || (design && design.bedId === o.id)) continue;
     const st = bedStats.get(o.id);
     if(!st) continue;
     const p = project(o.x, 1.2, o.y);
@@ -2476,6 +2726,25 @@ function updateLabels(){
       const ft = Math.floor(d), inch = Math.round((d-ft)*12);
       el.textContent = metric() ? (d*.3048).toFixed(2)+" m" : d.toFixed(1)+" ft · "+ft+"' "+inch+'"';
       el.style.left = p.x+"px"; el.style.top = (p.y-14)+"px";
+    }
+  }
+  /* plant numbers: the same number on every plant of a kind, as on a planting plan */
+  if(S.plantLabels) for(const bed of S.objects){
+    if(!isPlanting(bed) || !bed.plants?.length) continue;
+    const designing = design && design.bedId === bed.id;
+    const flat = S.simple || plantMode() === "symbols";
+    if(!designing && !flat) continue;
+    const nos = new Map(bedLegend(bed).map(r=>[r.k, r.no])), a = (bed.rot||0)*DEG;
+    for(const pl of bed.plants){
+      const q = rot2(pl.x, pl.y, a), r = plantRadius(pl), wx = bed.x+q.x, wz = bed.y+q.y;
+      const y = flat ? .1 : plantByKey(pl.k).h*(pl.s||1);
+      const p = project(wx, y, wz);
+      if(p.z > 1 || p.z < -1 || p.x < -20 || p.y < -20 || p.x > innerWidth+20 || p.y > innerHeight+20) continue;
+      const e = project(wx + camRight.x*r, y, wz + camRight.z*r);
+      if(Math.hypot(e.x-p.x, e.y-p.y) < 9) continue;
+      const el = take("pno" + (designing && design.sel === pl.id ? " on" : ""));
+      el.textContent = nos.get(pl.k);
+      el.style.left = p.x+"px"; el.style.top = p.y+"px";
     }
   }
   for(let i=n;i<labelPool.length;i++) labelPool[i].style.display = "none";
@@ -2827,6 +3096,7 @@ const GROUND = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
 const CANOPY_PLANE = new THREE.Plane(new THREE.Vector3(0,1,0), -.07);
 const pointers = new Map();
 let mode = null, pinch = null, dragObj = null, dragOff = null, panGrab = null;
+let dragPlant = null, plantMoved = false, stampDown = null;
 let measure = {a:null, b:null, live:null};
 
 function ndc(x,y){
@@ -2941,6 +3211,29 @@ canvas.addEventListener("pointerdown", e=>{
     mode = "measure";
     return;
   }
+  if(design){
+    /* Designing a bed: the pointer works on its plants, never on the yard. */
+    const bed = designBed(), g = groundAt(e.clientX, e.clientY);
+    stampDown = null;
+    if(bed && g && e.button === 0){
+      const l = localOf(bed, g.x, g.y);
+      if(design.stamp) stampDown = {x:e.clientX, y:e.clientY};     // placed on release, if this was a click and not a pan
+      else {
+        let pl = plantAt(bed, l.x, l.y);
+        if(pl){
+          if(e.altKey){ pl = {...pl, id:nid()}; bed.plants.push(pl); rebuildObject(bed); }
+          design.sel = pl.id;
+          dragPlant = pl; dragOff = {x:pl.x-l.x, y:pl.y-l.y}; plantMoved = !!e.altKey; mode = "plant";
+          updatePlantRing(); drawPanel();
+          return;
+        }
+        if(design.sel != null){ design.sel = null; updatePlantRing(); drawPanel(); }
+      }
+    }
+    mode = activeView === "vplan" ? "pan" : "orbit";
+    if(mode === "pan"){ panGrab = grabPan(e.clientX, e.clientY); canvas.style.cursor = "grabbing"; }
+    return;
+  }
   /* Observing: look only, nothing in the yard can be picked up */
   const hitObj = obsMode ? null : pickObject(e.clientX, e.clientY);
   if(tool !== "select" && !hitObj){
@@ -2966,6 +3259,7 @@ canvas.addEventListener("mousedown", e=>{ if(e.button === 1) e.preventDefault();
 canvas.addEventListener("auxclick", e=>{ if(e.button === 1) e.preventDefault(); });
 canvas.addEventListener("pointermove", e=>{
   const held = pointers.has(e.pointerId);
+  if(!held && design?.stamp && tool === "select") moveStampGhost(e.clientX, e.clientY);
   if(!held && !(tool === "measure" && measure.a && !measure.b)) return;
   const prev = held ? pointers.get(e.pointerId) : null;
   if(held) pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
@@ -2980,6 +3274,17 @@ canvas.addEventListener("pointermove", e=>{
   if(!held && tool === "measure"){
     const g = groundAt(e.clientX, e.clientY);
     if(g){ measure.live = snapPt(g); drawMeasureLine(); }
+    return;
+  }
+  if(mode === "plant" && dragPlant){
+    const bed = designBed(), g = groundAt(e.clientX, e.clientY);
+    if(bed && g){
+      /* free placement: plants ignore the yard grid */
+      const l = localOf(bed, g.x, g.y);
+      dragPlant.x = +(l.x+dragOff.x).toFixed(2); dragPlant.y = +(l.y+dragOff.y).toFixed(2);
+      plantMoved = true;
+      queueRebuild(bed); updatePlantRing();
+    }
     return;
   }
   if(mode === "drag" && dragObj){
@@ -3016,6 +3321,16 @@ function endPointer(e){
     mode = "pan";
   }
   if(mode === "drag") scheduleCompute();
+  if(mode === "plant"){
+    if(plantMoved){ scheduleCompute(); syncProject(); }
+    dragPlant = null; panelFor = null; drawPanel();
+  }
+  if(stampDown && design?.stamp && e.type === "pointerup" && pointers.size === 0
+     && Math.hypot(e.clientX-stampDown.x, e.clientY-stampDown.y) < 6){
+    const g = groundAt(e.clientX, e.clientY);
+    if(g) stampPlant(g);
+  }
+  stampDown = null;
   dragObj = null;
   if(pointers.size === 0){
     if(mode !== "measure") mode = null;
@@ -3027,6 +3342,9 @@ canvas.addEventListener("pointerup", endPointer);
 canvas.addEventListener("pointercancel", endPointer);
 canvas.addEventListener("contextmenu", e=>e.preventDefault());
 canvas.addEventListener("dblclick", e=>{
+  if(design) return;
+  const hit = tool === "select" ? pickObject(e.clientX, e.clientY) : null;
+  if(isPlanting(hit)){ enterDesign(hit); return; }
   const g = groundAt(e.clientX, e.clientY);
   if(g) recenterOn(g.x, g.y);
 });
@@ -3034,6 +3352,7 @@ let lastTap = 0, lastTapPt = null;
 canvas.addEventListener("pointerup", e=>{        // double-tap to re-centre on touch
   if(e.pointerType === "mouse") return;
   const now = performance.now();
+  if(design){ lastTap = 0; return; }
   if(now - lastTap < 320 && lastTapPt && Math.hypot(e.clientX-lastTapPt.x, e.clientY-lastTapPt.y) < 26){
     const g = groundAt(e.clientX, e.clientY);
     if(g) recenterOn(g.x, g.y);
@@ -3070,6 +3389,8 @@ function addObject(kind, p){
     o.planted = +todayISO().slice(0,4); o.plantH = defaultPlantH(o);
   }
   else if(kind === "bed") o = {id:nid(), type:"bed", name:"Garden bed", x:p.x, y:p.y, w:12, h:4, rot};
+  else if(kind === "planting") o = {id:nid(), type:"planting", name:"Planting bed", x:p.x, y:p.y, rot,
+                                    poly:starterOutline(16, 7), smooth:true, mulch:"bark", plants:[]};
   else if(kind === "deck") o = {id:nid(), type:"deck", name:"Deck", x:p.x, y:p.y, rot, height:.5, poly:rectPoly(16,12)};
   else if(kind === "fence"){
     /* a straight 40 ft run to start; drag its posts and add bends */
@@ -3099,6 +3420,10 @@ function addObject(kind, p){
     toast(o.type === "fence" ? "Drag the posts to place the fence. + between posts adds a bend; the + past the end extends it."
       : "Drag corners or add points to shape the "+kind+". Choose Done reshaping when finished.");
   }
+  if(isPlanting(o)){
+    if(window.innerWidth <= 1020) openSheet(true);
+    toast("Planting bed added. Choose Design this bed to fill it with plants.");
+  }
 }
 function removeSelected(){
   if(S.sel === BOUNDARY) return;
@@ -3111,6 +3436,7 @@ function removeSelected(){
 }
 const isPhone = ()=>matchMedia("(max-width:1020px)").matches;
 function select(id){
+  if(design && id !== design.bedId) exitDesign(true);
   S.sel = id;
   document.body.classList.toggle("hassel", id != null);
   if(id == null && document.getElementById("inspector")?.classList.contains("open")) openSheet(false);
@@ -3120,6 +3446,239 @@ function select(id){
   updateSelection();
   drawPanel();
   drawList();
+}
+
+/* ============================================================ bed designer --
+   Designing is a mode on one planting bed. The plan camera frames the bed,
+   the inspector becomes a plant palette and key, and the pointer places,
+   moves and removes plants instead of yard objects. Plants sit wherever they
+   are dropped (no grid) and may overlap. */
+let design = null;       // {bedId, sel, stamp, cat, q, view}
+let plantRing = null, stampGhost = null;
+function designBed(){ return design ? S.objects.find(o=>o.id === design.bedId && isPlanting(o)) || null : null; }
+function designPlant(){ const bed = designBed(); return bed && design.sel != null ? bed.plants.find(p=>p.id === design.sel) || null : null; }
+function plantWorld(bed, pl){ const q = rot2(pl.x, pl.y, (bed.rot||0)*DEG); return {x:bed.x+q.x, y:bed.y+q.y}; }
+function ringMesh(r, width, color, opacity){
+  const geo = new THREE.RingGeometry(Math.max(.02, r), r + width, 56);
+  geo.rotateX(-Math.PI/2);
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color, transparent:true, opacity, side:THREE.DoubleSide, depthWrite:false, depthTest:false}));
+  m.renderOrder = 6;
+  return m;
+}
+function dropHelper(m){ if(m){ helperGroup.remove(m); m.geometry.dispose(); m.material.dispose(); } return null; }
+function updatePlantRing(){
+  plantRing = dropHelper(plantRing);
+  const bed = designBed(), pl = designPlant();
+  if(pl){
+    const w = plantWorld(bed, pl), r = plantRadius(pl);
+    plantRing = ringMesh(r, Math.max(.07, r*.07), 0xffb43f, .95);
+    plantRing.position.set(w.x, OVER + .14, w.y);
+    helperGroup.add(plantRing);
+  }
+  markDirty();
+}
+function setStamp(k){
+  if(!design) return;
+  design.stamp = k || null; design.sel = null;
+  stampGhost = dropHelper(stampGhost);
+  if(design.stamp){
+    const r = plantByKey(design.stamp).w/2;
+    stampGhost = ringMesh(r*.96, r*.04 + .03, 0xffffff, .8);
+    stampGhost.visible = false;
+    helperGroup.add(stampGhost);
+    setTool("select");
+    if(window.innerWidth <= 1020) openSheet(false);     // on a phone the sheet covers the bed
+  }
+  canvas.style.cursor = design.stamp ? "copy" : "default";
+  updatePlantRing(); panelFor = null; drawPanel();
+}
+function moveStampGhost(sx, sy){
+  if(!stampGhost) return;
+  const g = groundAt(sx, sy);
+  stampGhost.visible = !!g;
+  if(g) stampGhost.position.set(g.x, OVER + .14, g.y);
+  markDirty();
+}
+function stampPlant(g){
+  const bed = designBed();
+  if(!bed || !design.stamp) return;
+  const l = localOf(bed, g.x, g.y), outline = bedOutline(bed), reach = plantByKey(design.stamp).w/2 + 1;
+  let near = pointInPoly(outline, l.x, l.y);
+  for(let i=0,j=outline.length-1; !near && i<outline.length; j=i++)
+    near = distToSeg(l.x, l.y, outline[j].x, outline[j].y, outline[i].x, outline[i].y).d <= reach;
+  if(!near){ toast("Click inside the bed to plant. Esc stops placing."); return; }
+  bed.plants.push({id:nid(), k:design.stamp, x:+l.x.toFixed(2), y:+l.y.toFixed(2)});
+  rebuildObject(bed);
+  scheduleCompute(); panelFor = null; drawPanel(); drawList();
+}
+function removePlant(id){
+  const bed = designBed();
+  if(!bed) return;
+  bed.plants = bed.plants.filter(p=>p.id !== id);
+  if(design.sel === id) design.sel = null;
+  rebuildObject(bed); updatePlantRing();
+  scheduleCompute(); panelFor = null; drawPanel(); drawList();
+}
+function setPlantView(v){
+  v = v === "symbols" ? "symbols" : "plants";
+  if(plantMode() !== v){
+    if(design) design.view = v; else { S.plantView = v; scheduleHist(); }
+    rebuildPlantings();
+  }
+  syncLayers(); panelFor = null; drawPanel(); markDirty();
+}
+/* A canopy over the bed would hide it from straight above: while designing in
+   Plan, trees that reach over the bed step aside. */
+function applyDesignVisibility(){
+  const bed = designBed(), reach = bed ? objReach(bed) : 0;
+  let changed = false;
+  for(const o of S.objects){
+    if(o.type !== "tree") continue;
+    const m = meshes.get(o.id);
+    if(!m) continue;
+    const hide = !!bed && activeView === "vplan" && !S.simple && Math.hypot(o.x-bed.x, o.y-bed.y) < o.spread/2 + reach;
+    if(m.visible === hide){ m.visible = !hide; changed = true; }
+  }
+  if(changed) markShadows();
+}
+function enterDesign(o){
+  if(!isPlanting(o)) return;
+  nodeEdit = false; activeNode = null;
+  if(S.sel !== o.id) select(o.id);
+  setTool("select");
+  design = {bedId:o.id, sel:null, stamp:null, cat:"all", q:"", view:"symbols", sunWasOpen:!$("sunpanel").classList.contains("min")};
+  document.body.classList.add("designing");
+  /* the sun card would sit on top of the bed; tuck it away while designing */
+  if(design.sunWasOpen){ $("sunpanel").classList.add("min"); syncSunH(); }
+  rebuildPlantings(); syncLayers();
+  setView("vplan");
+  /* frame the bed in the space between the rail and the inspector */
+  const b = bbox(outlineWorld(o)), wide = window.innerWidth > 1020;
+  const availW = Math.max(240, window.innerWidth - (wide ? 480 : 0)), availH = Math.max(200, window.innerHeight*(wide ? 1 : .5) - 150);
+  const perPx = Math.max(b.w*1.3/availW, b.h*1.3/availH);            // feet per screen pixel
+  const dist = clamp(perPx*window.innerHeight/(2*Math.tan(perspectiveCamera.fov*DEG/2)), 12, 900);
+  const shift = wide ? 160*perPx : 0;
+  const a = orbit.az*DEG;
+  flyTo({tx:b.cx + Math.cos(a)*shift, tz:b.cy - Math.sin(a)*shift, ty:0, el:90, dist}, 500);
+  updateSelection(); panelFor = null; drawPanel();
+  if(window.innerWidth <= 1020) openSheet(true);
+  toast("Pick a plant, then click in the bed. Drag a plant to move it.");
+}
+function exitDesign(quiet){
+  if(!design) return;
+  const changed = plantMode() !== (S.plantView === "symbols" ? "symbols" : "plants");
+  if(design.sunWasOpen){ $("sunpanel").classList.remove("min"); syncSunH(); }
+  design = null;
+  document.body.classList.remove("designing");
+  plantRing = dropHelper(plantRing); stampGhost = dropHelper(stampGhost);
+  canvas.style.cursor = "default";
+  if(changed) rebuildPlantings();
+  syncLayers(); applyDesignVisibility();
+  if(!quiet){ updateSelection(); panelFor = null; drawPanel(); }
+  markDirty();
+}
+
+/* ---------- planting bed panels ---------- */
+const hexCss = h=>"#"+h.toString(16).padStart(6,"0");
+function swatchSVG(p, no){
+  return `<svg class="psw" viewBox="0 0 40 40" aria-hidden="true"><path d="${symbolPath(p, 20, 20, 17)}" fill="${hexCss(symbolColor(p))}" fill-opacity=".88" stroke="#1c1a17" stroke-width="1.6" stroke-linejoin="round"/>`
+    + (no != null ? `<circle cx="20" cy="20" r="8.5" fill="#F6F2E7"/><text x="20" y="24.2" text-anchor="middle" font-family="Instrument Serif,Georgia,serif" font-size="13" fill="#1c1a17">${no}</text>` : `<circle cx="20" cy="20" r="1.6" fill="#1c1a17"/>`)
+    + `</svg>`;
+}
+const fmtFt = v=>v < 1 ? Math.round(v*12)+" in" : (+v.toFixed(1))+" ft";
+const plantSize = p=>fmtFt(p.h)+" tall · "+fmtFt(p.w)+" wide";
+/* hours of direct sun where one plant stands, from the bed's sun readings */
+function sunAtPlant(bed, pl){
+  const st = bedStats.get(bed.id);
+  if(!st || !st.fr) return null;
+  const N = st.N, ix = clamp(Math.round(((pl.x-st.fr.cx)/st.fr.w + .5)*(N-1)), 0, N-1),
+        iy = clamp(Math.round(((pl.y-st.fr.cy)/st.fr.h + .5)*(N-1)), 0, N-1);
+  return st.grid[iy*N+ix];
+}
+/* plants in this bed standing where the sun does not suit them, on the plan's date */
+function sunMisfits(bed){
+  const out = [];
+  for(const pl of bed.plants || []){
+    const h = sunAtPlant(bed, pl);
+    if(h != null && !plantByKey(pl.k).sun.includes(sunClass(h, S.fullSun))) out.push({pl, h});
+  }
+  return out;
+}
+function legendHTML(bed, pick){
+  const rows = bedLegend(bed);
+  if(!rows.length) return `<p class="hint" style="margin:0">No plants yet.</p>`;
+  const bad = new Set(sunMisfits(bed).map(m=>m.pl.k));
+  return `<div class="plegend">` + rows.map(r=>`<${pick ? `button data-stamp="${escapeHTML(r.k)}" aria-pressed="${design?.stamp === r.k}" title="Place more of these"` : "div"} class="prow">
+      ${swatchSVG(r.plant, r.no)}<span class="tx"><b>${escapeHTML(r.plant.n)}</b><i>${escapeHTML(r.plant.sci || "")}</i></span>
+      ${bad.has(r.k) ? `<span class="pwarn" title="Some of these get the wrong amount of sun here">sun</span>` : ""}<span class="ct num">× ${r.count}</span></${pick ? "button" : "div"}>`).join("") + `</div>`;
+}
+function plantCardHTML(bed, pl){
+  const p = plantByKey(pl.k), no = bedLegend(bed).find(r=>r.k === pl.k)?.no;
+  const h = sunAtPlant(bed, pl), cls = h == null ? null : sunClass(h, S.fullSun), ok = cls && p.sun.includes(cls);
+  const day = new Date(S.date+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});
+  return `<div class="isec plantcard"><div class="prow">${swatchSVG(p, no)}<span class="tx"><b>${escapeHTML(p.n)}</b><i>${escapeHTML(p.sci || "")}</i></span></div>
+    <div class="chips sm"><span>${plantSize(p)}</span><span>${bloomText(p)}</span><span>${sunNeeds(p)}</span><span>Zones ${p.zone[0]}–${p.zone[1]}</span></div>
+    ${h == null ? `<p class="hint">Measuring the sun on this spot…</p>`
+      : `<div class="fit ${ok ? "ok" : "bad"}"><svg class="ic"><use href="#i-${ok ? "check" : "close"}"/></svg><span>This spot gets <b class="num">${h.toFixed(1)} h</b> of direct sun on ${day}: ${SUN_LABEL[cls].toLowerCase()}. ${ok ? "That suits it." : "It wants "+sunNeeds(p).toLowerCase()+"."}</span></div>`}
+    ${p.note ? `<p class="profile">${escapeHTML(p.note)}</p>` : ""}
+    <div class="btnrow"><button class="btn" data-stamp="${escapeHTML(pl.k)}">Place more</button><button class="btn danger" data-act="delplant">Remove plant</button></div></div>`;
+}
+function paletteMatches(p){
+  if(design.cat !== "all" && p.cat !== design.cat) return false;
+  if(!design.q) return true;
+  const hay = (p.n+" "+(p.sci||"")+" "+p.cat+" "+(p.note||"")).toLowerCase();
+  return design.q.split(/\s+/).every(w=>hay.includes(w));
+}
+function paletteRowsHTML(bed){
+  const st = bedStats.get(bed.id), cls = st ? sunClass(st.avg, S.fullSun) : null;
+  let rows = "", last = null;
+  for(const p of PLANTS){
+    if(!paletteMatches(p)) continue;
+    if(p.model !== last){ last = p.model; rows += `<div class="palhead">${escapeHTML(MODELS[p.model]?.label || "")}</div>`; }
+    rows += `<button class="prow" data-stamp="${escapeHTML(p.k)}" aria-pressed="${design.stamp === p.k}">
+      ${swatchSVG(p)}<span class="tx"><b>${escapeHTML(p.n)}</b><i>${plantSize(p)} · ${bloomText(p)}</i></span>
+      ${cls && !p.sun.includes(cls) ? `<span class="pwarn" title="This bed averages ${SUN_LABEL[cls].toLowerCase()}; it wants ${sunNeeds(p).toLowerCase()}">${sunNeeds(p)}</span>` : ""}</button>`;
+  }
+  return rows || `<p class="hint">No plants match.</p>`;
+}
+function designPanelHTML(o){
+  const pl = designPlant(), stamp = design.stamp ? plantByKey(design.stamp) : null;
+  return `<div class="isec dview"><div class="seg" role="group" aria-label="How plants are drawn">
+        <button data-plantview="symbols" aria-pressed="${plantMode() === "symbols"}">Symbols</button>
+        <button data-plantview="plants" aria-pressed="${plantMode() !== "symbols"}">Plants</button></div>
+      <label class="chk"><input type="checkbox" class="sw" data-plantlabels ${S.plantLabels ? "checked" : ""}>Numbers</label></div>`
+    + (pl ? plantCardHTML(o, pl) : "")
+    + (stamp ? `<div class="isec stamping"><b>Placing ${escapeHTML(stamp.n)}</b><span>Click in the bed for each one. Esc when done.</span><button class="btn" data-stamp="">Stop</button></div>` : "")
+    + `<div class="isec"><div class="fh"><h4>Plant palette</h4><span>Pick one, then click in the bed</span></div>
+      <div class="btnrow" style="margin:0 0 10px"><button class="btn accent" data-act="plantlib">Browse the plant library</button></div>
+      <div class="seg tiny pcats">${[{k:"all", label:"All"}, ...CATEGORIES].map(c=>`<button data-plantcat="${c.k}" aria-pressed="${design.cat === c.k}">${c.label}</button>`).join("")}</div>
+      <label class="search psearch"><svg class="ic"><use href="#i-search"/></svg><input type="search" data-plantsearch placeholder="Search plants" value="${escapeHTML(design.q)}" aria-label="Search plants"></label>
+      <div class="palette">${paletteRowsHTML(o)}</div></div>`
+    + `<div class="isec"><div class="fh"><h4>Planting key</h4><span>${o.plants.length} plant${o.plants.length === 1 ? "" : "s"}</span></div>${legendHTML(o, true)}</div>`
+    + `<p class="hint">Drag a plant to move it. Alt-drag copies it. Delete removes the selected plant. Plants can overlap and reach past the bed edge.</p>`
+    + `<div class="ifoot">${o.plants.length ? `<button class="btn danger" data-act="clearplants">Clear bed</button>` : ""}<span class="grow"></span><button class="btn solid" data-act="enddesign">Done designing</button></div>`;
+}
+function plantKeyHTML(o){
+  const miss = sunMisfits(o);
+  return `<div class="fh"><h4>Planting key</h4><span>${o.plants.length} plant${o.plants.length === 1 ? "" : "s"}</span></div>${legendHTML(o, false)}`
+    + (miss.length ? `<div class="warn">${miss.length} plant${miss.length === 1 ? " stands" : "s stand"} where the sun does not suit ${miss.length === 1 ? "it" : "them"} on this date. Open the designer and select one to see why.</div>` : "");
+}
+function plantingPanelHTML(o, nameRow){
+  const b = bbox(bedOutline(o));
+  return `<div class="btnrow" style="margin:14px 0 4px"><button class="btn solid" data-act="design">Design this bed</button></div>`
+    + `<p class="hint" style="margin-top:6px">Opens the bed from above to place, move and swap plants. Double-clicking the bed does the same.</p>`
+    + `<div class="plkey">${plantKeyHTML(o)}</div>`
+    + `<div class="bedins" style="margin-top:14px;border-top:1px solid var(--line-2)">${bedInsightsHTML(o)}</div>`
+    + `<h4 style="margin-top:18px">Bed shape</h4>` + outlineHTML(o)
+    + `<div class="swrow"><span>Curved edge</span><input type="checkbox" class="sw" data-key="smooth" ${o.smooth ? "checked" : ""} aria-label="Curved edge"></div>`
+    + `<div class="field"><span class="lab">Surface</span><span style="flex:1.4"><select data-key="mulch">${
+        Object.entries(MULCHES).map(([k,v])=>`<option value="${k}" ${k === (o.mulch || "bark") ? "selected" : ""}>${v.label}</option>`).join("")}</select></span></div>`
+    + readRow("Overall", b.w.toFixed(1)+" × "+b.h.toFixed(1)+" ft")
+    + field("Rotation","rot",`min="-180" max="180" step="1" value="${o.rot||0}"`,"°")
+    + `<h4>Position</h4>` + field("Left–right","x",`step="1" value="${o.x}"`)
+    + field("Up–down","y",`step="1" value="${o.y}"`)
+    + nameRow
+    + `<div class="clearbox">${clearanceHTML(o)}</div>`;
 }
 
 /* ============================================================ inspector ---- */
@@ -3255,7 +3814,7 @@ function crownPath(fn, cx, top, base, half, n = 28){
   return "M"+pts.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L")+" Z";
 }
 const SHAPE_TILES = [["round","Round"],["oval","Upright oval"],["linden","Linden"],
-  ["pyramidal","Pyramid"],["columnar","Narrow pyramid"],["fastigiate","Column"],
+  ["pyramidal","Pyramid"],["columnar","Narrow pyramid"],["teardrop","Teardrop"],["spire","Spire"],["fastigiate","Column"],
   ["spreading","Spreading"],["vase","Vase"],["weeping","Weeping"]];
 function shapeTiles(o){
   return `<div class="tiles">`+SHAPE_TILES.map(([k,label])=>{
@@ -3436,7 +3995,7 @@ function inspectorHeader(o){
   const tag = $("seltag"), sub = $("selsub"), tags = $("seltags");
   if(!o){ tag.textContent = ""; sub.textContent = ""; tags.innerHTML = ""; return; }
   const p = presetFor(o);
-  const kind = {tree:"Tree", bed:"Garden bed", structure:"Building", deck:"Deck", driveway:"Driveway", sidewalk:"Sidewalk", boundary:"Property"}[o.type] || o.type;
+  const kind = {tree:"Tree", bed:"Garden bed", planting:design ? "Planting bed · Designing" : "Planting bed", structure:"Building", deck:"Deck", driveway:"Driveway", sidewalk:"Sidewalk", boundary:"Property"}[o.type] || o.type;
   tag.textContent = o.type === "tree" ? [kind, o.evergreen ? "Evergreen" : "Deciduous", p ? p.gn : "Custom"].join(" · ") : kind;
   sub.textContent = p?.sci || "";
   let t = "";
@@ -3456,6 +4015,10 @@ function inspectorHeader(o){
     const st = bedStats.get(o.id);
     if(st) t += st.avg >= S.fullSun ? `<span class="tagp brass">Full sun</span>` : st.avg >= 4 ? `<span class="tagp sky">Part sun</span>` : `<span class="tagp">Shade</span>`;
     t += `<span class="tagp">${dl(o.w)} × ${uL(o.h)} · ${uArea(o.w*o.h)}</span>`;
+  } else if(o.type === "planting"){
+    const st = bedStats.get(o.id);
+    if(st) t += st.avg >= S.fullSun ? `<span class="tagp brass">Full sun</span>` : st.avg >= 4 ? `<span class="tagp sky">Part sun</span>` : `<span class="tagp">Shade</span>`;
+    t += `<span class="tagp">${uArea(polyArea(bedOutline(o)))}</span><span class="tagp leaf">${o.plants.length} plant${o.plants.length === 1 ? "" : "s"}</span>`;
   } else if(o.type === "boundary"){
     t += `<span class="tagp">${uArea(polyArea(S.boundary))}</span><span class="tagp">${S.boundary.length} corners</span>`;
   }
@@ -3468,6 +4031,14 @@ const FITS = [
   [4, ["Lettuce","Kale","Chard","Peas","Beets","Carrots"], "Good for greens, roots and most herbs."],
   [0, ["Lettuce","Spinach","Mint","Hostas","Ferns"], "Leafy greens only, or move the bed."]
 ];
+/* for planting beds the suggestions come from the plant catalog */
+function plantingFit(h){
+  const cls = sunClass(h, S.fullSun);
+  const names = [...new Set(PLANTS.filter(p=>p.sun.includes(cls)).map(p=>p.n.replace(/ '.*$/, "")))].slice(0, 10);
+  return [0, names, cls === "full" ? "Full sun: most flowering perennials and grasses do well."
+    : cls === "part" ? "Part sun: choose plants that take some shade."
+    : "Shade: foliage plants such as hostas and ferns."];
+}
 function fitsFor(h){ return FITS.find(f=>h >= f[0]) || FITS[FITS.length-1]; }
 function fmtHM(mins){ const h = Math.floor(mins/60), m = Math.round(mins%60); return h+" h "+String(m).padStart(2,"0")+" m"; }
 function bedInsightsHTML(o){
@@ -3475,7 +4046,7 @@ function bedInsightsHTML(o){
   if(!st) return `<div class="isec"><p class="hint" style="margin:0">Measuring the sun on this bed…</p></div>`;
   const ed = dayEdges(), dayMin = Math.max(0, ed.set - ed.rise), dayH = dayMin/60;
   const C = 2*Math.PI*54, frac = dayH > 0 ? clamp(st.avg/dayH, 0, 1) : 0;
-  const fit = fitsFor(st.avg);
+  const fit = isPlanting(o) ? plantingFit(st.avg) : fitsFor(st.avg);
   let html = `<div class="isec ring"><svg viewBox="0 0 132 132" role="img" aria-label="${st.avg.toFixed(1)} of ${dayH.toFixed(1)} hours of daylight reach this bed">
       <circle cx="66" cy="66" r="54" fill="none" stroke="#243029" stroke-width="10"/>
       <circle cx="66" cy="66" r="54" fill="none" stroke="#D4A85A" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(C*frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 66 66)"/>
@@ -3509,7 +4080,7 @@ function bedInsightsHTML(o){
 const seasonCache = new Map();
 let seasonTimer = 0;
 function bedSeason(o){
-  const key = [o.id, o.x, o.y, o.w, o.h, o.rot, sceneVer, S.lat, S.lon, S.fullSun].join("|");
+  const key = [o.id, o.x, o.y, o.w, o.h, o.rot, sceneVer, S.lat, S.lon, S.fullSun].join("|");   // sceneVer covers outline edits
   const hit = seasonCache.get(o.id);
   if(hit && hit.key === key) return hit.val;
   clearTimeout(seasonTimer);
@@ -3524,8 +4095,12 @@ function computeBedSeason(o){
   const saveDate = S.date, south = S.lat < 0;
   const months = south ? [9,10,11,0,1,2,3] : [3,4,5,6,7,8,9];
   const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const cur = +saveDate.slice(5,7) - 1, a = o.rot*DEG, pts = [];
-  for(const [u,v] of [[0,0],[-.3,-.3],[.3,-.3],[-.3,.3],[.3,.3]]){ const q = rot2(u*o.w, v*o.h, a); pts.push({x:o.x+q.x, y:o.y+q.y}); }
+  const cur = +saveDate.slice(5,7) - 1, a = (o.rot||0)*DEG, pts = [], fr = bedFrame(o);
+  for(const [u,v] of [[0,0],[-.3,-.3],[.3,-.3],[-.3,.3],[.3,.3]]){
+    const lx = fr.cx + u*fr.w, ly = fr.cy + v*fr.h;
+    if(fr.outline && (u || v) && !pointInPoly(fr.outline, lx, ly)) continue;
+    const q = rot2(lx, ly, a); pts.push({x:o.x+q.x, y:o.y+q.y});
+  }
   const out = [];
   try{
     for(const m of months){
@@ -3537,7 +4112,7 @@ function computeBedSeason(o){
         const c = casters(t);
         if(!c) continue;
         let f = 0;
-        for(const p of pts) f += sunFraction(c, p.x, p.y);
+        for(const p of pts) f += sunFraction(c, p.x, p.y, o.id);
         sum += f/pts.length*(20/60);
       }
       out.push({label:names[m], v:sum, cur:m === cur});
@@ -3564,13 +4139,21 @@ function drawPanel(){
   }
   title.textContent = o.type === "boundary" ? "Property line" : o.name;
   inspectorHeader(o);
-  const key = [o.id, nodeEdit, activeNode, o.poly?o.poly.length:0, o.type === "tree" ? o.name + (o.planted ? "|p" : "") : ""].join("|");
+  if(design && (design.bedId !== o.id || !isPlanting(o))) exitDesign(true);
+  if(design && design.sel != null && !designPlant()) design.sel = null;
+  const key = [o.id, nodeEdit, activeNode, o.poly?o.poly.length:0, o.type === "tree" ? o.name + (o.planted ? "|p" : "") : "",
+    isPlanting(o) ? [o.plants.length, !!design].join(",") : ""].join("|");
+  /* the designer's panel is all live state: redraw it unless the search box is in use */
+  if(design && panelFor === key && !props.querySelector("[data-plantsearch]:focus")) panelFor = null;
   if(panelFor === key){
     if(o.type === "boundary" && !props.contains(document.activeElement)){
       panelFor = "init";
       drawPanel();
       return;
     }
+    if(design) return;
+    const pk = props.querySelector(".plkey");
+    if(pk) pk.innerHTML = plantKeyHTML(o);
     props.querySelectorAll("input[data-key]").forEach(i=>{
       if(document.activeElement === i) return;
       if(i.type === "checkbox") i.checked = !!o[i.dataset.key];
@@ -3642,6 +4225,8 @@ function drawPanel(){
       + `<h4>Position</h4>` + field("Left–right","x",`step="1" value="${o.x}"`)
       + field("Up–down","y",`step="1" value="${o.y}"`)
       + nameRow;
+  } else if(o.type === "planting"){
+    html += design ? designPanelHTML(o) : plantingPanelHTML(o, nameRow);
   } else if(o.type === "boundary"){
     const b = yardBounds();
     html += `<div style="height:10px"></div>` + outlineHTML(o)
@@ -3669,7 +4254,7 @@ function drawPanel(){
       + nameRow
       + `<div class="clearbox">${clearanceHTML(o)}</div>`;
   }
-  html += footHTML(o);
+  if(!design) html += footHTML(o);
   props.innerHTML = html;
   syncRanges(props);
   if(o.type === "tree" || o.type === "bed" || o.type === "fence") setTimeout(()=>tourTip(o.type), 400);
@@ -3722,10 +4307,22 @@ function applyPreset(o, p, fromSelect = false){
   $("inspbody").scrollTop = scroll;
   if(fromSelect) props.querySelector("select[data-preset]")?.focus({preventScroll:true});
 }
-const GEOKEYS = new Set(["height","spread","density","shape","evergreen","w","h","surface","crownBase","style"]);
+const GEOKEYS = new Set(["height","spread","density","shape","evergreen","w","h","surface","crownBase","style","smooth","mulch"]);
 props.addEventListener("input", e=>{
   const o = selected();
   if(!o) return;
+  if(e.target.hasAttribute("data-plantsearch")){
+    /* filter in place so the search box keeps its focus */
+    if(!design) return;
+    design.q = e.target.value.trim().toLowerCase();
+    const host = props.querySelector(".palette");
+    if(host) host.innerHTML = paletteRowsHTML(o);
+    return;
+  }
+  if(e.target.hasAttribute("data-plantlabels")){
+    S.plantLabels = e.target.checked; scheduleHist(); markDirty();
+    return;
+  }
   if(e.target.hasAttribute("data-preset")){
     const p = PRESETS[+e.target.value];
     if(p) applyPreset(o, p, true);
@@ -3807,10 +4404,30 @@ props.addEventListener("click", e=>{
     }
     return;
   }
+  if(design){
+    const st = e.target.closest("[data-stamp]");
+    if(st){ setStamp(st.dataset.stamp === design.stamp ? null : st.dataset.stamp); return; }
+    const pv = e.target.closest("[data-plantview]");
+    if(pv){ setPlantView(pv.dataset.plantview); return; }
+    const pc = e.target.closest("[data-plantcat]");
+    if(pc){ design.cat = pc.dataset.plantcat; panelFor = null; drawPanel(); return; }
+  }
   const btn = e.target.closest("button[data-act]");
   if(!btn) return;
   const act = btn.dataset.act, o = selected();
   if(!o) return;
+  if(act === "design"){ enterDesign(o); return; }
+  if(act === "plantlib"){ openLibrary("place", "plants"); return; }
+  if(act === "enddesign"){ exitDesign(); return; }
+  if(act === "delplant" && design?.sel != null){ removePlant(design.sel); return; }
+  if(act === "clearplants" && isPlanting(o)){
+    askUser("Clear this bed?", "This removes all "+o.plants.length+" plants from "+o.name+". The bed itself stays. Undo brings them back.",
+      [{label:"Cancel"}, {label:"Clear bed", kind:"danger", run:()=>{
+        o.plants = []; if(design) design.sel = null;
+        rebuildObject(o); updatePlantRing(); scheduleCompute(); panelFor = null; drawPanel(); drawList();
+      }}]);
+    return;
+  }
   if(act === "scaleboundary" && o.type === "boundary"){
     const edge = +$("boundary-scale-edge").value, lengthFeet = fromDl(+$("boundary-scale-feet").value);
     scaleBoundaryFromEdge(edge, lengthFeet);
@@ -3824,7 +4441,7 @@ props.addEventListener("click", e=>{
     if(S.locked && !nodeEdit){ lockedHint(); return; }
     nodeEdit = !nodeEdit;
     if(!nodeEdit) activeNode = null;
-    else setView("vplan");
+    else { exitDesign(true); setView("vplan"); }
     panelFor = null; drawPanel(); markDirty();
   }
   if(act === "delnode" && o.poly && o.poly.length > (isOpenPath(o) ? 2 : 3) && activeNode != null){
@@ -3836,7 +4453,7 @@ props.addEventListener("click", e=>{
     drawPanel(); updateSelection(); drawList();
   }
   if(act === "del") removeSelected();
-  if(act === "done"){ nodeEdit = false; activeNode = null; select(null); openSheet(false); markDirty(); }
+  if(act === "done"){ nodeEdit = false; activeNode = null; exitDesign(true); select(null); openSheet(false); markDirty(); }
   if(act === "species") openLibrary("replace");
   if(act === "plant" && o.type === "tree"){
     o.planted = +todayISO().slice(0,4); o.plantH = defaultPlantH(o);
@@ -3859,6 +4476,7 @@ props.addEventListener("click", e=>{
     const copy = JSON.parse(JSON.stringify(o));
     const offset = rot2(S.grid*2,S.grid*2,gridFrame().angle*DEG);
     copy.id = nid(); copy.x += offset.x; copy.y += offset.y;
+    if(copy.plants) for(const pl of copy.plants) pl.id = nid();
     S.objects.push(copy); rebuildObject(copy); select(copy.id); scheduleCompute();
   }
 });
@@ -3907,15 +4525,16 @@ function drawList(){
       const gt = o.type === "tree" ? grown(o) : null;
       const mt = o.type === "tree" ? (o.planted && gt.progress < .98 ? `${uS(gt.height)} × ${uS(gt.spread)} now · ${uS(o.height)} mature` : `${uS(o.height)} × ${uS(o.spread)} · ${near}`)
         : o.type === "bed" ? `${o.w}' × ${o.h}' · ${st ? st.avg.toFixed(1)+" h sun" : near}`
+        : o.type === "planting" ? `${uArea(polyArea(bedOutline(o)))} · ${o.plants.length} plant${o.plants.length === 1 ? "" : "s"}${bedStats.get(o.id) ? " · "+bedStats.get(o.id).avg.toFixed(1)+" h sun" : ""}`
         : o.type === "deck" ? `${uArea(polyArea(o.poly))} · ${uS(o.height ?? .5)} high · ${near}`
         : isPaved(o) ? `${uArea(polyArea(o.poly))} · ${o.poly.length} corners · ${near}`
         : o.type === "fence" ? `${uL(fenceLength(o))} · ${(FENCE_STYLES[o.style]||FENCE_STYLES.picket).label} · ${uS(o.height ?? 5)} high`
         : `${b.w.toFixed(0)}' × ${b.h.toFixed(0)}' · ${o.height}' to peak`;
-      const ic = o.type === "tree" ? "i-tree" : o.type === "bed" ? "i-bed"
+      const ic = o.type === "tree" ? "i-tree" : o.type === "bed" ? "i-bed" : o.type === "planting" ? "i-planting"
                : o.type === "deck" ? "i-deck" : isPaved(o) ? "i-"+o.type : o.type === "fence" ? "i-fence" : "i-house";
       rows.push(`<button data-id="${o.id}" aria-pressed="${o.id===S.sel}">
         <svg class="ic"><use href="#${ic}"/></svg>
-        <span class="tx"><span class="nm">${o.name}</span><span class="mt">${mt}</span></span></button>`);
+        <span class="tx"><span class="nm">${escapeHTML(o.name)}</span><span class="mt">${mt}</span></span></button>`);
     }
     el.innerHTML = rows.join("");
     $("objcount").textContent = S.objects.length || "";
@@ -4006,12 +4625,13 @@ function toast(msg){
   toast._t = setTimeout(()=>t.classList.remove("show"), 2000);
 }
 function setTool(t){
+  if(design && !["select","pan","measure"].includes(t)) exitDesign();
   tool = t;
   document.querySelectorAll("button[data-tool]").forEach(b=>
     b.setAttribute("aria-pressed", b.dataset.tool === t));
   $("addbtn").setAttribute("aria-pressed", !["select","pan","measure"].includes(t));
   if(t !== "measure"){ measure = {a:null,b:null,live:null}; drawMeasureLine(); }
-  canvas.style.cursor = t === "pan" ? "grab" : t === "select" ? "default" : "crosshair";
+  canvas.style.cursor = t === "pan" ? "grab" : t === "select" ? (design?.stamp ? "copy" : "default") : "crosshair";
 }
 document.querySelectorAll("button[data-tool]").forEach(b=>
   b.addEventListener("click", ()=>setTool(b.dataset.tool)));
@@ -4039,6 +4659,7 @@ function setSimple(v){
   updateSun(); refreshHeat();
   markDirty();
   scheduleHist();
+  if(design){ panelFor = null; drawPanel(); }
   toast(S.simple ? "Simple view — tree canopy outlines and grid; no tree trunks or branches" : "Realistic view");
 }
 $("vsimple").addEventListener("click", ()=>setSimple(!S.simple));
@@ -4190,7 +4811,8 @@ addMenu.addEventListener("click", e=>{
   const b = e.target.closest("button");
   if(!b) return;
   showAddMenu(false);
-  if(b.hasAttribute("data-lib")) openLibrary("place");
+  if(b.hasAttribute("data-lib")) openLibrary("place", "trees");
+  else if(b.hasAttribute("data-plantlib")) openLibrary("place", "plants");
   else toast("Click the yard to place the " + b.querySelector("b").textContent.toLowerCase());
 });
 document.addEventListener("pointerdown", e=>{
@@ -4203,6 +4825,7 @@ function syncLayers(){
   $("lySun").setAttribute("aria-pressed", !!S.heat);
   $("lyGrid").setAttribute("aria-pressed", !!S.showGrid);
   $("lySimple").setAttribute("aria-pressed", !!S.simple);
+  $("lyPlants").setAttribute("aria-pressed", plantMode() === "symbols");
 }
 function flipCheck(id, v){
   const c = $(id);
@@ -4214,6 +4837,10 @@ $("lyShadow").addEventListener("click", ()=>{ flipCheck("heat", false); syncLaye
 $("lySun").addEventListener("click", ()=>{ flipCheck("heat", !S.heat); syncLayers(); });
 $("lyGrid").addEventListener("click", ()=>{ flipCheck("showgrid", !S.showGrid); syncLayers(); });
 $("lySimple").addEventListener("click", ()=>{ setSimple(!S.simple); syncLayers(); });
+$("lyPlants").addEventListener("click", ()=>{
+  setPlantView(plantMode() === "symbols" ? "plants" : "symbols");
+  toast(plantMode() === "symbols" ? "Planting beds drawn as plan symbols" : "Planting beds drawn as plants");
+});
 for(const id of ["heat","showgrid","simpleview"]) $(id).addEventListener("change", ()=>syncLayers());
 
 /* ---------- project card ---------- */
@@ -4264,15 +4891,26 @@ let libMode = "place", pendingPreset = null;
 const lib = {type:"all", hmin:5, hmax:60, shade:new Set(["Dappled","Moderate","Dense"]), bloom:false, q:"", zone:"auto", hardy:false};
 function libZone(){ return lib.zone === "auto" ? placeZone() : +lib.zone; }
 const LIB_TALLEST = Math.max(62, ...PRESETS.map(p=>p.h + 2));
-function openLibrary(mode){
+let libKind = "trees";
+function openLibrary(mode, kind){
   libMode = mode;
+  if(kind) libKind = kind;
+  if(mode === "replace") libKind = "trees";
   showAddMenu(false);
-  const o = selected();
-  $("libtitle").textContent = mode === "replace" ? "Change species" : "Choose a tree";
+  const o = selected(), plants = libKind === "plants";
+  $("libkind").hidden = mode === "replace";
+  $("libkind").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.kind === libKind));
+  $("libfilters").hidden = plants; $("plantfilters").hidden = !plants;
+  $("libsearch").value = plants ? plib.q : lib.q;
+  $("libsearch").placeholder = plants ? "Search plants" : "Search species or cultivar";
+  $("libtitle").textContent = plants ? "Choose a plant" : mode === "replace" ? "Change species" : "Choose a tree";
+  $("libsubtitle").textContent = plants
+    ? "Perennials, grasses, groundcovers and shrubs for planting beds, each shown in bloom."
+    : "Hardy trees for cold-winter yards, drawn to the same scale so you can compare their size at maturity.";
   $("libnote").innerHTML = mode === "replace" && o
     ? `<span>Replacing</span><b>${escapeHTML(o.name)}</b><span>Keeps its place in the yard; size and shape change to the new species.</span>`
     : `<span>Placing</span><b>Pick a tree, then click the yard where it goes.</b><span>Esc cancels.</span>`;
-  renderLibrary();
+  if(plants) renderPlantLibrary(); else renderLibrary();
   $("library").hidden = false;
   setTimeout(()=>tourTip("library"), 400);
   /* Reopen where you left off, so changing species can step along the list. */
@@ -4358,7 +4996,131 @@ function renderLibrary(){
   }
   $("libgrid").innerHTML = html || `<p class="libempty">No trees match those filters.</p>`;
 }
+/* ---------- the plant library: perennials, grasses, groundcovers, shrubs ---------- */
+const plib = {cat:"all", sun:new Set(), colour:null, height:"all", q:""};
+const COLOURS = [["red","Red",0xC8202A],["orange","Orange",0xE87A1C],["yellow","Yellow",0xF2C230],["pink","Pink",0xE88AB0],
+                 ["purple","Purple",0x7A4AB0],["blue","Blue",0x5A63C8],["white","White",0xF4F2EC],["green","Green",0xB8D86A]];
+function colourFamily(hexv){
+  const c = new THREE.Color(hexv), h = {}; c.getHSL(h);
+  const deg = h.h*360;
+  if(h.s < .22 || h.l > .9) return h.l > .55 ? "white" : "purple";
+  return deg < 14 || deg >= 345 ? "red" : deg < 40 ? "orange" : deg < 68 ? "yellow" : deg < 170 ? "green"
+       : deg < 250 ? "blue" : deg < 295 ? "purple" : h.l > .6 || deg >= 320 ? "pink" : "purple";
+}
+function plantColours(p){
+  if(p.flower == null) return [];
+  return [...new Set([].concat(p.flower, p.mix || []).map(colourFamily))];
+}
+$("plcolor").innerHTML = COLOURS.map(([k, label, c])=>`<button data-colour="${k}" aria-pressed="false"><i style="background:${"#"+c.toString(16).padStart(6,"0")}"></i>${label}</button>`).join("");
+function plantLibMatches(p){
+  if(plib.cat !== "all" && p.cat !== plib.cat) return false;
+  for(const s of plib.sun) if(!p.sun.includes(s)) return false;
+  if(plib.colour && !plantColours(p).includes(plib.colour)) return false;
+  if(plib.height === "low" && p.h >= 1.5) return false;
+  if(plib.height === "mid" && (p.h < 1.5 || p.h > 4)) return false;
+  if(plib.height === "tall" && p.h <= 4) return false;
+  if(plib.q){
+    const hay = (p.n+" "+(p.sci||"")+" "+p.cat+" "+(MODELS[p.model]?.label || "")+" "+(p.note||"")).toLowerCase();
+    if(!plib.q.split(/\s+/).every(w=>hay.includes(w))) return false;
+  }
+  return true;
+}
+/* the bed a picked plant would go into: the one being designed, else the
+   selected one, else the only one there is */
+function plantingTarget(){
+  const o = designBed() || (isPlanting(selected()) ? selected() : null);
+  if(o) return o;
+  const beds = S.objects.filter(isPlanting);
+  return beds.length === 1 ? beds[0] : null;
+}
+let thumbWatch = null;
+function renderPlantLibrary(){
+  const bed = plantingTarget(), st = bed ? bedStats.get(bed.id) : null, cls = st ? sunClass(st.avg, S.fullSun) : null;
+  const here = new Map();
+  for(const o of S.objects) for(const pl of o.plants || []) here.set(pl.k, (here.get(pl.k)||0) + 1);
+  $("plnote").innerHTML = bed
+    ? `<span>Planting into</span><b>${escapeHTML(bed.name)}</b><span>${st ? SUN_LABEL[cls]+", about "+st.avg.toFixed(1)+" h of sun on this date. " : ""}Pick a plant, then click in the bed for each one.</span>`
+    : `<span>No bed chosen</span><b>${S.objects.some(isPlanting) ? "Select the bed to plant in first." : "Add a planting bed first."}</b><span>Add to yard, then Planting bed.</span>`;
+  let html = "", total = 0;
+  for(const cat of CATEGORIES){
+    const list = PLANTS.filter(p=>p.cat === cat.k && plantLibMatches(p));
+    if(!list.length) continue;
+    total += list.length;
+    html += `<section class="libgroup"><h2>${cat.label}<span>${list.length} ${list.length === 1 ? "plant" : "plants"}</span></h2>`;
+    let last = null;
+    for(const p of list){
+      if(p.model !== last){
+        if(last) html += `</div>`;
+        last = p.model;
+        html += `<div class="libgenus"><h3>${escapeHTML(MODELS[p.model]?.label || "")}</h3></div><div class="libcards">`;
+      }
+      const count = here.get(p.k) || 0, misfit = cls && !p.sun.includes(cls);
+      html += `<article class="lcard"><img class="pthumb" data-thumb="${escapeHTML(p.k)}" alt="">
+        <div class="nm"><h4>${escapeHTML(p.n)}</h4><span class="tg${count ? " here" : ""}">${count ? count+" planted" : ""}</span></div>
+        <div class="la">${escapeHTML(p.sci || "")}</div>
+        ${p.note ? `<p class="nt">${escapeHTML(p.note)}</p>` : ""}
+        <div class="ft"><div class="mt"><span>${fmtFt(p.h)} × ${fmtFt(p.w)}</span><span class="${misfit ? "wr" : "sh"}">${sunNeeds(p)}</span><span class="bl">${bloomText(p).replace(/^Blooms /, "").replace(/^in /, "")}</span></div>
+          <button class="btn" data-plant="${escapeHTML(p.k)}">${count ? "Add more" : "Place"}</button></div>
+      </article>`;
+    }
+    html += `</div></section>`;
+  }
+  $("libgrid").innerHTML = html || `<p class="libempty">No plants match those filters.</p>`;
+  $("libgrid").scrollTop = 0;
+  /* render each picture when its card scrolls into view */
+  thumbWatch?.disconnect();
+  thumbWatch = new IntersectionObserver(entries=>{
+    for(const en of entries){
+      if(!en.isIntersecting) continue;
+      thumbWatch.unobserve(en.target);
+      en.target.src = plantThumb(plantByKey(en.target.dataset.thumb));
+    }
+  }, {root:$("libgrid"), rootMargin:"300px"});
+  $("libgrid").querySelectorAll("img[data-thumb]").forEach(img=>thumbWatch.observe(img));
+}
+function pickPlant(k){
+  closeLibrary();
+  const bed = plantingTarget();
+  if(!bed){
+    toast(S.objects.some(isPlanting) ? "Select the bed to plant in, then pick the plant again." : "Add a planting bed first: Add to yard, then Planting bed.");
+    return;
+  }
+  if(!design || design.bedId !== bed.id) enterDesign(bed);
+  setStamp(k);
+  toast("Click in the bed to place " + plantByKey(k).n + ". Esc when done.");
+}
+$("libkind").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-kind]");
+  if(b && b.dataset.kind !== libKind) openLibrary("place", b.dataset.kind);
+});
+$("pltype").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-cat]");
+  if(!b) return;
+  plib.cat = b.dataset.cat;
+  $("pltype").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x === b));
+  renderPlantLibrary();
+});
+$("plheight").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-h]");
+  if(!b) return;
+  plib.height = b.dataset.h;
+  $("plheight").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x === b));
+  renderPlantLibrary();
+});
+$("plsun").addEventListener("change", e=>{
+  if(e.target.checked) plib.sun.add(e.target.value); else plib.sun.delete(e.target.value);
+  renderPlantLibrary();
+});
+$("plcolor").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-colour]");
+  if(!b) return;
+  plib.colour = plib.colour === b.dataset.colour ? null : b.dataset.colour;
+  $("plcolor").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x.dataset.colour === plib.colour));
+  renderPlantLibrary();
+});
 $("libgrid").addEventListener("click", e=>{
+  const pb = e.target.closest("[data-plant]");
+  if(pb){ pickPlant(pb.dataset.plant); return; }
   const b = e.target.closest("[data-pick]");
   if(!b) return;
   const p = PRESETS[+b.dataset.pick];
@@ -4371,7 +5133,10 @@ $("libgrid").addEventListener("click", e=>{
 });
 $("libclose").addEventListener("click", closeLibrary);
 $("library").addEventListener("pointerdown", e=>{ if(e.target === $("library")) closeLibrary(); });
-$("libsearch").addEventListener("input", e=>{ lib.q = e.target.value.trim().toLowerCase(); renderLibrary(); });
+$("libsearch").addEventListener("input", e=>{
+  const q = e.target.value.trim().toLowerCase();
+  if(libKind === "plants"){ plib.q = q; renderPlantLibrary(); } else { lib.q = q; renderLibrary(); }
+});
 $("libsearch").addEventListener("keydown", e=>{ if(e.key === "Escape") closeLibrary(); e.stopPropagation(); });
 $("libtype").addEventListener("click", e=>{
   const b = e.target.closest("button[data-type]");
@@ -4485,6 +5250,7 @@ function afterDateChange(){
       if(m) trees.setSeason(m, seasonNow(o));
     }
     regrowTrees();
+    rebuildPlantings(true);
   }
   syncYears();
   if(S.sel != null && selected()?.type === "tree"){ const gr = props.querySelector(".growbox"); if(gr) gr.innerHTML = growthHTML(selected()); }
@@ -4570,8 +5336,8 @@ function setMins(v){
   $("mins").value = S.fullSun; $("mins2").value = S.fullSun;
   for(const st of bedStats.values()){
     let good = 0;
-    for(const x of st.grid) if(x >= S.fullSun) good++;
-    st.pct = Math.round(100*good/st.grid.length);
+    st.grid.forEach((x, i)=>{ if(st.mask[i] && x >= S.fullSun) good++; });
+    st.pct = Math.round(100*good/st.inside);
   }
   refreshHeat(); panelFor = null; drawPanel(); drawList(); markDirty();
 }
@@ -4694,11 +5460,21 @@ document.addEventListener("keydown", e=>{
   if(e.key === "p" || e.key === "P"){ enterPhoto(); return; }
   if(e.key === "Escape"){
     if(!addMenu.hidden){ showAddMenu(false); return; }
+    if(design){
+      if(tool !== "select"){ setTool("select"); return; }
+      if(design.stamp){ setStamp(null); return; }
+      if(design.sel != null){ design.sel = null; updatePlantRing(); panelFor = null; drawPanel(); return; }
+      exitDesign(); return;
+    }
     if(nodeEdit){ nodeEdit = false; activeNode = null; panelFor = null; drawPanel(); markDirty(); return; }
     if(tool !== "select"){ setTool("select"); return; }
     if(S.sel != null){ select(null); openSheet(false); markDirty(); return; }
   }
-  if((e.key === "Delete" || e.key === "Backspace") && S.sel != null && S.sel !== BOUNDARY){
+  if(design){
+    /* while designing, Delete only ever removes a plant, never the bed */
+    if(e.key === "Delete" || e.key === "Backspace"){ if(design.sel != null) removePlant(design.sel); e.preventDefault(); return; }
+  }
+  else if((e.key === "Delete" || e.key === "Backspace") && S.sel != null && S.sel !== BOUNDARY){
     e.preventDefault();
     if(S.locked){ lockedHint(); return; }
     removeSelected();
@@ -4720,7 +5496,7 @@ function openSheet(on){
 }
 $("sheetbtn").addEventListener("click", ()=>openSheet(!$("inspector").classList.contains("open")));
 $("closesheet").addEventListener("click", ()=>openSheet(false));
-$("inspclose").addEventListener("click", ()=>{ nodeEdit = false; activeNode = null; select(null); openSheet(false); markDirty(); });
+$("inspclose").addEventListener("click", ()=>{ nodeEdit = false; activeNode = null; exitDesign(true); select(null); openSheet(false); markDirty(); });
 
 /* ============================================================ modal -------- */
 function askUser(title, msg, buttons){
@@ -5028,13 +5804,20 @@ function loadState(data, frame){
       if(o.type === "tree" && o.planted != null) o.planted = plantYear(o);
       if(isOutlineType(o) && !o.poly) o.poly = rectPoly(o.w || PAVING[o.type]?.w || 12, o.h || PAVING[o.type]?.h || 10);
       if(o.type === "deck" && !(o.height >= 0)) o.height = .5;
+      if(o.type === "planting"){
+        o.plants = Array.isArray(o.plants) ? o.plants.filter(p=>p && typeof p.k === "string" && Number.isFinite(p.x) && Number.isFinite(p.y)) : [];
+        if(!MULCHES[o.mulch]) o.mulch = "bark";
+      }
     }
+    if(S.plantView !== "symbols") S.plantView = "plants";
+    if(design && !designBed()) exitDesign(true);
     ensureFenceSides();
     if(gridFrame().angle !== priorGridAngle){
       orbit.az = -gridFrame().angle;
       applyCamera();
     }
-    uid = Math.max(...S.objects.map(o=>o.id), 0) + 1;
+    uid = Math.max(0, ...S.objects.flatMap(o=>[o.id, ...(o.plants || []).map(p=>p.id)]).filter(Number.isFinite)) + 1;
+    for(const o of S.objects) for(const p of o.plants || []) if(!Number.isFinite(p.id)) p.id = nid();
     measure = {a:null, b:null, live:null};
     nodeEdit = false; activeNode = null; panelFor = "init"; lastLeaf = leafKey();
     applySimpleChrome();
@@ -5332,7 +6115,7 @@ function initPrefsUI(){
   $("rsunpath")?.addEventListener("change", e=>setPath(e.target.checked));
   $("lyPath")?.addEventListener("click", ()=>setPath(prefs.sunPath === false));
   const exp = v=>{ prefs.exposure = clamp(v, .3, 2.5); $("rexp").value = prefs.exposure; $("rexp2").value = prefs.exposure;
-    changed(); clearTimeout(exp.t); exp.t = setTimeout(()=>{ updateSun(); refreshHeat(); markDirty(); }, 200); };
+    changed(); clearTimeout(exp.t); exp.t = setTimeout(()=>{ updateSun(); refreshHeat(); rebuildPlantings(); markDirty(); }, 200); };
   bindNum("rexp", exp); bindNum("rexp2", exp);
 }
 
@@ -5450,7 +6233,7 @@ const TOUR_STEPS = [
      <p>Nothing to add? Choose <b>Skip</b>.</p>`, next:"Skip",
    done:()=>builtCount() > (tourMark.built ?? 0)},
   {part:"3 · Plant your trees", title:"Open the tree library", target:"#railPlants",
-   body:`<p>79 hardy trees, from maples and lindens to spruces and junipers, each grown to its species' shape.</p>
+   body:`<p>143 hardy trees, from maples and lindens to spruces and junipers, each grown to its species' shape.</p>
      <p>Open <b>Plants</b>.</p>`,
    enter:()=>{ tourMark.trees = treeCount(); },
    done:()=>!$("library").hidden},
@@ -5528,7 +6311,8 @@ function maybeWelcome(){
 
 window.applyImportedBoundary = applyImportedBoundary;   // hook for the property-image importer
 /* development-only hook for automated screenshots */
-if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, get photo(){ return photo; }, get scene(){ return scene; }, rebuildAll, fromPreset, grown, select, worldPoly, project, get observer(){ return observer; }, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute, autosaveNow(){ nextAutosave = 0; autosaveTick(); }, get plan(){ return plan; } };
+if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, get photo(){ return photo; }, get scene(){ return scene; }, rebuildAll, fromPreset, grown, select, worldPoly, project, get observer(){ return observer; }, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute, autosaveNow(){ nextAutosave = 0; autosaveTick(); }, get plan(){ return plan; },
+  enterDesign, exitDesign, setStamp, setPlantView, get design(){ return design; } };
 initLocationUI();
 initPrefsUI();
 if(document.readyState === "complete") boot();

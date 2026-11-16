@@ -10,7 +10,8 @@ Inspired by three pieces of web work: Lusion's *Of the Oak* (a procedurally grow
   - **Broadleaves** grow by space colonization (branches reach toward light points filling the species' crown), then fan into fine twigs, and taper by the pipe model.
   - **Conifers** grow a whorl of branches a year with branchlets. Norway spruce's hang in curtains.
   - **Leaves** are individual instances in the species' true shape and arrangement: opposite pairs on maples, alternate on lindens, a fiddle outline on bur oak, pinnae on honeylocust. They're lit from both sides, with pale undersides and sun glowing through.
-  - **79 trees for zones 2–9**, each tagged with its USDA hardiness range: sugar, red, silver and Japanese maples, boxelder, northern pin and red oaks, Kentucky coffeetree, buckeyes, Japanese tree lilac, serviceberry, Canada Red chokecherry, plums, hawthorns, mountain ash, pagoda and flowering dogwoods, ironwood, blue beech, ginkgo, tamarack, magnolia, redbud, sweetgum, tulip tree, black gum, firs, white and Scotch pines, weeping white spruce, and the trees already in many older yards (green ash, cottonwood, Siberian elm).
+  - **143 trees.** 79 are tagged with their USDA hardiness range (zones 2–9): sugar, red, silver and Japanese maples, boxelder, northern pin and red oaks, Kentucky coffeetree, buckeyes, Japanese tree lilac, serviceberry, Canada Red chokecherry, plums, hawthorns, mountain ash, pagoda and flowering dogwoods, ironwood, blue beech, ginkgo, tamarack, magnolia, redbud, sweetgum, tulip tree, black gum, firs, white and Scotch pines, weeping white spruce, and the trees already in many older yards (green ash, cottonwood, Siberian elm).
+  - 64 more come from northern garden-centre lists (Freeman, sugar and Amur maples, lindens, Dakota Pinnacle and Prairie Dream birches, disease-resistant elms, NDSU oaks and honeylocust, a dozen crabapples, Amur chokecherries, smoke trees, tree lilacs, catalpa, katsura, and more arborvitae, junipers and spruces). These grow from the closest species profile and have no zone tag yet.
   - Special growth where the species needs it: pagoda dogwood in flat tiers, weeping white spruce with limbs hanging against the trunk, tamarack needles that turn gold and drop, compound leaves (ash, coffeetree, buckeye, mountain ash), a fan for ginkgo, square-tipped tulip tree leaves, braided scale-leaf sprays for junipers (distinct from arborvitae's flat fans).
   - **Research.** Species data comes from arboretum and extension fact sheets; see [docs/botany.md](docs/botany.md).
 - **Seasons in the trees.** Everything is timed from the leaf-out and leaf-drop dates, shifted per species (buckeyes leaf out a week early and are bare by mid-September; Kentucky coffeetree is two weeks late and drops early; willows hold on late). The shade maps follow the same calendar.
@@ -71,9 +72,9 @@ All of the original planner's features are here, in a quieter "field notebook" i
   - On phones the rail becomes a bottom tab bar, and panels and the inspector open as bottom sheets.
 - **Toolbar:**
   - Select, pan and measure.
-  - **Add to yard**: a tree from the species library, or a bed, building, deck, driveway or sidewalk.
+  - **Add to yard**: a tree from the species library, or a raised bed, planting bed, building, deck, driveway or sidewalk.
   - Plan / 3D / Eye level, frame the lot, centre on the selection, schematic view, undo and redo. Keyboard: 1 / 2 / 3 / 0 / F / G, Esc to cancel or deselect.
-- **Map layers:** shadows now, the sun-hours heat map, grid and schematic.
+- **Map layers:** shadows now, the sun-hours heat map, grid, schematic, and plant symbols for planting beds.
 - **Sun card:**
   - Drag the sun arc to set the time, or play the day.
   - Pick a date, click the day-length ribbon to move through the year, or jump to a solstice or equinox.
@@ -98,22 +99,80 @@ All of the original planner's features are here, in a quieter "field notebook" i
   - House angle vs. north with a dial.
 - **Also:** location and clock (see below), the heat map threshold and bare branches in the off-season, render settings, every object in the yard with its size and distance to the property line, and JSON plan files. Undo and redo keep 60 steps. You can import a property image to trace and scale the lot.
 
+### Planting beds
+
+A planting bed is an in-ground bed of perennials, grasses, groundcovers and shrubs. It sits in the yard like any other object, so it gets the same sun-hours reading and shows up in the 3D views.
+
+![Designing a bed from above](docs/planting-design.png)
+![The same bed in 3D](docs/planting-3d.png)
+
+- **Plant library:** 197 perennials, grasses, groundcovers, shrubs and evergreen shrubs, each pictured in bloom from its own 3D model. Open it from **Add to yard → Perennial or shrub**, from **Plants** in the rail, or from the designer. Filter by type, sun, flower colour and height, or search.
+- **Shape:** any outline. Reshape it corner by corner like a driveway; **Curved edge** runs a smooth curve through the corners. Surface is bark, soil, gravel or lawn.
+- **Design this bed** (or double-click the bed) opens the designer:
+  - The view drops to Plan and frames the bed. Trees whose canopy would cover it step aside while you work.
+  - Pick a plant in the palette, then click in the bed once for each one. Esc stops placing.
+  - Plants go exactly where you click. There is no grid, and circles may overlap or reach past the edge.
+  - Drag to move, Alt-drag to copy, Delete to remove. Delete never removes the bed while the designer is open.
+- **Symbols or plants:** symbols are the planting-plan view (a circle the width of the mature plant, coloured by its flowers, with an edge that says what kind of plant it is). Plants are the 3D models. The switch is in the designer, and under **Plant symbols** in the map layers for the whole yard. Plan / 3D / Eye level work in both.
+- **Numbers:** every plant of a kind carries the same number, listed in the planting key with a count.
+- **Sun check:** select a plant to see the hours of sun at that spot and whether it suits the plant. The palette flags plants that want different light from the bed's average.
+- **Seasons:** flowers appear inside each plant's bloom dates, and panicle and smooth hydrangeas change colour through theirs (lime, then white, then pink). Leaves take their fall colour before leaf drop. Out of season, perennials are cut back, grasses and seedheads stand tan, hydrangeas keep their dried heads on bare stems, dogwoods show their coloured canes and evergreens stay.
+- **Shade:** shrubs and perennials 2.5 ft and taller cast shade in the sun-hours maths, on the lawn, on other beds and on the heat map. A bed's own reading ignores its own plants, so a spot is not called shady because of the plant meant to grow there.
+
+![The plant library](docs/plant-library.png)
+![Hydrangea presets from the QA gallery](docs/plant-models.png)
+![Evergreen shrubs](docs/plant-evergreens.png)
+
+#### Plant models
+
+Every variety is a preset on one of 24 parametric growth forms, built like the trees: alpha-tested cards with procedural leaf and flower textures, tubes for stems and a dark inner mass.
+
+| Group | Growth forms |
+| --- | --- |
+| Perennials | Coneflowers & daisies, hostas, spikes, daylilies, tall clumps (bee balm, phlox, sedum, lilies), globes on stalks, peonies & bushy perennials, astilbes & ferns, ruffled mounds (coral bells, columbine), cushions, groundcover mats, upright grasses, fountain grasses, irises |
+| Shrubs | Panicle hydrangeas, mophead hydrangeas, arching shrubs (weigela, forsythia), upright shrubs (dogwood, ninebark, viburnum, smokebush), cut-leaf shrubs (sumac, elderberry), mounding shrubs (spirea, potentilla), lilacs, small-leaved mounds (barberry, boxwood), columnar shrubs |
+| Evergreen shrubs | One conifer model with five structures: globe (arborvitae, mugo pine, nest spruce), flat-topped globe (dwarf blue spruce), cone (dwarf Colorado spruce), spreading (creeping junipers, which turn plum in winter) and mounded yews; spruce, pine, arborvitae, juniper and yew foliage |
+| Add-on | A standard trunk (`opt.trunk`, in feet) turns any shrub canopy into a patio tree |
+
+`gallery.html` (with `npm run dev`, at `/gallery.html`) renders every preset in bloom, in June, in August, in fall and in winter, plus the texture sheet. It is a development page for checking models and is not part of the standalone build.
+
+Sizes, zones and bloom dates are typical mature figures; check the tag of the plant you buy.
+
+#### Adding plants and models
+
+| To change | Edit | Notes |
+| --- | --- | --- |
+| The plant list | `src/garden/plants.js` | One row per variety in a `group()` that shares a model and defaults: name, size, flower colour, overrides. The header documents every field. |
+| Growth forms and plan symbols | `src/garden/models.js` | `MODELS`: each form is a short function that calls shared generators (rosette, tuft, dome, stalks, bush, canes) and flower heads. |
+| Leaf and flower textures | `src/garden/plantTextures.js` | Painted on a canvas: brightness in red, which of the plant's two colours in green, shape in alpha. One texture serves every colour. |
+| How a bed is drawn | `src/garden/beds.js` | Outline, mulch, materials for the date, instancing. |
+| Library pictures | `src/garden/thumbs.js` | Studio renders of single plants. |
+
+In plan files a bed is `{type:"planting", x, y, rot, poly, smooth, mulch, plants:[{id, k, x, y}]}`: `k` is the catalog key and `x, y` are feet in the bed's own axes.
+
 ### Trees
 
 | Group | Species |
 | --- | --- |
-| Maples | Autumn Blaze, Sienna Glen, Matador, Crimson King, Crimson Sunset, Royal Red |
-| Lindens | Redmond, Greenspire |
-| Birches | Parkland Pillar (columnar, white bark), River Birch (cinnamon bark) |
-| Oaks | Bur Oak, Crimson Spire (columnar), Swamp white oak |
-| Elms, hackberries, honeylocusts, alders | Prairie Expedition elm, Common Hackberry, Thornless Honeylocust (fine leaflets, dappled shade), Prairie Horizon Alder |
-| Poplars & aspens | Quaking Aspen, Swedish Columnar Aspen, Hybrid Poplar, Tower Poplar |
-| Willows | Weeping Willow (hanging streamers) |
-| Crabapples | Prairifire, Flowering crabapple: pink-red blossoms for about two weeks from leaf-out in spring, gone by summer |
+| Maples | Autumn Blaze, Sienna Glen, Matador, Celebration, Silver, Sugar, Fall Fiesta, Inferno, Apollo (columnar), Emerald Lustre, Crimson King, Crimson Sunset, Royal Red, Flame and Ruby Slippers Amur, Hot Wings Tatarian (red winged seeds in summer) |
+| Lindens | Redmond, Greenspire, Boulevard, Front Yard, Harvest Gold |
+| Birches | Parkland Pillar and Dakota Pinnacle (columnar, white bark), River Birch and Northern Tribute (peeling cinnamon bark), Prairie Dream paper birch, single stem or clump |
+| Oaks | Bur Oak, Swamp white oak, Prairie Stature, Crimson Spire and Regal Prince (columnar) |
+| Elms | Prairie Expedition, Accolade, Cathedral, Princeton, Triumph, Valley Forge |
+| Hackberries, honeylocusts, alders | Common Hackberry, Prairie Sentinel (columnar), Thornless and Northern Acclaim Honeylocust (fine leaflets, dappled shade), Prairie Horizon Alder |
+| Poplars & aspens | Quaking Aspen, Prairie Gold, Summer Shimmer, Swedish Columnar Aspen, Hybrid Poplar, Robusta, Siouxland, Tower Poplar |
+| Willows | Weeping Willow (hanging streamers), Prairie Reflection laurel willow |
+| Crabapples | Prairifire, Adams, Courageous, Red Splendor, Rejoice, Royal Raindrops (single stem or clump), Starlite, Sparkling Sprite, Green Wall and Ivory Spear (columnar), and a generic flowering crab. Each blooms in its own colour for about two weeks from leaf-out |
+| Cherries & pears | Amur Chokecherry, Klondike, Ming (coppery peeling bark, white flowers), Prairie Gem Pear |
+| Small flowering trees | Winter King Hawthorn, Northern Redbud (single stem or clump), European Mountain Ash, Summerfrost Amur Maackia, Royal Purple and Golden Spirit smoke trees (a round head on a short trunk, with a haze of smoke through summer) |
+| Tree lilacs | Japanese Tree Lilac clump, Ivory Silk, Snowdance: creamy plumes in early summer |
+| Other shade trees | Early Glow Buckeye, Northern Catalpa, Rising Fire Hornbeam, Ironwood, KoolKat Katsura, Espresso Kentucky Coffeetree |
 | Hydrangeas | Limelight, Pinky Winky tree forms: panicles from midsummer that go lime → white → pink into fall |
-| Spruces | Norway (pendulous branchlets), Columnar Norway, Colorado Blue, Black Hills |
-| Pines | Tannenbaum Mugo, Columnar Mugo, Columnar Norway Pine |
-| Junipers & arborvitae | Techny and Emerald Green arborvitae (flat sprays), Spartan and Moonglow junipers |
+| Spruces | Norway (pendulous branchlets), Columnar Norway, Colorado Blue, Fat Albert, Black Hills, Meyer, Weeping White |
+| Pines | Tannenbaum and Hyland Splendor Mugo, Columnar Mugo, Columnar Norway Pine |
+| Junipers & arborvitae | Techny, Technito, Emerald Green, Holmstrup, North Pole, Pyramidal and Rushmore arborvitae; Spartan, Moonglow, Medora and Skyrocket junipers. Built as a tight skin of upright sprays on spire and teardrop crowns, with foliage to the ground |
+
+A species can borrow another's foliage, carry its own flower form and bloom window, have its own bark, and grow as a three-stem clump (`lk`, `bk`, `bw`, `bark`, `clump` on its entry in `PRESETS`).
 
 Flowering follows the leaf-out date and the hemisphere, so blossoms appear and drop with the season you pick.
 
@@ -121,6 +180,7 @@ Flowering follows the leaf-out date and the hemisphere, so blossoms appear and d
 ![New species in July: Parkland Pillar birch, quaking aspen, weeping willow, bur oak, Crimson Spire oak, honeylocust, Norway spruce, Techny arborvitae](docs/trees-new-species.png)
 ![Mid-May: Prairifire and flowering crabapples in bloom, hydrangeas not yet](docs/trees-spring-blooms.png)
 ![August: crabapple blossoms gone, hydrangea panicles out](docs/trees-summer-hydrangea.png)
+![Arborvitae and junipers](docs/trees-arborvitae-juniper.png)
 ![Bed insights](docs/bed-insights.png)
 
 Plans are stored in feet. Display → Units switches everything on screen to metres (and growth rates to cm a year); the choice is saved in this browser.
