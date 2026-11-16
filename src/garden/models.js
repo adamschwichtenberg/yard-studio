@@ -1,6 +1,6 @@
 /* ============================================================ plant models
-   The 3D plant library for planting beds: 23 parametric growth forms (14
-   perennial, 9 shrub) plus a standard-trunk add-on. A catalog entry in
+   The 3D plant library for planting beds: 24 parametric growth forms (14
+   perennial, 10 shrub) plus a standard-trunk add-on. A catalog entry in
    plants.js is a preset on one of them: a model key, a size in feet, colours
    and a few model options. No variety has its own mesh.
 
@@ -206,6 +206,35 @@ class Plant {
     }
   }
 
+  /* Clusters of florets standing on a flower head: small cards facing outward,
+     so a panicle or mophead has a broken, petalled outline instead of a
+     smooth one. Round a ball (len 0) or up a cone of radius prof(t). */
+  florets(c, axis, n, prof, size, cap = 0, sy = 1, len = 0){
+    const a = perp(axis), b = V().crossVectors(axis, a), turn = this.rnd()*TAU;
+    for(let i = 0; i < n; i++){
+      const th = turn + i*GOLD;
+      let q, nr, t = (i + .5)/n;
+      if(len){
+        const rad = prof(t), ring = a.clone().multiplyScalar(Math.cos(th)).addScaledVector(b, Math.sin(th));
+        q = c.clone().addScaledVector(axis, len*(.06 + .9*t)).addScaledVector(ring, rad*.9);
+        nr = ring.addScaledVector(axis, .25 + .9*t*t).normalize();
+      } else {
+        /* over the ball, leaving out the cap where the stalk comes in */
+        const ph = Math.acos(1 - t*(2 - cap*.35)), sn = Math.sin(ph);
+        nr = axis.clone().multiplyScalar(Math.cos(ph)).addScaledVector(a, sn*Math.cos(th)).addScaledVector(b, sn*Math.sin(th)).normalize();
+        const rad = prof(t);
+        q = V(c.x + nr.x*rad, c.y + nr.y*rad*sy, c.z + nr.z*rad);
+      }
+      const s = size*(.8 + .4*this.rnd());
+      let up = axis.clone().addScaledVector(nr, -nr.dot(axis));
+      if(up.lengthSq() < .02) up = perp(nr);
+      up.normalize().applyAxisAngle(nr, this.rnd()*TAU);
+      /* young florets (first colour) toward the tip, older (second) toward the base */
+      const tex = (len ? t > .5 : nr.dot(axis) > .1) ? "flower:cluster-a" : "flower:cluster-b";
+      this.card("flower", tex, q.clone().addScaledVector(up, -s/2), up, nr, s, s, {normal:nr.clone().lerp(UP, .35).normalize(), ao:clamp(this.ao(q) + .25, 0, 1)});
+    }
+  }
+
   /* ---------- flower heads ---------- */
   head(type, pos, dir, size, o = {}){
     const F = "flower";
@@ -240,15 +269,18 @@ class Plant {
         break;
       }
       case "mop": {
-        const c = pos.clone().addScaledVector(dir, size*.32);
-        this.ball(F, o.fine ? "flower:florets-fine" : "flower:florets", c, size*.46, .86);
-        this.cross(F, "flower:mop", c.clone().addScaledVector(UP, -size*.56), UP, size*1.16, size*1.12, 2, {normal:dir.clone().lerp(UP, .6).normalize()});
+        /* a ball of sterile florets: a floret-wrapped core with clusters standing proud of it */
+        const c = pos.clone().addScaledVector(dir, size*.34), rad = size*.46;
+        this.ball(F, o.fine ? "flower:florets-fine" : "flower:florets", c, rad*.8, .86);
+        this.florets(c, dir, 15, q=>rad*(.98 + .1*this.rnd()), size*(o.fine ? .36 : .44), 1.25, .86);
         break;
       }
       case "panicle": {
-        const base = pos.clone().addScaledVector(dir, -size*.08);
-        this.spindle(F, "flower:florets", base, dir, size*(o.fat ?? .3), size);
-        this.cross(F, "flower:panicle", base.clone().addScaledVector(dir, -size*.04), dir, size*(o.fat ?? .3)*2.5, size*1.1, 2, {normal:dir.clone().lerp(UP, .5).normalize()});
+        /* a cone of florets on a stalk: youngest at the tip, the base ageing first */
+        const base = pos.clone().addScaledVector(dir, -size*.06), fat = size*(o.fat ?? .3);
+        this.spindle(F, "flower:florets", base, dir, fat*.72, size*.94);
+        const prof = t=>fat*(.34 + 1.05*Math.sin(Math.PI*Math.pow(t, .62))*(1 - .5*t));
+        this.florets(base, dir, 20, prof, size*.34, 0, 1, size);
         break;
       }
       case "lilac": this.cross(F, "flower:lilac", pos.clone().addScaledVector(dir, -size*.1), dir, size*.55, size, 3, {normal:dir.clone().lerp(UP, .5).normalize()}); break;
@@ -259,6 +291,10 @@ class Plant {
         break;
       }
       case "berries": this.fan(F, "flower:berries", pos, dir, size/2, .3); break;
+      case "button":
+        /* a domed cluster of tiny flowers (ninebark): three crossed domes, seen from any side */
+        this.cross(F, "flower:dome", pos.clone().addScaledVector(dir, -size*.15), dir, size, size*.75, 3, {normal:dir.clone().lerp(UP, .5).normalize()});
+        break;
       case "smoke":
         /* a billow of fine hairs: three crossed puffs, so the haze has depth from any side */
         this.cross(F, "flower:smoke", pos.clone().addScaledVector(dir, -size*.25), dir, size, size, 3, {normal:dir.clone().lerp(UP, .5).normalize()});
@@ -480,6 +516,131 @@ class Plant {
       }
     }
   }
+  /* A dwarf conifer, built as the full-size tree is: a leader, whorls of limbs
+     off it, branchlets off the limbs, and every twig a shoot clothed in
+     needles. It is the tree in miniature, only shorter between the whorls and
+     far denser. profile(u) is the outline; `rise` the angle of the limbs above
+     level at the bottom and at the top (rad); `shoot` the needle-clad twig. */
+  whorled({profile, trunk = 0, shoot, rise = [.15, 1.05], leader = true, max = 1700}){
+    const r = this.rnd, H = this.H, R = this.R, y0 = trunk, ch = Math.max(.3, H - y0);
+    const l1 = r()*TAU, l2 = r()*TAU;
+    const env = (u, az)=>R*profile(clamp(u, 0, 1))*(az == null ? 1 : .94 + .06*Math.sin(az*3 + l1 + u*5) + .04*Math.sin(az*5 + l2));
+    const cm = y0 + ch*.4;
+    this.nrm = q=>V(q.x, (q.y - cm)*(R/ch)*.9 + R*.45, q.z).normalize();
+    this.ao = q=>{ const u = (q.y - y0)/ch, e = Math.max(.2, env(u)); return clamp(.1 + .75*Math.pow(Math.hypot(q.x, q.z)/e, 1.4) + .2*clamp(u, 0, 1), .1, 1); };
+    /* shoots sized to the plant, and fewer, longer ones on a big plant so the count stays in budget */
+    const area = Math.PI*R*(R + 1.6*ch);
+    let sl = shoot.len;
+    const est = area/(sl*sl*.2);
+    if(est > max) sl *= Math.sqrt(est/max);
+    const sw = sl*shoot.wide, cards = [];
+    const put = (base, dir, k = 1)=>{
+      const tip = base.clone().addScaledVector(dir, sl*k), u = (tip.y - y0)/ch;
+      if(tip.y < .03 || Math.hypot(tip.x, tip.z) > env(u, Math.atan2(tip.z, tip.x))*1.12 + sl*.2) return;
+      cards.push([base, dir, k]);
+    };
+    if(trunk) this.tube("wood", [V(0, 0, 0), V(.03, trunk*.5, .02), V(0, trunk + ch*.2, 0)], Math.max(.09, H*.02), Math.max(.07, H*.015), 7);
+    const top = y0 + ch*(leader ? .93 : .6);
+    this.tube(trunk ? "wood" : "stem", [V(0, y0, 0), V(.02, (y0 + top)/2, .02), V(0, top, 0)], clamp(H*.014, .03, .1), .012, 5);
+    const nW = clamp(Math.round(ch/(sl*.55)), 5, 18);
+    for(let j = 0; j < nW; j++){
+      const u = (j + .6)/(nW + .4), el = lerp(rise[0], rise[1], Math.pow(u, 1.3));
+      const e0 = env(u), nb = clamp(Math.round(5 + e0*2.6 + (r() - .5)), 5, 13);
+      for(let k = 0; k < nb; k++){
+        const az = k/nb*TAU + j*GOLD + (r() - .5)*.5, out = polar(az, 1), side = V(-out.z, 0, out.x);
+        /* the limb ends on the outline and leaves the leader lower down, at its angle */
+        const reach = env(u, az)*(.86 + .12*r()), yt = y0 + ch*u;
+        const ys = clamp(yt - reach*Math.tan(el), y0 + .02, Math.max(y0 + .03, top));
+        const a = V(0, ys, 0), b = polar(az, reach, yt);
+        const mid = a.clone().lerp(b, .55); mid.y -= (yt - ys)*.12 + reach*.05;       // a slight sag, tip lifting
+        const pts = [];
+        for(let i = 0; i <= 5; i++){ const t = i/5, m = 1 - t; pts.push(V(a.x*m*m + mid.x*2*m*t + b.x*t*t, a.y*m*m + mid.y*2*m*t + b.y*t*t, a.z*m*m + mid.z*2*m*t + b.z*t*t)); }
+        const L = a.distanceTo(b);
+        this.tube("stem", pts, clamp(L*.02, .012, .05), .008, 3);
+        const at = t=>{ const f = clamp(t, 0, 1)*5, i = Math.min(4, Math.floor(f)); return [pts[i].clone().lerp(pts[i+1], f - i), V().subVectors(pts[i+1], pts[i]).normalize()]; };
+        /* shoots clothe the outer limb, overlapping; branchlets leave it left and right */
+        const n = Math.max(2, Math.round(L*.72/(sl*.4)));
+        for(let q = 0; q < n; q++){
+          const t = .3 + .7*(q + .5)/n, [pos, along] = at(t);
+          put(pos, along.clone().add(V(r() - .5, r() - .5, r() - .5).multiplyScalar(.2)).normalize(), .85 + .3*r());
+          /* and one standing up off the limb, so its back is clothed too */
+          put(pos, along.clone().multiplyScalar(.5).addScaledVector(UP, .85).addScaledVector(side, (r() - .5)*.7).normalize(), .75 + .3*r());
+          if(q%2 === 0 || t > .7){
+            const sg = (q>>1)%2 ? 1 : -1;
+            for(const s2 of t > .55 ? [sg, -sg] : [sg]){
+              const d2 = along.clone().multiplyScalar(.6).addScaledVector(side, s2*(.7 + .3*r())).addScaledVector(UP, shoot.lift ?? .25).add(V(r() - .5, r() - .5, r() - .5).multiplyScalar(.25)).normalize();
+              put(pos, d2, .8 + .35*r());
+              /* a branchlet forks once more where there is room */
+              if(t < .8 && r() < .7) put(pos.clone().addScaledVector(d2, sl*.6), d2.clone().multiplyScalar(.7).addScaledVector(along, .5).addScaledVector(UP, (shoot.lift ?? .25) + .2).normalize(), .7 + .3*r());
+            }
+          }
+        }
+        const tipDir = at(1)[1], tipAt = b.clone().addScaledVector(out, -sl*.35);
+        put(tipAt, tipDir.clone().lerp(UP, shoot.tipUp ?? .25).normalize(), 1);
+        /* the limb's end is a rosette of shoots, so it reads from straight on as well as from the side */
+        const upP = V().crossVectors(side, tipDir).normalize(), t0 = r()*TAU;
+        for(let i = 0; i < 4; i++){
+          const th = t0 + i*TAU/4;
+          put(tipAt, tipDir.clone().multiplyScalar(.5).addScaledVector(side, Math.cos(th)*.85).addScaledVector(upP, Math.sin(th)*.85).addScaledVector(UP, (shoot.lift ?? .25)*.6).normalize(), .8 + .3*r());
+        }
+      }
+    }
+    /* the leader's own shoots: the tree's top */
+    if(leader) for(let i = 0; i < 7; i++){ const a = i*GOLD; put(V(0, top - sl*.2 - i*sl*.22, 0), V(Math.cos(a)*.6, i ? .55 : 2, Math.sin(a)*.6).normalize(), .9); }
+    for(const [base, dir, k] of cards) this.cross("leaf", shoot.tex, base, dir, sw*k, sl*k, 2, {normal:this.nrm(base).lerp(dir, .35).normalize()});
+  }
+  /* A shrub of canes: long stems from the base, upright in the middle and
+     arching outward at the edge, each with a few side shoots near its end and
+     small leaves all the way along. The canes show through the leaves, and
+     their tips make a feathered outline: ninebark. */
+  wands({n, foliage, heads, thick, arch = .55}){
+    const r = this.rnd, H = this.H, R = this.R, sr = thick ?? clamp(H*.006, .012, .035);
+    this.nrm = q=>V(q.x, (q.y - H*.45)*(R/H)*.9 + R*.4, q.z).normalize();
+    this.ao = q=>clamp(.18 + .6*Math.hypot(q.x, q.z)/Math.max(.2, R) + .3*q.y/H, .12, 1);
+    const fs = foliage.size, tips = [];
+    const leafy = (pts, from, k)=>{
+      /* leaves set alternately along the cane, pointing on toward its tip */
+      const len = pts.reduce((s, q, i)=>i ? s + q.distanceTo(pts[i-1]) : 0, 0), m = Math.max(2, Math.round(len*(1 - from)/(fs*.3)));
+      for(let i = 0; i < m; i++){
+        const t = from + (1 - from)*(i + .5)/m, f = t*(pts.length - 1), j = Math.min(pts.length - 2, Math.floor(f));
+        const q = pts[j].clone().lerp(pts[j+1], f - j), along = V().subVectors(pts[j+1], pts[j]).normalize();
+        const sd = perp(along).applyAxisAngle(along, i*GOLD), s = fs*k*(.75 + .5*r())*(1 - .25*t);
+        const dir = along.clone().multiplyScalar(.75).addScaledVector(sd, .65).addScaledVector(UP, .15).normalize();
+        this.sprig("leaf", foliage.tex, q.clone().addScaledVector(dir, -s*.15), dir, sd.clone().lerp(UP, .5), s, s, {bend:.25*r(), own:.5});
+      }
+    };
+    for(let i = 0; i < n; i++){
+      const az = i*GOLD + r()*.5, f = Math.sqrt((i + .5)/n), out = polar(az, 1);
+      /* inner canes stand, outer ones lean and arch over */
+      const top = H*(1 - .36*f*f)*(.88 + .12*r()), reach = R*f*(.98 + .1*r());
+      const a = polar(az, R*.12*f*r()), b = out.clone().multiplyScalar(reach).setY(top*(1 - arch*.3*f));
+      const mid = out.clone().multiplyScalar(reach*(.3 + .2*f)).setY(top*(.72 + .2*f*arch));
+      const pts = [];
+      for(let k = 0; k <= 7; k++){ const t = k/7, m = 1 - t; pts.push(V(a.x*m*m + mid.x*2*m*t + b.x*t*t, Math.max(.02, a.y*m*m + mid.y*2*m*t + b.y*t*t), a.z*m*m + mid.z*2*m*t + b.z*t*t)); }
+      this.tube("stem", pts, sr, sr*.3, 4);
+      leafy(pts, .2 + .15*r(), 1);
+      tips.push(pts[7]);
+      /* side shoots off the upper cane, climbing */
+      const ns = 2 + Math.floor(r()*3);
+      for(let k = 0; k < ns; k++){
+        const t = .45 + .45*(k + r()*.6)/ns, j = Math.min(6, Math.floor(t*7)), q = pts[j].clone().lerp(pts[j+1], t*7 - j);
+        const along = V().subVectors(pts[j+1], pts[j]).normalize(), sd = perp(along).applyAxisAngle(along, r()*TAU);
+        const L = H*(.1 + .12*r()), d = along.clone().multiplyScalar(.55).addScaledVector(sd, .6).addScaledVector(UP, .55).normalize();
+        const e = q.clone().addScaledVector(d, L), sp = [q, q.clone().lerp(e, .5).addScaledVector(UP, L*.06), e];
+        this.tube("stem", sp, sr*.45, sr*.15, 3);
+        leafy(sp, .1, .9);
+        tips.push(e);
+      }
+    }
+    if(heads){
+      /* flower buttons sit along the upper canes and at their ends */
+      const hn = Math.min(heads.n, tips.length);
+      for(let i = 0; i < hn; i++){
+        const q = tips[Math.floor(i*tips.length/hn)], out = V(q.x, 0, q.z).normalize();
+        this.head(heads.type, q.clone().addScaledVector(out, -heads.size*.3).addScaledVector(UP, -heads.size*.15), out.lerp(UP, .6).normalize(), heads.size*(.8 + .4*r()), heads);
+      }
+    }
+  }
   /* long canes arching up and over: weigela, bridalwreath, sumac */
   canes({n, foliage, heads, thick, droop = .5, reach = 1, fork = false, tips}){
     const r = this.rnd, H = this.H, R = this.R, sr = thick ?? clamp(H*.012, .012, .07);
@@ -529,6 +690,7 @@ const P_WEEP   = u=>.5 + .5*Math.pow(Math.sin(Math.PI*Math.pow(clamp(u, 0, 1), .
 
 const P_FLAT   = u=>Math.pow(Math.sin(Math.PI*Math.pow(u, .55)*.9), .4)*(u > .94 ? 1 - (u - .94)*6 : 1);
 const P_CONE   = u=>Math.pow(1 - u, .78)*(.55 + .45*Math.min(1, u*9));
+const P_SPIRE  = u=>Math.pow(1 - u, .85)*(.6 + .4*Math.min(1, u*7))*.98 + .02;
 const P_SPREAD = u=>(.42 + .58*Math.pow(clamp(u, 0, 1), .55))*(u > .82 ? Math.sqrt(Math.max(0, 1 - Math.pow((u - .82)/.18, 2))) : 1);
 
 /* ---------- the growth forms ---------- */
@@ -598,7 +760,7 @@ export const MODELS = {
     build(P, p, o){
       const H = P.H, R = P.R, head = o.head || "peony";
       const hs = o.headSize ?? (head === "peony" ? clamp(H*.17, .38, .6) : head === "spike" ? H*.36 : .3);
-      P.bush({profile:P_ROUND,         foliage:{tex:o.leafTex || "leaf:peony", size:clamp(H*.36, .5, 1.2), fine:.8, max:420, bend:.35},
+      P.bush({profile:P_ROUND,         foliage:{tex:o.leafTex || "leaf:peony", size:clamp(H*.36, .6, 1.2), fine:1, cover:1.5, max:170, shell:4, bend:.35},
         stems:{n:8, thick:.02},
         heads:{type:head, n:count((head === "peony" ? 6 : 9) + R*R*(head === "peony" ? 3 : 5), 6, 22), size:hs, zone:head === "peony" ? [.5, 1] : [.6, 1], up:head === "spike" ? .9 : .5, out:head === "spike" ? .7 : 1.02}});
     }},
@@ -709,6 +871,13 @@ export const MODELS = {
           size:(o.headSize ?? sizes[head])*(head === "plume" ? clamp(H/8, .6, 1.2) : head === "smoke" ? clamp(H*.14, .7, 1.6) : 1), out:head === "smoke" ? 1 : undefined,
           zone:head === "smoke" ? [.5, 1] : [.5, 1], up:head === "spike" ? .8 : head === "smoke" ? .7 : .45, tex:head === "plume" ? "flower:plume-wide" : head === "flat" ? "flower:umbel" : o.headTex, wide:head === "plume" ? .85 : undefined} : null});
     }},
+  ninebark: {label:"Ninebarks & cane shrubs", symbol:"cloud",
+    build(P, p, o){
+      const H = P.H, R = P.R;
+      P.wands({n:count(18 + R*R*4, 20, 48), arch:o.arch ?? .55,
+        foliage:{tex:o.leafTex || "leaf:lobed-small", size:clamp(H*.11, .4, .72)},
+        heads:p.flower != null ? {type:"button", n:count(14 + R*R*4, 14, 60), size:o.headSize ?? .3} : null});
+    }},
   sumac: {label:"Cut-leaf shrubs", symbol:"fern",
     build(P, p, o){
       const H = P.H, R = P.R;
@@ -780,6 +949,17 @@ MODELS.conifer = {label:"Evergreen shrubs", symbol:"box",
       return;
     }
     const profile = {globe:P_BALL, flat:P_FLAT, cone:P_CONE, vase:P_SPREAD, mound:P_MOUND}[form] || P_BALL;
+    if(tex === "leaf:spruce" || tex === "leaf:pine"){
+      /* dwarf spruces and pines: the tree in miniature. Spruce limbs stand out
+         nearly level and lift toward the top; pine limbs sweep up, each ending
+         in an upright candle of long needles. */
+      const pineK = tex === "leaf:pine", tr = o.trunk || 0, size = Math.min(H - tr, R*2);
+      P.whorled({profile:form === "cone" ? P_SPIRE : profile, trunk:tr,
+        rise:pineK ? [.5, 1.25] : form === "cone" ? [.05, .75] : [.12, 1.1],
+        shoot:pineK ? {tex:"leaf:shoot-pine", len:clamp(size*.2, .5, .85), wide:1, lift:.75, tipUp:.75}
+                    : {tex:"leaf:shoot-spruce", len:clamp(size*.12, .34, .55), wide:1, lift:.22, tipUp:.2}});
+      return;
+    }
     const pine = tex === "leaf:pine", trunk = o.trunk || 0, ch = H - trunk;
     P.bush({profile, trunk, open:form === "vase" ? .15 : 0,
       stems:{n:form === "cone" ? 3 : count(5 + R*2, 5, 10)},

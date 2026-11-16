@@ -333,12 +333,14 @@ group({...VASE, sci:"Cornus sericea", bloom:["05-25","06-15"], fall:0x8a2a3a, op
   ["Dogwood 'Bud's Yellow'", 7, 6, 0xF4F4EA, {sci:"Cornus alba 'Bud's Yellow'", stem:0xD8C83A}],
   ["Dogwood 'Sgt. Pepper'", 5.5, 5, 0xF4F4EA, {foliage:0x5a8a5a, foliage2:0xF0ECD8, stem:0xB8202A, opt:{head:"flat", leafTex:"leaf:ovate+edge"}, note:"Cream-edged leaves, pink in fall, on red stems."}]
 ]);
-group({...VASE, sci:"Physocarpus opulifolius", sun:FULL, bloom:["06-01","06-25"], stem:0x7a5a44, opt:{head:"flat", leafTex:"leaf:lobed"},
+group({...VASE, model:"ninebark", sci:"Physocarpus opulifolius", sun:FULL, bloom:["06-01","06-25"], stem:0x6a4a3a, opt:{},
        note:"Coloured foliage all season with pinkish-white flower buttons in June and peeling bark in winter."}, [
   ["Ninebark 'Summer Wine'", 5.5, 5.5, 0xF0DCE0, {foliage:0x5a2530}],
   ["Ninebark 'Summer Wine Black'", 5.5, 5.5, 0xF0DCE0, {foliage:0x241418}],
   ["Ninebark 'Honeycomb'", 5, 5, 0xF4F4EA, {foliage:0xC8C83A}],
-  ["Ninebark 'Amber Jubilee'", 5.5, 4, 0xF4F4EA, {foliage:0xD08A3A, fall:0x8a2a3a, note:"New growth in orange, yellow and gold."}]
+  ["Ninebark 'Amber Jubilee'", 5.5, 4, 0xF4F4EA, {foliage:0xD08A3A, fall:0x8a2a3a, note:"New growth in orange, yellow and gold."}],
+  ["Ninebark 'Fireside'", 6, 5, 0xF2D8DE, {sci:"Physocarpus opulifolius 'UMNHarpell'", k:"ninebark-fireside", foliage:0x4a1c2a, fall:0x3a1630, bloom:["05-28","06-20"],
+    note:"Reddish new growth deepens to red-purple and holds through summer, turning deep purple in fall. Rounded and upright, tidier than most ninebarks, with pinkish-white flowers in late spring."}]
 ]);
 group(VASE, [
   ["Smokebush 'Lilla'", 4, 4, 0xE8A0B0, {sci:"Cotinus coggygria 'Lilla'", sun:FULL, zone:[4,8], bloom:["06-15","08-20"], bloomLabel:"Smoke", foliage:0x5a2030, fall:0xB8281E, opt:{head:"smoke", leafTex:"leaf:heart"}, note:"A dwarf smokebush that stays a four-foot shrub: wine-red leaves under pink smoke. The full-size smoke trees are in the tree library."}],
@@ -360,6 +362,8 @@ group({model:"sumac", cat:"shrub", sun:FP, zone:[4,8], foliage:0x4a7436, stem:0x
 const SPI = {model:"spirea", cat:"shrub", sci:"Spiraea japonica", sun:FULL, zone:[4,8], bloom:["06-10","07-25"], foliage:0x5a8a45, stem:0x6a5040, winter:"bare",
              note:"A fine-textured mound topped with flat flower clusters in early summer; shear for more."};
 group(SPI, [
+  ["Spirea 'Superstar'", 2.5, 3.5, 0xC8327A, {sci:"Spiraea × bumalda 'Denistar'", k:"spirea-superstar", zone:[3,8], foliage:0x3f6a34, fall:0x9a4a2a, bloom:["06-05","07-10"],
+    note:"A compact, rounded spirea. New growth comes scarlet, then deep green under dark pink flowers in June; bronze-red in fall. Shear after bloom for a second flush in August."}],
   ["Spirea 'Goldflame'", 3, 3.5, 0xD8588F, {k:"spirea-goldflame", foliage:0xA7B24A, fall:0xC8642C, note:"New growth in burnt orange, then gold; rosy flowers; coppery in fall."}],
   ["Spirea 'Glow Girl'", 3.5, 3.5, 0xF7F7F2, {sci:"Spiraea betulifolia 'Tor Gold'", zone:[3,9], bloom:["05-28","06-25"], foliage:0xC8D83A, fall:0xD8782A}],
   ["Spirea 'Double Play Blue Kazoo'", 2.5, 2.5, 0xF7F7F2, {sci:"Spiraea media 'SMSMBK'", zone:[3,8], foliage:0x7f9aa0, fall:0xA83A3A, note:"Blue-green leaves with burgundy new growth and white flowers."}],
@@ -376,6 +380,8 @@ group({model:"lilac", cat:"shrub", sci:"Syringa", sun:FULL, zone:[3,7], bloom:["
        note:"Fragrant flower cones in late spring on a dense, upright shrub."}, [
   ["Lilac 'Miss Kim'", 6, 5.5, 0xC8A0E0, {sci:"Syringa pubescens subsp. patula 'Miss Kim'", bloom:["05-28","06-15"], fall:0x7a2a44, note:"Late, icy-lavender flowers and burgundy fall colour."}],
   ["Lilac 'Bloomerang Dark Purple'", 5, 5, 0x6A3A9A, {sci:"Syringa 'SMSJBP7'", bloom:["05-18","06-08"], note:"Blooms in spring, rests, then again from midsummer to frost."}],
+  ["Lilac 'Pinktini'", 4.5, 3.5, 0xE0559A, {sci:"Syringa × prestoniae 'Jeftini'", k:"lilac-pinktini", zone:[2,7], bloom:["05-25","06-12"], foliage:0x4f8a3a,
+    note:"A small, upright Preston lilac for tight spaces: rich pink flowers in late May and early June over clean bright green leaves. Very cold hardy."}],
   ["Lilac 'Dream Cloud'", 5.5, 5, 0xE8B0D0, {note:"Soft pink flowers."}],
   ["Dwarf Korean Lilac patio tree", 6.5, 4.5, 0xD8B8E6, {sci:"Syringa meyeri 'Palibin'", k:"lilac-dwarf-korean", opt:{trunk:3}, note:"The dense dwarf Korean lilac grafted on a single trunk."}]
 ]);

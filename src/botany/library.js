@@ -343,7 +343,7 @@ export class TreeLibrary {
     const R = Math.max(0.5, t.spread / 2);
     const dens = Math.round(THREE.MathUtils.clamp(t.density ?? 0.85, 0.1, 1) * 20) / 20;
     const variant = (t.id ?? 0) % 4;
-    const ck = [key, t.shape, H.toFixed(1), R.toFixed(1), dens, crownBase.toFixed(3), this.high, variant, !!draft].join('|');
+    const ck = [key, t.shape, H.toFixed(1), R.toFixed(1), dens, crownBase.toFixed(3), this.high, variant, !!draft, !!t.clump].join('|');
     let g = this.cache.get(ck);
     if (g) return g;
     const cb = H * crownBase;
@@ -353,7 +353,7 @@ export class TreeLibrary {
     shell = (shell * crownH) / 16;
     // Drafts (while a slider is moving) grow a fifth of the leaves and skip the coverage pass.
     const target = Math.round(this.#target(sp, shell, dens) * (draft ? 0.2 : 1));
-    const p = { key, H, R, cb, fn: profile, dens, sp, shape: t.shape, variant, target, noFill: !!draft };
+    const p = { key, H, R, cb, fn: profile, dens, sp, shape: t.shape, variant, target, noFill: !!draft, clump: !!t.clump };
     if (sp.conifer) {
       const shoot = SHOOT[sp.shoot];
       const area = shoot.length * shoot.length * 0.55;

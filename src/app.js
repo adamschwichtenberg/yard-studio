@@ -468,6 +468,7 @@ function fromPreset(name, x, y){
   if(d.leaf2 != null) o.leaf2 = d.leaf2;
   if(d.fruit) o.fruit = d.fruit;
   if(d.cb != null) o.crownBase = d.cb;
+  if(d.clump) o.clump = true;
   return o;
 }
 /* The planting bed in the starting yard: tall at the back, low along the front. */
@@ -3426,7 +3427,7 @@ function addObject(kind, p){
   }
   if(isPlanting(o)){
     if(window.innerWidth <= 1020) openSheet(true);
-    toast("Planting bed added. Choose Design this bed to fill it with plants.");
+    toast("Planting bed added. Choose Edit this bed to fill it with plants.");
   }
 }
 function removeSelected(){
@@ -3773,7 +3774,7 @@ function plantKeyHTML(o){
 }
 function plantingPanelHTML(o, nameRow){
   const b = bbox(bedOutline(o));
-  return `<div class="btnrow" style="margin:14px 0 4px"><button class="btn solid" data-act="design">Design this bed</button></div>`
+  return `<div class="btnrow" style="margin:14px 0 4px"><button class="btn solid" data-act="design">Edit this bed</button></div>`
     + `<p class="hint" style="margin-top:6px">Opens the bed from above to place, move and swap plants. Double-clicking the bed does the same.</p>`
     + `<div class="plkey">${plantKeyHTML(o)}</div>`
     + `<div class="bedins" style="margin-top:14px;border-top:1px solid var(--line-2)">${bedInsightsHTML(o)}</div>`
@@ -4420,6 +4421,7 @@ function applyPreset(o, p, fromSelect = false){
   if(p.leaf2 != null) o.leaf2 = p.leaf2; else delete o.leaf2;
   if(p.fruit) o.fruit = p.fruit; else delete o.fruit;
   if(p.cb != null) o.crownBase = p.cb;
+  if(p.clump) o.clump = true; else delete o.clump;
   if(o.plantH) o.plantH = Math.min(o.plantH, p.h);
   /* Keep the inspector where it was, so you can step through species one
      after another without scrolling back down each time. */
@@ -5944,6 +5946,8 @@ function loadState(data, frame){
       S.boundary = rectPoly(S.yard?.w || 110, S.yard?.h || 90);
     for(const o of S.objects){
       if(o.type === "tree" && o.planted != null) o.planted = plantYear(o);
+      /* trees placed before clumps were drawn as clumps */
+      if(o.type === "tree" && o.clump == null && PRESETS.find(p=>p.n === o.name)?.clump) o.clump = true;
       if(isOutlineType(o) && !o.poly) o.poly = rectPoly(o.w || PAVING[o.type]?.w || 12, o.h || PAVING[o.type]?.h || 10);
       if(o.type === "deck" && !(o.height >= 0)) o.height = .5;
       if(o.type === "planting"){

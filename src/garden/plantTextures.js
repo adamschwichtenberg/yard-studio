@@ -312,6 +312,41 @@ function conifer(o){
     }
   };
 }
+/* One conifer shoot: a twig clothed in needles all round, a bud at its tip.
+   Needles that point at the viewer are drawn short, so the shoot has roundness.
+     needle  needle length as a share of the card     fwd  how far they sweep toward the tip (rad)
+     tuft    long needles crowding the tip, a candle standing out of it (pine) */
+function shoot(o){
+  return (g, N, r)=>{
+    const {needle = .13, fwd = .95, per = 46, width = .011, tuft = false} = o;
+    const x0 = N/2, y0 = N*.995, y1 = N*(tuft ? .2 : .08);
+    const rows = [];
+    for(let i = 0; i < per; i++){
+      const t = (i + r()*.8)/per, y = y0 + (y1 - y0)*t;
+      for(let k = 0; k < (tuft ? 3 : 4); k++){
+        /* where round the twig the needle stands: sideways (long) to toward-the-eye (short) */
+        const turn = r()*TAU, sideK = Math.cos(turn), depth = Math.sin(turn);
+        const len = N*needle*(.75 + .4*r())*(tuft ? .7 + .5*t : 1 - .2*t)*Math.sqrt(sideK*sideK + .12);
+        const a = (sideK >= 0 ? 1 : -1)*fwd*(.75 + .4*r())*(tuft ? 1 - .35*t : 1);
+        rows.push({y, a, len, l:.42 + .3*(depth*.5 + .5) + r()*.22, z:depth});
+      }
+    }
+    rows.sort((p, q)=>p.z - q.z);
+    const draw = f=>{
+      g.strokeStyle = ink(f.l); g.lineWidth = N*width*(1 + .3*f.z); g.lineCap = "round";
+      g.beginPath(); g.moveTo(x0, f.y); g.lineTo(x0 + Math.sin(f.a)*f.len, f.y - Math.cos(f.a)*f.len); g.stroke();
+    };
+    const half = Math.floor(rows.length/2);
+    rows.slice(0, half).forEach(draw);
+    stemLine(g, x0, y0, x0, y1, N*.02, .36);
+    rows.slice(half).forEach(draw);
+    if(tuft){
+      /* the candle: this year's growth, pale, with short needles pressed to it */
+      stemLine(g, x0, y1, x0, N*.04, N*.022, .8);
+      for(let i = 0; i < 16; i++){ const y = y1 - (y1 - N*.05)*r(), s = r() > .5 ? 1 : -1; draw({y, a:s*.35, len:N*.05, l:.85, z:0}); }
+    } else { g.fillStyle = ink(.78); g.beginPath(); g.ellipse(x0, y1 - N*.012, N*.016, N*.026, 0, 0, TAU); g.fill(); }
+  };
+}
 /* a carpet of tiny leaves seen from above */
 function carpet(o){
   return (g, N, r)=>{
@@ -432,6 +467,31 @@ function cluster(o){
       const m = gradient ? c01((y - .1)/.8 + (r() - .5)*.25) : 0;
       floret(g, x*N, y*N, N*size*(.8 + r()*.4), petals, .66 + r()*.34, {m, eye, eyeM:gradient ? m : 1, eyeL:.55, rot:r()*6, pw:.62});
     }
+  };
+}
+/* a handful of four-petalled sterile florets, overlapping, with gaps between:
+   one cluster on a hydrangea head. `age` sets how far toward the second colour. */
+function florets4(o){
+  return (g, N, r)=>{
+    const {age = 0, n = 7} = o, pts = [[.5, .5]];
+    let guard = 0;
+    while(pts.length < n && guard++ < 400){
+      const x = .2 + r()*.6, y = .2 + r()*.6;
+      if(pts.every(q=>Math.hypot(q[0] - x, q[1] - y) > .2)) pts.push([x, y]);
+    }
+    pts.forEach(([x, y], i)=>{
+      const m = c01(age + (r() - .5)*.35), R = N*(.17 + r()*.05), rot = r()*TAU;
+      g.save(); g.translate(x*N, y*N); g.rotate(rot);
+      for(let k = 0; k < 4; k++){
+        g.rotate(TAU/4);
+        /* a broad petal with a notch of shade toward the centre */
+        g.fillStyle = ink(.7 + .28*r() - (i ? 0 : .04), m); g.beginPath();
+        g.moveTo(0, 0); g.bezierCurveTo(R*.75, -R*.25, R*.7, -R*1.05, 0, -R); g.bezierCurveTo(-R*.7, -R*1.05, -R*.75, -R*.25, 0, 0); g.fill();
+        g.strokeStyle = "rgba(0,0,0,.14)"; g.lineWidth = N*.006; g.beginPath(); g.moveTo(0, -R*.12); g.lineTo(0, -R*.7); g.stroke();
+      }
+      g.fillStyle = ink(.5, m); g.beginPath(); g.arc(0, 0, R*.13, 0, TAU); g.fill();
+      g.restore();
+    });
   };
 }
 /* opaque florets for wrapping a ball or cone; colour runs from first (top) to second (bottom) */
@@ -582,6 +642,7 @@ const KINDS = {
   "leaf:lance":      [512, sprig({n:11, len:.3, asp:.24})],
   "leaf:lance+edge": [512, sprig({n:11, len:.3, asp:.24, edge:true})],
   "leaf:lobed":      [512, twig({len:.16, asp:.5, gap:.7, sides:4, lobes:1})],
+  "leaf:lobed-small":[512, twig({len:.15, asp:.52, gap:.55, sides:2, lobes:1, lean:.5})],
   "leaf:small":      [512, twig({len:.085, asp:.6, gap:.5, sides:6, sub:true})],
   "leaf:small+edge": [512, twig({len:.085, asp:.6, gap:.5, sides:6, sub:true, edge:true})],
   "leaf:box":        [512, twig({len:.07, asp:.7, gap:.42, sides:7, sub:true, opp:true, lean:.6})],
@@ -594,6 +655,8 @@ const KINDS = {
   "leaf:pine":       [512, conifer({shoots:5, needle:.17, tufts:true, fan:.7, reach:.42, width:.005})],
   "leaf:arborvitae": [512, conifer({shoots:9, scales:true, fan:.75, reach:.5})],
   "leaf:juniper":    [512, conifer({shoots:11, needle:.03, spread:.55, step:.014, fan:.5, reach:.5, fork:true, width:.007})],
+  "leaf:shoot-spruce":[256, shoot({needle:.2, fwd:1.0, per:60, width:.02})],
+  "leaf:shoot-pine":  [256, shoot({needle:.4, fwd:.5, per:40, width:.014, tuft:true})],
   "leaf:yew":        [512, conifer({shoots:7, needle:.06, spread:1.2, step:.012, flat:true, fan:.8, reach:.5, width:.008})],
   "leaf:succulent":  [256, carpet({n:260, size:.075, asp:.62})],
   /* compound and cut leaves */
@@ -633,6 +696,8 @@ const KINDS = {
   "flower:lilac":        [256, cluster({shape:"cone", size:.045, petals:4, n:420, eye:.2, wide:.7})],
   "flower:florets":      [256, fill({size:.11})],
   "flower:florets-fine": [256, fill({size:.07})],
+  "flower:cluster-a":    [128, florets4({age:.12})],
+  "flower:cluster-b":    [128, florets4({age:.78})],
   "flower:ruffles":      [256, fill({size:.12, ruffle:true})],
   "flower:plume":        [256, plume({})],
   "flower:plume-wide":   [256, plume({width:.34, dense:1.3})],

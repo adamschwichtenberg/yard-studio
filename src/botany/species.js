@@ -254,7 +254,10 @@ export const SPECIES = {
   arborvitae: { conifer: true, shoot: 'arborvitae', bark: 'cedar', whorl: 0.55, droop: 0.6 },
   juniper: { conifer: true, shoot: 'juniper', bark: 'cedar', whorl: 0.5, droop: 0.7, shootBoost: 1.8, shootMax: 2.2, ornaments: [{ type: 'berry', color: [0x6a7a9a, 0x5a6a8a], size: 0.3 }] },
   // Weeping white spruce: short limbs that turn straight down and hang against the trunk.
-  weepingspruce: { conifer: true, shoot: 'spruce', bark: 'spruce', whorl: 0.75, weep: true, pendulous: 1, ornaments: [{ type: 'cone', color: [0x6a4a30, 0x7a5a3a], size: 2 }] },
+  // Weeping spruces have a grower of their own (growWeepingSpruce). `weep` tunes it:
+  // reach = how far a limb leaves the trunk before turning over (share of the crown radius),
+  // drop = how far it hangs, skirt = how much the lowest limbs sweep out.
+  weepingspruce: { conifer: true, shoot: 'spruce', bark: 'spruce', whorl: 0.75, weep: { reach: 0.55, drop: 1, skirt: 0.5 }, ornaments: [{ type: 'cone', color: [0x6a4a30, 0x7a5a3a], size: 2 }] },
   fir: { conifer: true, shoot: 'fir', bark: 'fir', whorl: 1.0, ascend: 0.08, ornaments: [{ type: 'cone', color: [0x5a4a6a, 0x6a5a3a], size: 3 }] },
   // White pine: widely spaced, near-horizontal whorls give its layered look.
   whitepine: { conifer: true, shoot: 'whitepine', bark: 'whitepine', whorl: 2.2, ascend: 0.06, perWhorl: 5, open: true, ornaments: [{ type: 'cone', color: [0x7a5a38, 0x8a6a48], size: 5 }] },
@@ -304,7 +307,7 @@ const BY_NAME = [
 const CONIFER_BY_NAME = [
   [/arborvitae|thuja/, 'arborvitae'],
   [/juniper|cedar|yew/, 'juniper'],
-  [/weeping white spruce|glauca 'pendula'/, 'weepingspruce'],
+  [/weeping.*spruce|spruce.*(weeping|pendula)|glauca 'pendula'/, 'weepingspruce'],
   [/\bfir\b|abies/, 'fir'],
   [/white pine|strobus/, 'whitepine'],
   [/scotch|scots pine|sylvestris/, 'scotchpine'],

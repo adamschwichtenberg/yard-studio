@@ -172,13 +172,16 @@ export function growBroadleaf(p) {
 
   // 2. The starting frame: trunk, leader or scaffold limbs.
   const lean = V((r() - 0.5) * 0.06, 1, (r() - 0.5) * 0.06).normalize();
-  const stems = sp.stems && H > 12 ? sp.stems : 1;
+  // A clump: three stems from one base, leaning apart and sharing a crown.
+  const clump = p.clump ? 3 : 0;
+  const stems = clump || (sp.stems && H > 12 ? sp.stems : 1);
   const trunkTop = sp.leader ? cb + crownH * 0.9 : sp.vase ? cb * 0.78 : cb;
   const axisStep = D * 1.2;
   let lastAxis = [];
   for (let s = 0; s < stems; s++) {
     const a = (s / stems) * Math.PI * 2 + r();
-    const tilt = stems > 1 ? V(Math.cos(a) * 0.22, 1, Math.sin(a) * 0.22).normalize() : lean;
+    const lay = clump ? 0.26 + 0.1 * r() : 0.22;
+    const tilt = stems > 1 ? V(Math.cos(a) * lay, 1, Math.sin(a) * lay).normalize() : lean;
     let prev = s === 0 ? -1 : 0;
     let pt = s === 0 ? V(0, 0, 0) : nodes.pos[0].clone();
     if (s === 0) prev = nodes.add(pt.clone(), -1, { grow: false, axis: true });
@@ -186,7 +189,9 @@ export function growBroadleaf(p) {
     for (let i = 1; i <= n; i++) {
       const y = (i / n) * trunkTop;
       const wob = V((r() - 0.5) * D * 0.12, 0, (r() - 0.5) * D * 0.12);
-      pt = V(tilt.x * y, y, tilt.z * y).add(wob);
+      // Clump stems part at the ground and straighten as they climb.
+      const run = clump ? Math.min(R * 0.4, lay * 5.5) * (1 - Math.exp(-y / Math.max(3, H * 0.16))) / lay : y;
+      pt = V(tilt.x * run, y, tilt.z * run).add(wob);
       // Laterals only from the crown; the clear trunk below stays clean.
       prev = nodes.add(pt, prev, { grow: y >= cb * 0.92, axis: true });
     }
@@ -196,10 +201,13 @@ export function growBroadleaf(p) {
   if (!sp.leader) {
     const K = (sp.scaffolds || 4) + (variant % 2) - (variant === 2 ? 1 : 0);
     const ang = THREE.MathUtils.degToRad(sp.angle);
-    const top = lastAxis[0];
     const limbLen = sp.vase ? crownH * 0.62 : Math.min(R * 0.55, crownH * 0.55);
-    for (let k = 0; k < K; k++) {
-      const az = (k / K) * Math.PI * 2 + (r() - 0.5) * 0.6 + variant;
+    // In a clump every stem forks; together they carry about as many limbs as one trunk would, plus a few.
+    const tops = clump ? lastAxis : [lastAxis[0]];
+    const Kc = clump ? tops.length * Math.max(2, Math.round(K / tops.length) + 1) : K;
+    for (let k = 0; k < Kc; k++) {
+      const top = tops[k % tops.length];
+      const az = (k / Kc) * Math.PI * 2 + (r() - 0.5) * 0.6 + variant;
       const a = ang * (0.85 + 0.3 * r());
       const dir = V(Math.cos(az) * Math.sin(a), Math.cos(a), Math.sin(az) * Math.sin(a));
       let prev = top;
@@ -760,7 +768,111 @@ function placeOrnaments(nodes, depth, p) {
 /**
  * p: { H, R, cb, fn, dens, sp, shoot, shape, variant, target }
  */
+/**
+ * Weeping spruces (Picea glauca 'Pendula' and its kind): a dead-straight
+ * leader with every limb turning over within a foot or two of the trunk and
+ * hanging against it, the longest at the bottom where they sweep out into a
+ * skirt. The foliage hangs with the limbs, so the tree reads as a narrow
+ * spire of curtains, not as a cone of level tiers.
+ * Tuned per species by sp.weep: { reach, drop, skirt }.
+ */
+export function growWeepingSpruce(p) {
+  const { H, R, cb, fn, sp, shoot, variant, dens } = p;
+  const w = { reach: 0.55, drop: 1, skirt: 0.5, ...(typeof sp.weep === 'object' ? sp.weep : {}) };
+  const r = rng(hash(`weep|${p.key}|${H.toFixed(1)}|${R.toFixed(1)}|${cb.toFixed(2)}|${variant}`));
+  const crownH = Math.max(0.5, H - cb);
+  const envelope = envelopeLUT(fn, R, cb, crownH);
+  const chains = [];
+  const shoots = [];
+  const cones = [];
+  const trunkR = Math.max(0.1, 0.015 * H + 0.008 * R);
+  // The leader: straight, with the faintest wander, bare for its last foot.
+  const lead = [];
+  const lrs = [];
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12;
+    lead.push(V((r() - 0.5) * 0.08 * t, H * t, (r() - 0.5) * 0.08 * t));
+    lrs.push(trunkR * (1 - t * 0.94));
+  }
+  chains.push({ pts: lead, rs: lrs });
+  const S = shoot.length * 1.05 * (0.9 + 0.2 * dens);
+  const put = (pos, axis, u, k = 1) => {
+    const face = V().crossVectors(axis, randUnit(r)).normalize();
+    const outer = THREE.MathUtils.clamp(Math.hypot(pos.x, pos.z) / Math.max(0.3, envelope(pos.y) * 0.9), 0, 1);
+    shoots.push({ pos, axis, face, s: S * k * (0.8 + 0.4 * r()), rand: r(), ao: THREE.MathUtils.clamp(0.3 + 0.55 * outer + 0.15 * u, 0, 1) });
+  };
+  const step = Math.max(0.42, Math.min(0.8, crownH / 46));
+  const nWhorls = Math.max(8, Math.round(crownH / step));
+  for (let j = 0; j < nWhorls; j++) {
+    const u = (j + 0.5) / nWhorls;
+    const y = cb + u * crownH;
+    if (y > H - 0.9) break;
+    const Renv = Math.max(0.35, envelope(y));
+    const n = 4 + (r() < 0.5 ? 1 : 0) + (Renv > 2.5 ? 1 : 0);
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + j * GOLDEN + (r() - 0.5) * 0.5;
+      const dir = V(Math.cos(a), 0, Math.sin(a));
+      // Out and a little up, over the shoulder, then down. Lower limbs are older and hang further.
+      const reach = Renv * w.reach * (0.8 + 0.4 * r());
+      const drop = Math.min(y - 0.25, (1.3 + 3.2 * (1 - u)) * w.drop * (0.75 + 0.5 * r()) * Math.min(1, H / 18));
+      const flare = Renv * (0.72 + 0.28 * r()) + w.skirt * (1 - u) * (1 - u) * R * 0.5;
+      const start = V(0, y, 0);
+      const c1 = start.clone().addScaledVector(dir, reach * 0.9).addScaledVector(UP, reach * 0.35);
+      const c2 = start.clone().addScaledVector(dir, reach * 1.25).addScaledVector(UP, -drop * 0.35);
+      const end = start.clone().addScaledVector(dir, flare).addScaledVector(UP, -drop);
+      const pts = [];
+      const rs = [];
+      const N = 8;
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        const m = 1 - t;
+        pts.push(V().addScaledVector(start, m * m * m).addScaledVector(c1, 3 * m * m * t).addScaledVector(c2, 3 * m * t * t).addScaledVector(end, t * t * t));
+        rs.push(Math.max(0.012, trunkR * 0.22 * (0.5 + 0.5 * (1 - u)) * (1 - t * 0.85)));
+      }
+      chains.push({ pts, rs });
+      // Foliage: shoots hang along the limb, and short branchlets hang off its sides like a fringe.
+      const side = V().crossVectors(dir, UP).normalize();
+      const len = reach + drop;
+      const m = Math.max(4, Math.round(len / (S * 0.5)));
+      for (let q = 0; q < m; q++) {
+        const t = 0.1 + (0.9 * (q + r() * 0.6)) / m;
+        const f = Math.min(N - 1e-3, t * N);
+        const i0 = Math.floor(f);
+        const at = V().lerpVectors(pts[i0], pts[i0 + 1], f - i0);
+        const along = V().subVectors(pts[i0 + 1], pts[i0]).normalize();
+        put(at.clone().addScaledVector(randUnit(r), 0.04), along.clone().addScaledVector(randUnit(r), 0.25).normalize(), u);
+        // side branchlets: out a hand's width, then down
+        for (const sg of q % 2 ? [1] : [-1]) {
+          const off = at.clone().addScaledVector(side, sg * S * (0.3 + 0.3 * r())).addScaledVector(dir, S * 0.12);
+          const hang = V(side.x * sg * 0.3 + dir.x * 0.15, -1, side.z * sg * 0.3 + dir.z * 0.15).addScaledVector(randUnit(r), 0.22).normalize();
+          put(off, hang, u, 0.95);
+          if (r() < 0.6) put(off.clone().addScaledVector(hang, S * 0.55), hang.clone().addScaledVector(randUnit(r), 0.25).normalize(), u, 0.85);
+        }
+      }
+      // the tip turns out and lifts a little, as the growing end does
+      put(end.clone(), V(dir.x * 0.7, -0.55, dir.z * 0.7).normalize(), u, 0.9);
+      if (sp.ornaments && u > 0.6 && r() < 0.22) cones.push({ pos: c2.clone(), dir: V(0, -1, 0), rand: r(), outer: 1 });
+    }
+  }
+  // The top: this year's leader with a few short shoots standing off it.
+  for (let i = 0; i < 9; i++) {
+    const y = H - 0.15 - i * 0.16;
+    const a = i * GOLDEN;
+    put(V(0, y, 0), V(Math.cos(a) * 0.55, i < 2 ? 1 : 0.25, Math.sin(a) * 0.55).normalize(), 1, 0.7);
+  }
+  const core = [new THREE.Vector2(0.02, cb + crownH * 0.03)];
+  for (let i = 1; i <= 10; i++) {
+    const t = i / 10;
+    const y = cb + t * crownH;
+    core.push(new THREE.Vector2(Math.max(0.04, envelope(y) * 0.3 * THREE.MathUtils.smoothstep(t, 0.02, 0.15)), y));
+  }
+  core.push(new THREE.Vector2(0.01, H * 0.94));
+  const ornaments = (sp.ornaments || []).map((o) => ({ ...o, list: cones }));
+  return { chains, shoots, core, ornaments, trunkR };
+}
+
 export function growConifer(p) {
+  if (p.sp.weep) return growWeepingSpruce(p);
   const { H, R, cb, fn, sp, shoot, variant, dens } = p;
   const r = rng(hash(`con|${p.key}|${H.toFixed(1)}|${R.toFixed(1)}|${cb.toFixed(2)}|${variant}`));
   const crownH = Math.max(0.5, H - cb);
@@ -822,14 +934,6 @@ export function growConifer(p) {
         mid = V(dir.x * len * 0.8, start.y + (y - start.y) * 0.45, dir.z * len * 0.8);
         len = Math.hypot(len, y - start.y);
       }
-      if (sp.weep) {
-        // Weeping spruce: a short limb that turns over and hangs against the trunk.
-        const reach = L * (0.75 + 0.2 * r());
-        const drop = Math.min(y - 0.4, 1.2 + reach * (1.6 + r()));
-        mid = start.clone().addScaledVector(dir, reach * 1.15).addScaledVector(UP, reach * 0.15);
-        end = start.clone().addScaledVector(dir, reach * 0.95).addScaledVector(UP, -drop);
-        len = reach + drop * 0.8;
-      }
       const pts = [];
       const rs = [];
       for (let i = 0; i <= 6; i++) {
@@ -877,7 +981,7 @@ export function growConifer(p) {
       const at = V().lerpVectors(b.pts[k], b.pts[k + 1], seg - k);
       const along = V().subVectors(b.pts[k + 1], b.pts[k]).normalize();
       const sign = s % 2 ? 1 : -1;
-      const lenSec = (b.len * (sp.weep ? 0.12 : upright ? 0.16 : 0.45) * (1 - t * 0.7) + scaleSeg * 0.6) * (0.8 + 0.4 * r());
+      const lenSec = (b.len * (upright ? 0.16 : 0.45) * (1 - t * 0.7) + scaleSeg * 0.6) * (0.8 + 0.4 * r());
       let dir2;
       if (s === nSec) dir2 = along.clone();
       // Norway spruce: most branchlets hang in curtains, the rest lie flat
