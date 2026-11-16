@@ -6312,7 +6312,7 @@ function maybeWelcome(){
 window.applyImportedBoundary = applyImportedBoundary;   // hook for the property-image importer
 /* development-only hook for automated screenshots */
 if(import.meta.env.DEV) window.__yardDebug = { get S(){ return S; }, get photo(){ return photo; }, get scene(){ return scene; }, rebuildAll, fromPreset, grown, select, worldPoly, project, get observer(){ return observer; }, setView, flyTo, orbit, applyCamera, markDirty, scheduleCompute, autosaveNow(){ nextAutosave = 0; autosaveTick(); }, get plan(){ return plan; },
-  enterDesign, exitDesign, setStamp, setPlantView, get design(){ return design; } };
+  enterDesign, exitDesign, setStamp, setPlantView, get design(){ return design; }, afterDateChange };
 initLocationUI();
 initPrefsUI();
 if(document.readyState === "complete") boot();
