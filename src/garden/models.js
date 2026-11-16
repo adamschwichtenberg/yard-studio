@@ -274,12 +274,11 @@ class Plant {
       }
       case "mop": {
         /* a domed ball of sterile florets: a floret-wrapped core with clusters
-           standing proud of it all over, so the outline is petalled */
+           standing proud of it all over, so the outline is petalled. No flat
+           profile cards: on a ball they show as a cross. */
         const c = pos.clone().addScaledVector(dir, size*.3), rad = size*.47;
-        this.ball(F, o.fine ? "flower:florets-fine" : "flower:florets", c, rad*.78, .8);
-        /* crossed profiles give the head a petalled edge from any side */
-        this.cross(F, "flower:mop", c.clone().addScaledVector(dir, -size*.54), dir, size*1.1, size*1.08, 2, {normal:dir.clone().lerp(UP, .6).normalize()});
-        this.florets(c, dir, o.fine ? 18 : 26, ()=>rad*(.9 + .12*this.rnd()), size*(o.fine ? .34 : .42), 1.1, .82);
+        this.ball(F, o.fine ? "flower:florets-fine" : "flower:florets", c, rad*.86, .82);
+        this.florets(c, dir, o.fine ? 22 : 34, ()=>rad*(.95 + .1*this.rnd()), size*(o.fine ? .32 : .38), 1.1, .82);
         break;
       }
       case "panicle": {
