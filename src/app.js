@@ -18,6 +18,8 @@ import { store, newPlanId, canUseFiles, pickSaveFile, pickOpenFile, filePermissi
 import { PLANTS, CATEGORIES, plantByKey, symbolColor, sunClass, SUN_LABEL, sunNeeds, bloomText, bedLegend, winterHabit, setCustomPlants, customPlants } from "./garden/plants.js";
 import { symbolPath, MODELS } from "./garden/models.js";
 import { plantThumb } from "./garden/thumbs.js";
+import { houseFrame, wallGeometry, gableRoofGeometry, gableTrim, openingParts, autoOpenings, cleanOpenings, newOpening, OPENING_KINDS,
+         elevationSVG as wallElevationSVG, planSVG, opLeft, tFromLeft, headroom } from "./house.js";
 import { MULCHES, bedOutline, starterOutline, plantRadius, plantAt, bedSeasonKey, buildPlantingBed } from "./garden/beds.js";
 
 const DEG = Math.PI/180;
@@ -1061,7 +1063,28 @@ function polyShadow(o, u, cot, hgt){
   const step = Math.max(1.2, Math.min(b.w, b.h)*0.42);
   return {poly:world, dx:u.x*L, dy:u.y*L, n:clamp(Math.ceil(L/step), 6, 90)};
 }
+/* The roof's shadow: the footprint drawn in toward the ridge (gable) or the
+   flat top (hip) as it rises from the eave to the peak. */
+function roofShadow(o, F, u, cot){
+  const L0 = Math.min(800, F.eave*cot), L1 = Math.min(800, F.H*cot), a = (o.rot||0)*DEG;
+  return {roof:true, poly:F.poly, ox:o.x, oy:o.y, cos:Math.cos(a), sin:Math.sin(a), c:F.c, ax:F.ax, gable:F.gable,
+          x0:u.x*L0, y0:u.y*L0, x1:u.x*L1, y1:u.y*L1, n:clamp(Math.ceil((L1 - L0)/1.5), 4, 40)};
+}
+function inRoofShadow(ps, px, py){
+  for(let i=0;i<=ps.n;i++){
+    const t = i/ps.n, wx = px - (ps.x0 + (ps.x1 - ps.x0)*t) - ps.ox, wy = py - (ps.y0 + (ps.y1 - ps.y0)*t) - ps.oy;
+    /* into the building's own frame, then undo the roof's taper at this height */
+    let lx = wx*ps.cos + wy*ps.sin - ps.c.x, ly = -wx*ps.sin + wy*ps.cos - ps.c.y;
+    if(ps.gable){
+      const d = lx*ps.ax.x + ly*ps.ax.y, k = 1/Math.max(.03, 1 - t) - 1;
+      lx += ps.ax.x*d*k; ly += ps.ax.y*d*k;
+    } else { const s = 1 - .58*t; lx /= s; ly /= s; }
+    if(pointInPoly(ps.poly, lx + ps.c.x, ly + ps.c.y)) return true;
+  }
+  return false;
+}
 function inPolyShadow(ps, px, py){
+  if(ps.roof) return inRoofShadow(ps, px, py);
   for(let i=0;i<=ps.n;i++){
     const t = i/ps.n;
     if(pointInPoly(ps.poly, px - ps.dx*t, py - ps.dy*t)) return true;
@@ -1100,8 +1123,15 @@ function casters(minutes){
       }
     } else if((o.type === "structure" || o.type === "deck") && o.poly && o.poly.length > 2){
       /* a raised deck throws real shade; a ground-level patio does not */
-      const H = o.type === "deck" ? deckHeight(o) : o.height;
-      if(H > 1) polys.push({ps: polyShadow(o, u, cot, H), dens:1});
+      if(o.type === "deck"){
+        const H = deckHeight(o);
+        if(H > 1) polys.push({ps: polyShadow(o, u, cot, H), dens:1});
+      } else {
+        /* a house shades as its walls to the eave, then its roof narrowing to the ridge */
+        const F = houseFrame(o);
+        polys.push({ps: polyShadow(o, u, cot, F.eave), dens:1});
+        polys.push({ps: roofShadow(o, F, u, cot), dens:1});
+      }
     }
   }
   rects.push(...fenceCasters(u, cot));
@@ -1344,7 +1374,7 @@ function deckTexture(){
 let TEX = {};
 
 /* ---------- materials ---------- */
-let MAT_WALL, MAT_ROOF, MAT_TIMBER;
+let MAT_WALL, MAT_ROOF, MAT_TIMBER, MAT_SIMPLE_HOUSE;
 /* schematic mode: flat untextured solids plus a crisp wire outline */
 const MAT_SIMPLE = {
   structure: new THREE.MeshStandardMaterial({color:0x2c3742, roughness:1, metalness:0, flatShading:true}),
@@ -1379,6 +1409,79 @@ function initMaterials(){
   MAT_ROOF = new THREE.MeshStandardMaterial({...shingles, roughness:.92, metalness:0,
     side:THREE.DoubleSide, flatShading:true});
   MAT_TIMBER = new THREE.MeshStandardMaterial({color:0x7a5a3c, roughness:.9, metalness:0});
+  MAT_WALL.side = THREE.DoubleSide;
+  MAT_SIMPLE_HOUSE = MAT_SIMPLE.structure.clone(); MAT_SIMPLE_HOUSE.side = THREE.DoubleSide;
+}
+/* ---------- a house's own colours ----------
+   Siding and shingles are textures painted in one colour; a house's colour is
+   that texture tinted, so the boards and courses still show. */
+const houseMats = new Map();
+function houseMat(key, make){
+  let m = houseMats.get(key);
+  if(!m){ m = make(); houseMats.set(key, m); }
+  return m;
+}
+const texMeans = new Map();
+function texMean(tex){
+  let m = texMeans.get(tex.uuid);
+  if(m) return m;
+  m = [.5, .5, .5];
+  try{
+    const img = tex.image, c = document.createElement("canvas");
+    c.width = c.height = 32;
+    const g = c.getContext("2d", {willReadFrequently:true});
+    g.drawImage(img, 0, 0, 32, 32);
+    const d = g.getImageData(0, 0, 32, 32).data, sum = [0, 0, 0];
+    for(let i = 0; i < d.length; i += 4) for(let k = 0; k < 3; k++) sum[k] += Math.pow(d[i + k]/255, 2.2);
+    m = sum.map(v=>Math.max(.02, v/(d.length/4)));
+  }catch{ /* keep the middle grey */ }
+  texMeans.set(tex.uuid, m);
+  return m;
+}
+function tint(mat, base, hex){
+  const c = new THREE.Color(hex), m = texMean(base.map);
+  mat.color.setRGB(Math.min(6, c.r/m[0]), Math.min(6, c.g/m[1]), Math.min(6, c.b/m[2]));
+}
+function wallMaterial(o){
+  const batten = o.siding === "batten";
+  if(!o.wallColor && !batten) return MAT_WALL;
+  return houseMat("w|"+(o.wallColor || "")+"|"+batten, ()=>{
+    const m = MAT_WALL.clone();
+    if(batten){
+      /* board and batten: the same boards stood on end, a foot apart */
+      for(const k of ["map", "normalMap"]){
+        m[k] = MAT_WALL[k].clone(); m[k].rotation = Math.PI/2; m[k].repeat.set(1/8, 1/8); m[k].needsUpdate = true;
+      }
+    }
+    if(o.wallColor) tint(m, MAT_WALL, o.wallColor);
+    return m;
+  });
+}
+function roofMaterial(o){
+  if(!o.roofColor) return MAT_ROOF;
+  return houseMat("r|"+o.roofColor, ()=>{ const m = MAT_ROOF.clone(); tint(m, MAT_ROOF, o.roofColor); return m; });
+}
+const flatMat = (hex, rough)=>houseMat("f|"+hex+"|"+rough, ()=>new THREE.MeshStandardMaterial({color:new THREE.Color(hex), roughness:rough, metalness:0}));
+/* what a house is drawn in when nothing is chosen */
+const HOUSE_DEFAULTS = {wallColor:"#ded8c8", trimColor:"#f1eee7", frameColor:"#f1eee7", roofColor:"#4a4744", doorColor:"#34414d", garageColor:"#e8e4da"};
+const houseColor = (o, k)=>/^#[0-9a-f]{6}$/i.test(o[k] || "") ? o[k] : HOUSE_DEFAULTS[k];
+/* the door of an undesigned house goes on the wall facing the nearest deck or patio */
+function houseDoorWall(o, F){
+  let doorWall = -1, best = Infinity;
+  for(const e of F.edges){
+    if(e.len < 6) continue;
+    for(const d of S.objects){
+      if(d.type !== "deck") continue;
+      const q = localOf(o, d.x, d.y), dist = Math.hypot(q.x - e.mx, q.y - e.my);
+      if((q.x - e.mx)*e.nx + (q.y - e.my)*e.ny > 0 && dist < best){ best = dist; doorWall = e.i; }
+    }
+  }
+  return doorWall >= 0 ? doorWall : F.edges.reduce((bi, e, i, a)=>e.len > a[bi].len ? i : bi, 0);
+}
+/* the windows and doors a house shows: its own, else the automatic layout */
+function houseOpenings(o, F){
+  if(Array.isArray(o.openings)) return o.openings.filter(op=>op.wall < F.edges.length);
+  return autoOpenings(F, houseDoorWall(o, F));
 }
 
 function canopyRadius({R, fn}){
@@ -1426,6 +1529,18 @@ function buildTreeSimple(grp, t, crown){
   grp.add(ring);
 }
 
+const mulchRingDia = o=>clamp(+o.mulchDia || 2, 1, 30);
+let mulchRingMat = null;
+function mulchRingMaterial(){
+  if(mulchRingMat) return mulchRingMat;
+  mulchRingMat = new THREE.MeshStandardMaterial({color:0x6b4a34, roughness:1, metalness:0});
+  if(TEX.soil){
+    mulchRingMat.map = TEX.soil.clone(); mulchRingMat.map.needsUpdate = true;
+    mulchRingMat.map.repeat.set(2, 2);
+    mulchRingMat.color.multiplyScalar(3.4);     // the soil texture is dark; let the mulch colour through
+  }
+  return mulchRingMat;
+}
 function buildTree(o, draft = false){
   const grp = new THREE.Group();
   /* the tree at its size on the plan's date */
@@ -1436,6 +1551,14 @@ function buildTree(o, draft = false){
   const trunkR = Math.max(.16, t.height*.0135);
 
   if(S.simple){ buildTreeSimple(grp, t, {cb, top, R, fn}); return grp; }
+  if(o.mulchRing){
+    /* a circle of mulch round the trunk, as wide as its panel says */
+    const ring = new THREE.Mesh(new THREE.CircleGeometry(mulchRingDia(o)/2, 48), mulchRingMaterial());
+    ring.rotation.x = -Math.PI/2; ring.position.y = .045;
+    ring.receiveShadow = true;
+    ring.raycast = ()=>{};
+    grp.add(ring);
+  }
 
   const sh = SHAPES[t.shape] || SHAPES.round;
   grp.add(trees.build(t, {bare, draft, season:seasonNow(t), crownBase:crownBaseFt(t)/Math.max(1, t.height), profile:sh.r}));
@@ -1513,107 +1636,66 @@ function scaledPoly(poly, grow){
   const s = 1 + grow/avg;
   return poly.map(p=>({x:c.x+(p.x-c.x)*s, y:c.y+(p.y-c.y)*s}));
 }
-function buildingDetails(o, poly, eave){
-  const parts = {trim:[], glass:[], found:[], door:[]};
-  const c = polyCentroid(poly);
-  const overhang = Math.min(1.6, eave*.12);
+function buildingDetails(o, F, overhang){
+  const parts = {trim:[], frame:[], glass:[], found:[], door:[], garage:[]};
+  const poly = F.poly, eave = F.eave;
 
   /* foundation band, a hand's width proud of the siding */
-  const fnd = extrudePoly(scaledPoly(poly, .12), .9);
-  parts.found.push(fnd);
+  parts.found.push(extrudePoly(scaledPoly(poly, .12), .9));
 
-  /* fascia board and soffit around the roof edge */
-  const outer = scaledPoly(poly, overhang);
-  for(let i=0;i<outer.length;i++){
-    const A = outer[i], B = outer[(i+1)%outer.length], len = Math.hypot(B.x-A.x, B.y-A.y);
-    parts.trim.push(placedBox(len+.1, .75, .14, (A.x+B.x)/2, eave-.28, (A.y+B.y)/2, -Math.atan2(B.y-A.y, B.x-A.x)));
+  if(F.gable) parts.trim.push(...gableTrim(F, overhang));
+  else {
+    /* fascia board and soffit around the roof edge */
+    const outer = scaledPoly(poly, overhang);
+    for(let i=0;i<outer.length;i++){
+      const A = outer[i], B = outer[(i+1)%outer.length], len = Math.hypot(B.x-A.x, B.y-A.y);
+      parts.trim.push(placedBox(len+.1, .75, .14, (A.x+B.x)/2, eave-.28, (A.y+B.y)/2, -Math.atan2(B.y-A.y, B.x-A.x)));
+    }
+    /* soffit: the roof-edge outline, facing down */
+    const soffit = flatPoly(outer).toNonIndexed();
+    const sp = soffit.attributes.position, sn = soffit.attributes.normal;
+    for(let i=0;i<sp.count;i+=3){
+      const x = sp.getX(i+1), y = sp.getY(i+1), z = sp.getZ(i+1);
+      sp.setXYZ(i+1, sp.getX(i+2), sp.getY(i+2), sp.getZ(i+2));
+      sp.setXYZ(i+2, x, y, z);
+    }
+    for(let i=0;i<sn.count;i++) sn.setXYZ(i, 0, -1, 0);
+    soffit.translate(0, eave-.02, 0);
+    parts.trim.push(soffit);
   }
-  /* soffit: the roof-edge outline, facing down */
-  const soffit = flatPoly(outer).toNonIndexed();
-  const sp = soffit.attributes.position, sn = soffit.attributes.normal;
-  for(let i=0;i<sp.count;i+=3){
-    const x = sp.getX(i+1), y = sp.getY(i+1), z = sp.getZ(i+1);
-    sp.setXYZ(i+1, sp.getX(i+2), sp.getY(i+2), sp.getZ(i+2));
-    sp.setXYZ(i+2, x, y, z);
+  /* corner board at the start of every wall, up to the roof */
+  for(const e of F.edges){
+    const top = F.top(e, 0);
+    parts.trim.push(placedBox(.5, top-.9, .5, e.A.x, .9 + (top-.9)/2, e.A.y, -Math.atan2(e.dy, e.dx)));
   }
-  for(let i=0;i<sn.count;i++) sn.setXYZ(i, 0, -1, 0);
-  soffit.translate(0, eave-.02, 0);
-  parts.trim.push(soffit);
+  for(const op of houseOpenings(o, F)) openingParts(F, op, parts);
 
-  /* which wall gets the door: the one facing the nearest deck or patio */
-  let doorWall = -1, best = Infinity;
-  const decks = S.objects.filter(d=>d.type === "deck");
-  const edges = poly.map((A,i)=>{
-    const B = poly[(i+1)%poly.length], len = Math.hypot(B.x-A.x, B.y-A.y);
-    const dx = (B.x-A.x)/(len||1), dy = (B.y-A.y)/(len||1);
-    let nx = dy, ny = -dx;
-    const mx = (A.x+B.x)/2, my = (A.y+B.y)/2;
-    if(nx*(mx-c.x) + ny*(my-c.y) < 0){ nx = -nx; ny = -ny; }
-    return {A, B, len, dx, dy, nx, ny, mx, my};
-  });
-  edges.forEach((e,i)=>{
-    if(e.len < 6) return;
-    for(const d of decks){
-      const p = localOf(o, d.x, d.y), dist = Math.hypot(p.x-e.mx, p.y-e.my);
-      if((p.x-e.mx)*e.nx + (p.y-e.my)*e.ny > 0 && dist < best){ best = dist; doorWall = i; }
-    }
-  });
-  if(doorWall < 0) doorWall = edges.reduce((bi,e,i,a)=>e.len > a[bi].len ? i : bi, 0);
-
-  const opening = (e, t, w, h, sill, glass)=>{
-    const x = e.A.x + e.dx*t, y = e.A.y + e.dy*t, rot = -Math.atan2(e.dy, e.dx);
-    const out = .06;
-    parts.trim.push(placedBox(w+.5, h+.5, .16, x + e.nx*out, sill + h/2, y + e.ny*out, rot));
-    const pane = placedBox(w, h, .1, x + e.nx*(out+.05), sill + h/2, y + e.ny*(out+.05), rot);
-    (glass ? parts.glass : parts.door).push(pane);
-    if(glass){
-      /* muntins and a sill */
-      parts.trim.push(placedBox(.12, h, .06, x + e.nx*(out+.11), sill + h/2, y + e.ny*(out+.11), rot));
-      parts.trim.push(placedBox(w, .12, .06, x + e.nx*(out+.11), sill + h/2, y + e.ny*(out+.11), rot));
-      parts.trim.push(placedBox(w+.8, .2, .45, x + e.nx*(out+.12), sill - .25, y + e.ny*(out+.12), rot));
-    }
-  };
-  const rows = eave >= 16 ? [3, eave - 5.6] : eave >= 7 ? [3] : [];
-  edges.forEach((e,i)=>{
-    /* corner board at the start of every wall */
-    parts.trim.push(placedBox(.5, eave-.9, .5, e.A.x, .9 + (eave-.9)/2, e.A.y, -Math.atan2(e.dy, e.dx)));
-    if(e.len < 7 || !rows.length) return;
-    const doorAt = i === doorWall ? e.len*(e.len > 20 ? .38 : .5) : null;
-    if(doorAt != null) opening(e, doorAt, 3, 6.8, .9, false);
-    const n = Math.max(1, Math.floor(e.len/11));
-    for(let k=0;k<n;k++){
-      const t = (k+.5)*e.len/n;
-      for(const [r, sill] of rows.entries()){
-        if(r === 0 && doorAt != null && Math.abs(t - doorAt) < 4.5) continue;
-        if(t < 2.6 || t > e.len - 2.6) continue;
-        opening(e, t, 3, Math.min(4.2, eave - sill - 1.4), sill, true);
-      }
-    }
-  });
   const grp = new THREE.Group();
-  for(const [key, mat] of [["trim",MAT_TRIM],["glass",MAT_GLASS],["found",MAT_FOUND],["door",MAT_DOOR]]){
+  const mats = {trim:flatMat(houseColor(o, "trimColor"), .55), frame:flatMat(houseColor(o, "frameColor"), .5), glass:MAT_GLASS, found:MAT_FOUND,
+                door:flatMat(houseColor(o, "doorColor"), .45), garage:flatMat(houseColor(o, "garageColor"), .6)};
+  for(const key in parts){
     if(!parts[key].length) continue;
     const geos = parts[key].map(g=>{ const n = g.index ? g.toNonIndexed() : g; n.deleteAttribute("uv"); return n; });
-    const m = new THREE.Mesh(mergeGeometries(geos, false), mat);
+    const m = new THREE.Mesh(mergeGeometries(geos, false), mats[key]);
     m.castShadow = key !== "glass"; m.receiveShadow = true;
     grp.add(m);
   }
   return grp;
 }
 function buildStructure(o){
-  const grp = new THREE.Group();
-  const poly = o.poly && o.poly.length > 2 ? o.poly : rectPoly(12,10);
-  const eave = Math.max(.6, o.height*.68), peak = Math.max(o.height - eave, .1);
-  const walls = new THREE.Mesh(extrudePoly(poly, eave), S.simple ? MAT_SIMPLE.structure : MAT_WALL);
+  const grp = new THREE.Group(), F = houseFrame(o);
+  const overhang = Math.min(1.6, F.eave*.12);
+  const walls = new THREE.Mesh(wallGeometry(F), S.simple ? MAT_SIMPLE_HOUSE : wallMaterial(o));
   walls.castShadow = walls.receiveShadow = true;
   grp.add(walls);
-  const roof = new THREE.Mesh(hipRoof(poly, peak, Math.min(1.6, eave*.12)),
-    S.simple ? MAT_SIMPLE.structure : MAT_ROOF);
-  roof.position.y = eave;
+  const roofMat = S.simple ? MAT_SIMPLE_HOUSE : roofMaterial(o);
+  let roof;
+  if(F.gable) roof = new THREE.Mesh(gableRoofGeometry(F, overhang), roofMat);
+  else { roof = new THREE.Mesh(hipRoof(F.poly, F.peak, overhang), roofMat); roof.position.y = F.eave; }
   roof.castShadow = roof.receiveShadow = true;
   grp.add(roof);
   if(S.simple){ addWire(grp, walls, WIRE.structure); addWire(grp, roof, WIRE.structure); }
-  else grp.add(buildingDetails(o, poly, eave));
+  else grp.add(buildingDetails(o, F, overhang));
   return grp;
 }
 function deckHeight(o){ return Math.max(.1, o.height ?? .5); }
@@ -3604,6 +3686,247 @@ function exitDesign(quiet){
 }
 let restoreView = false;      // set while a plan loads: the camera is about to be reframed anyway
 
+/* ============================================================ house editor --
+   A house's roof, siding and colours are set in its panel. Its windows and
+   doors are placed wall by wall in a dialog that shows each wall square-on,
+   to scale, as seen from outside. */
+function pitchText(o){
+  const F = houseFrame(o);
+  return F.gable ? `${(+F.pitch.toFixed(1))} in 12` : "Hip roof";
+}
+function houseSettingsHTML(o){
+  const F = houseFrame(o);
+  const sel = (label, key, cur, opts)=>`<div class="field"><span class="lab">${label}</span><span style="flex:1.4"><select data-key="${key}">${
+    opts.map(([k, v])=>`<option value="${k}" ${k === cur ? "selected" : ""}>${v}</option>`).join("")}</select></span></div>`;
+  const col = (label, key)=>`<div class="field"><span class="lab">${label}</span><span class="inp colr"><input type="color" data-key="${key}" value="${houseColor(o, key)}" aria-label="${label}"></span></div>`;
+  return sl("Eave height", "eave", 2, Math.max(3, o.height - 1), .5, +F.eave.toFixed(1))
+    + `<h4>Roof</h4>`
+    + sel("Roof", "roof", F.gable ? "gable" : "hip", [["hip", "Hip, four slopes"], ["gable", "Gable, two slopes"]])
+    + (F.gable ? sel("Ridge runs", "ridge", o.ridge === "turn" ? "turn" : "long", [["long", "The long way"], ["turn", "The short way"]])
+        + `<div class="field"><span class="lab">Pitch</span><span class="val num pitchv">${pitchText(o)}</span></div>` : "")
+    + col("Roof colour", "roofColor")
+    + `<h4>Siding and trim</h4>`
+    + sel("Siding", "siding", o.siding === "batten" ? "batten" : "lap", [["lap", "Lap siding"], ["batten", "Board and batten"]])
+    + col("Siding colour", "wallColor") + col("Trim", "trimColor") + col("Window frames", "frameColor")
+    + col("Entry door", "doorColor") + col("Garage door", "garageColor");
+}
+let houseEd = null;       // {id, wall, sel, guides, drag}
+const houseOf = ()=>houseEd ? S.objects.find(o=>o.id === houseEd.id && o.type === "structure") || null : null;
+function ensureHouseDialog(){
+  if($("housedlg")) return;
+  document.body.insertAdjacentHTML("beforeend", `<div id="housedlg" hidden><section id="housesheet" role="dialog" aria-modal="true" aria-labelledby="housetitle">
+    <header><div class="t"><h1 id="housetitle">Edit this house</h1><p>Pick a wall, then add windows and doors and drag them into place. Each wall is drawn to scale, seen from outside.</p></div>
+      <button class="btn solid" data-h="done">Done</button></header>
+    <div class="hbody"><aside class="hleft"></aside><main class="hmain"><div class="hwallhead"></div><div id="helev"></div><p class="hint hhint"></p></main><aside class="hright"></aside></div>
+  </section></div>`);
+  const dlg = $("housedlg"), elev = $("helev");
+  dlg.addEventListener("click", e=>{
+    if(e.target === dlg){ closeHouseEditor(); return; }
+    const o = houseOf();
+    if(!o) return;
+    const b = e.target.closest("[data-h],[data-wall],[data-add]");
+    if(!b) return;
+    if(b.dataset.wall != null){ houseEd.wall = +b.dataset.wall; houseEd.sel = null; drawHouseEditor(); return; }
+    if(b.dataset.add){ addOpening(o, b.dataset.add); return; }
+    const act = b.dataset.h, op = houseSel(o);
+    if(act === "done") closeHouseEditor();
+    else if(act === "del" && op){ o.openings = o.openings.filter(x=>x !== op); houseEd.sel = null; houseChanged(o); drawHouseEditor(); }
+    else if(act === "dup" && op){
+      const F = houseFrame(o), e2 = F.edges[op.wall], left = Math.min(opLeft(e2, op) + op.w + 1, e2.len - op.w - .3);
+      const copy = {...op, id:nextOpId(o), t:tFromLeft(e2, Math.max(.3, left), op.w)};
+      o.openings.push(copy); houseEd.sel = copy.id; houseChanged(o); drawHouseEditor();
+    }
+    else if(act === "clearwall"){ ownOpenings(o); o.openings = o.openings.filter(x=>x.wall !== houseEd.wall); houseEd.sel = null; houseChanged(o); drawHouseEditor(); }
+    else if(act === "auto"){ delete o.openings; houseEd.sel = null; houseChanged(o); drawHouseEditor(); }
+  });
+  dlg.addEventListener("input", e=>{
+    const o = houseOf(), key = e.target.dataset.hop;
+    if(!o || !key) return;
+    const op = houseSel(o);
+    if(!op) return;
+    const F = houseFrame(o), ed = F.edges[op.wall];
+    if(key === "grid") op.grid = e.target.checked;
+    else if(key === "cols" || key === "rows") op[key] = +e.target.value;
+    else if(key === "glass") op.glass = e.target.value;
+    else {
+      const v = fromDl(parseFloat(e.target.value));
+      if(!Number.isFinite(v)) return;
+      let left = opLeft(ed, op);
+      if(key === "w") op.w = clamp(v, .5, Math.max(.5, ed.len - .6));
+      else if(key === "h") op.h = clamp(v, .5, 30);
+      else if(key === "y") op.y = Math.max(0, v);
+      else if(key === "x") left = v;
+      left = clamp(left, .3, Math.max(.3, ed.len - op.w - .3));
+      op.t = tFromLeft(ed, left, op.w);
+      op.y = clamp(op.y, 0, Math.max(0, headroom(F, ed, left, op.w) - op.h));
+    }
+    for(const k of ["w", "h", "y", "t"]) op[k] = rnd(op[k], 4);
+    houseChanged(o); drawElevation(o);
+  });
+  /* tidy the boxes once typing is done */
+  dlg.addEventListener("change", e=>{ if(e.target.dataset.hop) drawHouseEditor(); });
+  const wallPt = e=>{
+    const svg = elev.querySelector("svg");
+    if(!svg) return null;
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const q = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return {x:q.x, y:-q.y};
+  };
+  elev.addEventListener("pointerdown", e=>{
+    const o = houseOf(), g = e.target.closest("[data-op]");
+    if(!o) return;
+    if(!g){ if(houseEd.sel != null){ houseEd.sel = null; drawHouseEditor(); } return; }
+    ownOpenings(o);
+    const op = o.openings.find(x=>x.id === +g.dataset.op), q = wallPt(e);
+    if(!op || !q) return;
+    const F = houseFrame(o), ed = F.edges[op.wall];
+    houseEd.sel = op.id;
+    houseEd.drag = {id:e.pointerId, dx:q.x - opLeft(ed, op), dy:q.y - op.y, moved:false};
+    elev.setPointerCapture(e.pointerId);
+    drawHouseEditor();
+    e.preventDefault();
+  });
+  elev.addEventListener("pointermove", e=>{
+    const d = houseEd?.drag, o = houseOf();
+    if(!d || !o || e.pointerId !== d.id) return;
+    const op = houseSel(o), q = wallPt(e);
+    if(!op || !q) return;
+    const F = houseFrame(o), ed = F.edges[op.wall], guides = [];
+    let left = Math.round((q.x - d.dx)*4)/4, y = Math.round((q.y - d.dy)*4)/4;
+    /* line up with the other pieces on this wall: centres, sills and heads */
+    for(const other of o.openings){
+      if(other === op || other.wall !== op.wall) continue;
+      const oc = opLeft(ed, other) + other.w/2;
+      if(Math.abs(left + op.w/2 - oc) < .35){ left = oc - op.w/2; guides.push({x:oc}); }
+      if(Math.abs(y - other.y) < .35){ y = other.y; guides.push({y}); }
+      else if(Math.abs(y + op.h - other.y - other.h) < .35){ y = other.y + other.h - op.h; guides.push({y:y + op.h}); }
+    }
+    left = clamp(left, .3, Math.max(.3, ed.len - op.w - .3));
+    y = clamp(y, 0, Math.max(0, headroom(F, ed, left, op.w) - op.h));
+    op.t = rnd(tFromLeft(ed, left, op.w), 4); op.y = rnd(y, 3);
+    d.moved = true; houseEd.guides = guides;
+    houseChanged(o); drawElevation(o); syncOpFields(o);
+  });
+  const end = e=>{ if(houseEd?.drag && e.pointerId === houseEd.drag.id){ houseEd.drag = null; houseEd.guides = []; const o = houseOf(); if(o) drawElevation(o); } };
+  elev.addEventListener("pointerup", end);
+  elev.addEventListener("pointercancel", end);
+}
+const houseSel = o=>Array.isArray(o.openings) && houseEd?.sel != null ? o.openings.find(x=>x.id === houseEd.sel) || null : null;
+const nextOpId = o=>Math.max(0, ...(o.openings || []).map(x=>x.id || 0)) + 1;
+/* the first change to an undesigned house keeps the automatic layout as its starting point */
+function ownOpenings(o){
+  if(Array.isArray(o.openings)) return;
+  const F = houseFrame(o);
+  o.openings = autoOpenings(F, houseDoorWall(o, F));
+}
+function houseChanged(o){ queueRebuild(o); scheduleHist(); markDirty(); }
+function addOpening(o, k){
+  ownOpenings(o);
+  const F = houseFrame(o), ed = F.edges[houseEd.wall];
+  if(!ed) return;
+  const op = newOpening(k, houseEd.wall);
+  op.id = nextOpId(o);
+  op.w = Math.min(op.w, Math.max(1, ed.len - .6));
+  /* the first free spot along the wall at this height, starting from the middle */
+  const others = o.openings.filter(x=>x.wall === op.wall), fits = left=>others.every(x=>{
+    const xl = opLeft(ed, x);
+    return left + op.w + .5 <= xl || left >= xl + x.w + .5 || op.y + op.h <= x.y || op.y >= x.y + x.h;
+  });
+  let left = (ed.len - op.w)/2;
+  for(let i = 0; i < 80 && !fits(left); i++){ const off = Math.ceil((i + 1)/2)*.5*(i%2 ? -1 : 1); left = clamp((ed.len - op.w)/2 + off, .3, Math.max(.3, ed.len - op.w - .3)); }
+  op.t = rnd(tFromLeft(ed, left, op.w), 4);
+  op.y = clamp(op.y, 0, Math.max(0, headroom(F, ed, left, op.w) - op.h));
+  o.openings.push(op);
+  houseEd.sel = op.id;
+  houseChanged(o); drawHouseEditor();
+}
+function wallFacing(o, e){
+  const v = rot2(e.nx, e.ny, (o.rot||0)*DEG);
+  return compassName(vecBearing(v.x, v.y));
+}
+function houseColours(o){
+  return {wall:houseColor(o, "wallColor"), trim:houseColor(o, "trimColor"), frame:houseColor(o, "frameColor"), door:houseColor(o, "doorColor"),
+          garage:houseColor(o, "garageColor"), batten:o.siding === "batten"};
+}
+function drawElevation(o){
+  const F = houseFrame(o), ed = F.edges[houseEd.wall];
+  if(!ed) return;
+  $("helev").innerHTML = wallElevationSVG(F, ed, houseOpenings(o, F).filter(x=>x.wall === ed.i), houseEd.sel, houseColours(o), houseEd.guides || []);
+}
+function syncOpFields(o){
+  const op = houseSel(o);
+  if(!op) return;
+  const F = houseFrame(o), ed = F.edges[op.wall], vals = {x:opLeft(ed, op), y:op.y, w:op.w, h:op.h};
+  for(const k in vals){ const i = $("housedlg").querySelector(`[data-hop="${k}"]`); if(i && document.activeElement !== i) i.value = dl(vals[k], 2); }
+}
+function drawHouseEditor(){
+  const o = houseOf();
+  if(!o){ closeHouseEditor(); return; }
+  const F = houseFrame(o), dlg = $("housedlg");
+  if(!F.edges[houseEd.wall]) houseEd.wall = 0;
+  const ed = F.edges[houseEd.wall], all = houseOpenings(o, F), own = Array.isArray(o.openings);
+  dlg.querySelector(".hleft").innerHTML = `<h4>Walls</h4>` + planSVG(F, ed.i)
+    + `<div class="hwalls">` + F.edges.map(e=>{
+        const n = all.filter(x=>x.wall === e.i).length;
+        return `<button data-wall="${e.i}" aria-pressed="${e.i === ed.i}"><b>Faces ${wallFacing(o, e)}</b><i>${uL(e.len)} wide · ${n} piece${n === 1 ? "" : "s"}</i></button>`;
+      }).join("") + `</div>`;
+  dlg.querySelector(".hwallhead").innerHTML = `<b>Wall facing ${wallFacing(o, ed)}</b><span>${uL(ed.len)} wide · ${uL(F.eave)} to the eave${ed.cross != null ? " · gable end" : ""}</span>`;
+  dlg.querySelector(".hhint").textContent = own
+    ? "Drag a piece to move it; it lines up with the others as you go. Arrow keys nudge the selected piece, Delete removes it."
+    : "This house still has its automatic windows and door. Add or move a piece and the layout becomes yours to edit.";
+  drawElevation(o);
+  const op = houseSel(o), num = (label, key, v, step = .25)=>`<div class="field"><span class="lab">${label}</span><span class="inp"><input type="number" inputmode="decimal" data-hop="${key}" step="${dstep(step)}" min="0" value="${dl(v, 2)}" aria-label="${label}"><span class="u">${lu()}</span></span></div>`;
+  let right = "";
+  if(op){
+    const pick = (label, key, cur, opts)=>`<div class="field"><span class="lab">${label}</span><span style="flex:1.2"><select data-hop="${key}">${opts.map(([k, v])=>`<option value="${k}" ${String(k) === String(cur) ? "selected" : ""}>${v}</option>`).join("")}</select></span></div>`;
+    right += `<h4>${{window:"Window", door:"Entry door", patio:"Patio door", garage:"Garage door"}[op.kind]}</h4>`
+      + num("Width", "w", op.w) + num("Height", "h", op.h) + num("From the left", "x", opLeft(ed, op)) + num(op.kind === "window" ? "Sill above ground" : "Bottom above ground", "y", op.y)
+      + (op.kind === "window" || op.kind === "patio" ? pick(op.kind === "patio" ? "Panels" : "Panes across", "cols", op.cols || 1, [[1, "1"], [2, "2"], [3, "3"], [4, "4"]]) : "")
+      + (op.kind === "window" ? pick("Sash", "rows", op.rows || 1, [[1, "One pane high"], [2, "Double-hung"]]) : "")
+      + (op.kind === "window" || op.kind === "patio" ? `<div class="swrow"><span>Grids in the glass</span><input type="checkbox" class="sw" data-hop="grid" ${op.grid ? "checked" : ""} aria-label="Grids in the glass"></div>` : "")
+      + (op.kind === "door" ? pick("Glass", "glass", op.glass || "none", [["none", "Solid door"], ["half", "Half glass"], ["full", "Full glass"]]) : "")
+      + `<div class="btnrow"><button class="btn" data-h="dup">Duplicate</button><button class="btn danger" data-h="del">Delete</button></div>`;
+  }
+  right += `<h4>Add to this wall</h4>`;
+  let group = null;
+  for(const k of OPENING_KINDS){
+    if(k.group !== group){ if(group) right += `</div>`; group = k.group; right += `<div class="hgroup">${group}</div><div class="hadd">`; }
+    right += `<button class="btn" data-add="${k.k}">${k.label}</button>`;
+  }
+  right += `</div><div class="hfoot">${all.some(x=>x.wall === ed.i) ? `<button class="btn danger" data-h="clearwall">Clear this wall</button>` : ""}${own ? `<button class="btn" data-h="auto" title="Throw away your layout and go back to automatic windows and doors">Back to automatic</button>` : ""}</div>`;
+  dlg.querySelector(".hright").innerHTML = right;
+}
+function openHouseEditor(o){
+  if(o.type !== "structure") return;
+  if(design) exitDesign(true);
+  ensureHouseDialog();
+  const F = houseFrame(o);
+  /* start on the wall the camera is looking at most squarely, else the longest */
+  houseEd = {id:o.id, wall:F.edges.reduce((bi, e, i, a)=>e.len > a[bi].len ? i : bi, 0), sel:null, guides:[], drag:null};
+  $("housedlg").hidden = false;
+  drawHouseEditor();
+}
+function closeHouseEditor(){
+  if(!houseEd) return;
+  houseEd = null;
+  $("housedlg").hidden = true;
+  panelFor = null; drawPanel(); markDirty();
+}
+function houseKey(e){
+  if(e.key === "Escape"){ e.preventDefault(); if(houseEd.sel != null && !e.target.closest?.("input,select")){ houseEd.sel = null; drawHouseEditor(); } else closeHouseEditor(); return; }
+  if(e.target.closest?.("input,select,textarea")) return;
+  const o = houseOf(), op = o ? houseSel(o) : null;
+  if(!op) return;
+  if(e.key === "Delete" || e.key === "Backspace"){ e.preventDefault(); o.openings = o.openings.filter(x=>x !== op); houseEd.sel = null; houseChanged(o); drawHouseEditor(); return; }
+  const step = e.shiftKey ? 1 : .25, mv = {ArrowLeft:[-step, 0], ArrowRight:[step, 0], ArrowUp:[0, step], ArrowDown:[0, -step]}[e.key];
+  if(!mv) return;
+  e.preventDefault();
+  const F = houseFrame(o), ed = F.edges[op.wall], left = clamp(opLeft(ed, op) + mv[0], .3, Math.max(.3, ed.len - op.w - .3));
+  op.t = rnd(tFromLeft(ed, left, op.w), 4);
+  op.y = rnd(clamp(op.y + mv[1], 0, Math.max(0, headroom(F, ed, left, op.w) - op.h)), 3);
+  houseChanged(o); drawElevation(o); syncOpFields(o);
+}
+
 /* ---------- a plan's own varieties ---------- */
 const customRec = k=>(S.customPlants || []).find(c=>c.k === k) || null;
 function customChanged(){
@@ -4319,6 +4642,8 @@ function drawPanel(){
       + sl("Leaf density","density",.1,1,.05,o.density ?? .85,"%",true)
       + `</div>`
       + `<div class="swrow"><span>Evergreen</span><input type="checkbox" class="sw" data-key="evergreen" ${o.evergreen?"checked":""} aria-label="Evergreen"></div>`
+      + `<div class="swrow"><span>Mulch ring</span><input type="checkbox" class="sw" data-key="mulchRing" ${o.mulchRing ? "checked" : ""} aria-label="Mulch ring"></div>`
+      + (o.mulchRing ? field("Ring diameter", "mulchDia", `min="1" max="30" step="1" value="${mulchRingDia(o)}"`) : "")
       + `<div class="clearbox">${clearanceHTML(o)}</div>`
       + `<h4>Details</h4>` + nameRow
       + `<div class="field"><span class="lab">Species list</span><span style="flex:1.6">${presetSelect(o)}</span></div>`
@@ -4359,13 +4684,15 @@ function drawPanel(){
       + `<p class="hint">Fence sides, style and height are under Lot in the sidebar.</p>`;
   } else {
     const b = bbox(o.poly);
-    html += `<div style="height:10px"></div>` + outlineHTML(o)
+    html += (o.type === "structure" ? `<div class="btnrow" style="margin:14px 0 4px"><button class="btn solid" data-act="edithouse">Edit this house</button></div>`
+          + `<p class="hint" style="margin-top:6px">Opens each wall square-on to place windows, doors and garage doors.</p>` : "")
+      + `<div style="height:10px"></div>` + outlineHTML(o)
       + (isPaved(o) ? `<p class="hint">Ground-level ${o.type === "driveway" ? "asphalt driveway" : "concrete sidewalk"}.
           Drag corners and use + to make bends, tapers or irregular shapes. It receives shade but does not act like a building.</p>` : "")
       + `<h4>Overall size</h4>`
       + numRow("Width", 'data-fit="w"', b.w.toFixed(0))
       + numRow("Depth", 'data-fit="h"', b.h.toFixed(0))
-      + (o.type === "structure" ? sl("Height to peak","height",4,80,1,o.height) : "")
+      + (o.type === "structure" ? sl("Height to peak","height",4,80,1,o.height) + houseSettingsHTML(o) : "")
       + (o.type === "deck" ? sl("Deck height","height",0,20,.5,(o.height ?? .5).toFixed(1))
           + `<div class="field"><span class="lab">Surface</span><span style="flex:1.4"><select data-key="surface">${
             Object.entries(SURFACES).map(([k,v])=>`<option value="${k}" ${k===deckSurface(o)?"selected":""}>${v}</option>`).join("")}</select></span></div>` : "")
@@ -4441,7 +4768,8 @@ function applyPreset(o, p, fromSelect = false){
   $("inspbody").scrollTop = scroll;
   if(fromSelect) props.querySelector("select[data-preset]")?.focus({preventScroll:true});
 }
-const GEOKEYS = new Set(["height","spread","density","shape","evergreen","w","h","surface","crownBase","style","smooth","mulch"]);
+const GEOKEYS = new Set(["height","spread","density","shape","evergreen","w","h","surface","crownBase","style","smooth","mulch",
+  "mulchRing","mulchDia","eave","roof","ridge","siding","wallColor","trimColor","frameColor","roofColor","doorColor","garageColor"]);
 props.addEventListener("input", e=>{
   const o = selected();
   if(!o) return;
@@ -4530,6 +4858,9 @@ props.addEventListener("input", e=>{
     o[k] = e.target.dataset.pct ? v/100 : e.target.dataset.len ? rnd(fromDl(v), 2) : v;
   }
   else o[k] = e.target.value;
+  if(k === "roof" || k === "ridge" || k === "mulchRing") panelFor = null;
+  if(k === "mulchRing" && o.mulchRing && !o.mulchDia) o.mulchDia = 2;
+  if(o.type === "structure"){ const pv = props.querySelector(".pitchv"); if(pv) pv.textContent = pitchText(o); }
   if(k === "style" && o.type === "fence"){ o.density = (FENCE_STYLES[o.style]||FENCE_STYLES.picket).dens; panelFor = null; }
   if(GEOKEYS.has(k)) queueRebuild(o); else placeObject(o);
   if(k === "name") document.getElementById("seltitle").textContent = o.name;
@@ -4568,6 +4899,7 @@ props.addEventListener("click", e=>{
   const act = btn.dataset.act, o = selected();
   if(!o) return;
   if(act === "design"){ enterDesign(o); return; }
+  if(act === "edithouse" && o.type === "structure"){ openHouseEditor(o); return; }
   if(act === "plantlib"){ openLibrary("place", "plants"); return; }
   if(act === "enddesign"){ exitDesign(); return; }
   if(act === "custdone" && design){ design.edit = null; panelFor = null; drawPanel(); return; }
@@ -5600,6 +5932,7 @@ document.addEventListener("keydown", e=>{
   if(/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
   if($("modal").classList.contains("on")) return;
   if(document.body.classList.contains("photo")){ if(e.key === "Escape") exitPhoto(); return; }
+  if(houseEd){ houseKey(e); return; }
   if(!$("library").hidden){ if(e.key === "Escape") closeLibrary(); return; }
   if(obsMode){
     if(e.key === "Escape"){ e.preventDefault(); if(flying()) setObsMode("orbit"); else exitObserve(); return; }
@@ -5960,6 +6293,7 @@ function loadState(data, frame){
       if(o.type === "tree" && o.clump == null && PRESETS.find(p=>p.n === o.name)?.clump) o.clump = true;
       if(isOutlineType(o) && !o.poly) o.poly = rectPoly(o.w || PAVING[o.type]?.w || 12, o.h || PAVING[o.type]?.h || 10);
       if(o.type === "deck" && !(o.height >= 0)) o.height = .5;
+      if(o.type === "structure" && o.openings !== undefined){ o.openings = cleanOpenings(o.openings); if(!o.openings) delete o.openings; }
       if(o.type === "planting"){
         o.plants = Array.isArray(o.plants) ? o.plants.filter(p=>p && typeof p.k === "string" && Number.isFinite(p.x) && Number.isFinite(p.y)) : [];
         if(!MULCHES[o.mulch]) o.mulch = "bark";
