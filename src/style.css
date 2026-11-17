@@ -1104,3 +1104,13 @@ body.observe #coach{top:calc(var(--gut) + 150px)}
   .hplan{height:110px}
   .hwalls{flex-direction:row;flex-wrap:wrap}
 }
+
+/* bed designer: the bar that says plants are being placed, and ends it */
+#stampbar{position:fixed;left:50%;top:86px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:14px;padding:8px 8px 8px 18px;
+  background:var(--panel-solid);border:1px solid var(--brass-line);border-radius:999px;box-shadow:0 12px 40px rgba(0,0,0,.5);font-size:13px;color:var(--text-2);max-width:calc(100vw - 32px)}
+#stampbar[hidden]{display:none}
+#stampbar b{color:var(--brass-2);font-weight:500}
+#stampbar .btn{min-height:32px;border-radius:999px;padding:0 14px;white-space:nowrap}
+.howto{margin:8px 0 10px;padding:10px 12px 10px 26px;border:1px solid var(--line-3);border-radius:10px;background:var(--well);font-size:12.5px;line-height:1.5;color:var(--text-2)}
+.howto li{margin:2px 0}
+.howto b{color:var(--text);font-weight:500}

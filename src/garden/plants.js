@@ -312,6 +312,8 @@ group(PAN, [
   ["Hydrangea 'Fire Light Tidbit'", 2.5, 3, [W0, 0xE4708A, 0xB02848], {opt:{dense:true}, note:"The smallest panicle hydrangea; white to pomegranate pink."}],
   ["Hydrangea 'Puffer Fish'", 4, 4, [0xF6F6EE, 0xF6F6EE, 0xCFE0A0], {opt:{dense:true, fat:.4}, note:"A larger Bobo. Fluffy white cones age to lime, with a fresh burst of white at the tips late in the season."}],
   ["Hydrangea 'Sweet Starlight'", 4, 3.5, [W0, 0xF0B0C0, 0xD0507A], {zone:[4,8], note:"Compact, with white cones that start turning pink earlier than most."}],
+  ["Hydrangea 'Limelight' tree", 8, 6, [0xC8DC8A, 0xF4F4E6, 0xE8A9B8], {opt:{trunk:3.4}, note:"Limelight grown on a single trunk. The same plant is in the tree library."}],
+  ["Hydrangea 'Pinky Winky' tree", 8, 6, [0xEEEEDC, 0xF2E6E2, 0xD0607E], {opt:{trunk:3.4}, note:"Pinky Winky grown on a single trunk: white cones that turn pink from the base up."}],
   ["Hydrangea 'Berry White' tree", 7, 4.5, [W0, 0xE890A8, 0xB02A5A], {opt:{trunk:3}, note:"Berry White grown on a single trunk."}],
   ["Hydrangea 'Little Lime' tree", 6.5, 4, [0xCFE0A0, 0xEEF0DC, 0xE6A8B6], {opt:{trunk:3}, note:"Little Lime grown on a single trunk."}],
   ["Hydrangea 'Vanilla Strawberry' patio tree", 7.5, 4.5, [0xF6F0DC, 0xF0A0B4, 0xC82A48], {opt:{trunk:3.2}, note:"Vanilla Strawberry grown on a single trunk."}]
@@ -360,6 +362,8 @@ group({...VASE, model:"ninebark", sci:"Physocarpus opulifolius", sun:FULL, bloom
   ["Ninebark 'Summer Wine Black'", 5.5, 5.5, 0xF0DCE0, {foliage:0x241418}],
   ["Ninebark 'Honeycomb'", 5, 5, 0xF4F4EA, {foliage:0xC8C83A}],
   ["Ninebark 'Amber Jubilee'", 5.5, 4, 0xF4F4EA, {foliage:0xD08A3A, fall:0x8a2a3a, note:"New growth in orange, yellow and gold."}],
+  ["Ninebark 'Summer Wine' tree", 7, 5, 0xF0DCE0, {k:"ninebark-summer-wine-tree", foliage:0x5a2530, opt:{trunk:3.2}, note:"Summer Wine grown on a standard: a rounded head of wine-red leaves on a single trunk."}],
+  ["Ninebark 'Amber Jubilee' tree", 7, 4.5, 0xF4F4EA, {k:"ninebark-amber-jubilee-tree", foliage:0xD08A3A, fall:0x8a2a3a, opt:{trunk:3.2}, note:"Amber Jubilee grown on a standard: orange, yellow and gold new growth on a single trunk."}],
   ["Ninebark 'Fireside'", 6, 5, 0xF2D8DE, {sci:"Physocarpus opulifolius 'UMNHarpell'", k:"ninebark-fireside", foliage:0x4a1c2a, fall:0x3a1630, bloom:["05-28","06-20"],
     note:"Reddish new growth deepens to red-purple and holds through summer, turning deep purple in fall. Rounded and upright, tidier than most ninebarks, with pinkish-white flowers in late spring."}]
 ]);

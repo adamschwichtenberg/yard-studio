@@ -986,6 +986,14 @@ export const MODELS = {
   ninebark: {label:"Ninebarks & cane shrubs", symbol:"cloud",
     build(P, p, o){
       const H = P.H, R = P.R;
+      if(o.trunk){
+        /* on a standard: a twiggy round head grafted on a single trunk */
+        const ch = H - o.trunk;
+        P.bush({profile:P_BALL, trunk:o.trunk, lump:.12,
+          foliage:{tex:o.leafTex || "leaf:lobed-small", size:clamp(ch*.16, .45, .8), fine:1, wild:.7, bend:.3},
+          heads:p.flower != null ? {type:"button", n:count(12 + R*R*5, 12, 50), size:o.headSize ?? .3, zone:[.4, 1], up:.5, out:1.02} : null});
+        return;
+      }
       P.wands({n:count(18 + R*R*4, 20, 48), arch:o.arch ?? .55,
         foliage:{tex:o.leafTex || "leaf:lobed-small", size:clamp(H*.11, .4, .72)},
         heads:p.flower != null ? {type:"button", n:count(14 + R*R*4, 14, 60), size:o.headSize ?? .3} : null});

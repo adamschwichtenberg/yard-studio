@@ -211,6 +211,9 @@ export const SPECIES = {
   // spent flower panicles: hair-fine stalks that billow among the leaves in summer.
   smoketree: { leaf: 'smoke', bark: 'smooth', leader: false, angle: 48, tropism: 0.2, arrange: 'alternate', perShoot: 6, twiggy: 0.8, scaffolds: 5,
     ornaments: [{ type: 'smoke', from: 40, to: 105, bloom: true }] },
+  // Ninebark on a standard: a shrub's twiggy head on a short trunk, small lobed leaves, flower buttons in June.
+  ninebark: { leaf: 'hawthorn', bark: 'smooth', leader: false, angle: 50, tropism: 0.15, arrange: 'alternate', perShoot: 7, twiggy: 0.9, standard: true,
+    ornaments: [{ type: 'blossom', from: 36, to: 56, bloom: true, size: 1.1 }] },
   treelilac: { leaf: 'lilac', bark: 'cherry', leader: false, angle: 40, tropism: 0.3, arrange: 'opposite', perShoot: 4, twiggy: 0.7,
     ornaments: [{ type: 'panicle', from: 36, to: 52, bloom: true, size: 1.7 }] },
   serviceberry: { leaf: 'serviceberry', bark: 'smooth', leader: false, angle: 24, tropism: 0.45, arrange: 'alternate', perShoot: 5, twiggy: 0.75, stems: 4,
@@ -284,7 +287,7 @@ const GROWTH = {
   maple: 2.5, norwaymaple: 1.2, sugarmaple: 1.2, redmaple: 1.8, silvermaple: 3, boxelder: 2.5, jmaple: 0.9,
   linden: 1.7, littleleaf: 1.3, birch: 1.6, riverbirch: 2.2, alder: 2.5, aspen: 2.5, poplar: 4, columnaraspen: 2.5,
   hackberry: 1.7, hackberrycol: 1.6, elm: 2.2, siberianelm: 3, buroak: 1, whiteoak: 1.5, swampoak: 1.5,
-  pinoak: 2, redoak: 2, willow: 3, crabapple: 1.2, apple: 1.2, hydrangea: 1.5, smoketree: 1.2, locust: 2.2, ash: 2,
+  pinoak: 2, redoak: 2, willow: 3, crabapple: 1.2, apple: 1.2, hydrangea: 1.5, smoketree: 1.2, ninebark: 1.5, locust: 2.2, ash: 2,
   coffeetree: 1.4, buckeye: 1, treelilac: 1.2, serviceberry: 1.2, chokecherry: 2, plum: 1.4, hawthorn: 1,
   mtnash: 1.4, pagoda: 1, dogwood: 1, ironwood: 0.9, bluebeech: 0.9, ginkgo: 1.1, magnolia: 1.3, redbud: 1.6,
   sweetgum: 1.7, tulip: 2.5, blackgum: 1, broadleaf: 1.5,
@@ -301,6 +304,7 @@ export function phenology(key) {
 
 /* Name → profile, checked in order; the first match wins. */
 const BY_NAME = [
+  [/ninebark|physocarpus/, 'ninebark'],
   [/smoke ?tree|smoke ?bush|cotinus/, 'smoketree'],
   [/tamarack|larch|larix/, 'tamarack'],
 ];

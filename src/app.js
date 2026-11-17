@@ -215,6 +215,21 @@ const PRESETS = [
  {gn:"Hydrangeas", n:"Limelight Hydrangea tree", z:[3,8], s:"round", h:8, w:6, ev:false, d:.78, leaf:0x46702c, fall:0x8a6a30,
   bloom:[0xc2d888, 0xf0f0e0, 0xd89aa0], sci:"Hydrangea paniculata 'Limelight'",
   note:"Tree-form panicle hydrangea. Lime-green cones from midsummer turn white, then blush pink in fall."},
+ {gn:"Hydrangeas", n:"Berry White Hydrangea tree", z:[3,8], s:"round", h:7, w:5, ev:false, d:.76, leaf:0x486f35, fall:0x9a8a3a,
+  bloom:[0xf2f0e2, 0xe890a8, 0xb02a5a], sci:"Hydrangea paniculata 'Renba'",
+  note:"Tree-form panicle hydrangea. Big upright cones open white and turn deep berry-pink from the base up on strong stems."},
+ {gn:"Hydrangeas", n:"Little Lime Hydrangea tree", z:[3,8], s:"round", h:6.5, w:4, ev:false, d:.76, leaf:0x486f35, fall:0x9a8a3a,
+  bloom:[0xcfe0a0, 0xeef0dc, 0xe6a8b6], sci:"Hydrangea paniculata 'Jane'",
+  note:"Tree-form panicle hydrangea. A smaller Limelight on a single trunk: lime cones that go white, then pink."},
+ {gn:"Hydrangeas", n:"Vanilla Strawberry Hydrangea tree", z:[3,8], s:"round", h:7.5, w:5, ev:false, d:.76, leaf:0x486f35, fall:0x9a8a3a,
+  bloom:[0xf6f0dc, 0xf0a0b4, 0xc82a48], sci:"Hydrangea paniculata 'Renhy'",
+  note:"Tree-form panicle hydrangea. Cones open vanilla white and turn strawberry red from the base, on red stems."},
+ {gn:"Ninebarks", n:"Summer Wine Ninebark tree", z:[3,7], s:"round", h:7, w:5, cb:3.2, ev:false, d:.74, leaf:0x5a2530, fall:0x6a2a30, bark:"smooth",
+  bloom:[0xe8c8d0, 0xf0dce0, 0xd8b8b8], bt:"Pinkish-white flowers in June", sci:"Physocarpus opulifolius 'Seward'",
+  note:"Summer Wine grown on a standard: a rounded head of wine-red, cut leaves on a single trunk, covered in pinkish-white flower buttons in June."},
+ {gn:"Ninebarks", n:"Amber Jubilee Ninebark tree", z:[3,7], s:"round", h:7, w:4.5, cb:3.2, ev:false, d:.74, leaf:0xd08a3a, fall:0x8a2a3a, bark:"smooth",
+  bloom:[0xeeeada, 0xf4f4ea, 0xe0d8c0], bt:"White flowers in June", sci:"Physocarpus opulifolius 'Jefam'",
+  note:"Amber Jubilee grown on a standard: new growth in orange, yellow and gold over a single trunk, with white flowers in June and purple fall colour."},
  {gn:"Hydrangeas", n:"Pinky Winky hydrangea", z:[3,8], s:"round", h:8, w:6, ev:false, d:.75, leaf:0x4a7a30, fall:0x8a6a30,
   bloom:[0xeeeedc, 0xf2e6e2, 0xd0607e], sci:"Hydrangea paniculata 'DVPpinky'",
   note:"Tree-form panicle hydrangea. White cones that turn pink from the base up. Its shadow only matters to a bed right beside it."},
@@ -2806,6 +2821,7 @@ function updateLabels(){
   };
   for(const o of S.objects){
     if(!isBed(o) || (design && design.bedId === o.id)) continue;
+    if(o.type === "planting" && !S.heat) continue;
     const st = bedStats.get(o.id);
     if(!st) continue;
     const p = project(o.x, 1.2, o.y);
@@ -2913,7 +2929,8 @@ function shapePoolSize(n){
       if(!isPoly(o)) return;
       const g = groundAt(e.clientX, e.clientY);
       if(!g) return;
-      const s = snapPt(g);
+      /* Alt lets a corner go anywhere, not only to grid points */
+      const s = e.altKey ? g : snapPt(g);
       o.poly[shDrag.i] = localOf(o, s.x, s.y);
       if(o.type === "boundary") afterBoundaryChange(false);
       else { queueRebuild(o); updateSelection(); }
@@ -3437,7 +3454,7 @@ function endPointer(e){
 }
 canvas.addEventListener("pointerup", endPointer);
 canvas.addEventListener("pointercancel", endPointer);
-canvas.addEventListener("contextmenu", e=>e.preventDefault());
+canvas.addEventListener("contextmenu", e=>{ e.preventDefault(); if(design && design.stamp) setStamp(null); });
 canvas.addEventListener("dblclick", e=>{
   if(design) return;
   const hit = tool === "select" ? pickObject(e.clientX, e.clientY) : null;
@@ -3588,6 +3605,7 @@ function setStamp(k){
     if(window.innerWidth <= 1020) openSheet(false);     // on a phone the sheet covers the bed
   }
   canvas.style.cursor = design.stamp ? "copy" : "default";
+  syncStampBar();
   updatePlantRing(); panelFor = null; drawPanel();
 }
 function moveStampGhost(sx, sy){
@@ -3625,8 +3643,9 @@ function setPlantView(v){
   }
   syncLayers(); panelFor = null; drawPanel(); markDirty();
 }
-/* A canopy over the bed would hide it from straight above: while designing in
-   Plan, trees that reach over the bed step aside. */
+/* While a bed is being edited, the trees that reach over it can be switched
+   off to see what is underneath, and back on to plant around them. */
+let designTrees = true;
 function applyDesignVisibility(){
   const bed = designBed(), reach = bed ? objReach(bed) : 0;
   let changed = false;
@@ -3634,54 +3653,52 @@ function applyDesignVisibility(){
     if(o.type !== "tree") continue;
     const m = meshes.get(o.id);
     if(!m) continue;
-    const hide = !!bed && activeView === "vplan" && !S.simple && Math.hypot(o.x-bed.x, o.y-bed.y) < o.spread/2 + reach;
+    const hide = !!bed && !designTrees && !S.simple && Math.hypot(o.x-bed.x, o.y-bed.y) < o.spread/2 + reach;
     if(m.visible === hide){ m.visible = !hide; changed = true; }
   }
-  if(changed) markShadows();
+  if(changed){ markShadows(); markDirty(); }
+}
+/* ---------- placing plants: a bar over the yard says so, and ends it ---------- */
+function syncStampBar(){
+  let bar = $("stampbar");
+  if(!bar){
+    document.body.insertAdjacentHTML("beforeend", `<div id="stampbar" hidden><span></span><button class="btn solid">Done placing</button></div>`);
+    bar = $("stampbar");
+    bar.querySelector("button").addEventListener("click", ()=>setStamp(null));
+  }
+  const on = !!(design && design.stamp);
+  bar.hidden = !on;
+  if(on) bar.querySelector("span").innerHTML = `Placing <b>${escapeHTML(plantByKey(design.stamp).n)}</b>: click in the bed for each one`;
 }
 function enterDesign(o){
   if(!isPlanting(o)) return;
   nodeEdit = false; activeNode = null;
   if(S.sel !== o.id) select(o.id);
   setTool("select");
-  /* where the camera was, to go back to when designing is done */
-  const back = design?.back || {view:activeView, orbit:{...orbit}};
-  design = {bedId:o.id, sel:null, stamp:null, edit:null, cat:"all", size:"all", colour:"", q:"", view:"symbols", back,
+  /* The view stays exactly as it is: the bed is edited from wherever you are looking. */
+  design = {bedId:o.id, sel:null, stamp:null, edit:null, cat:"all", size:"all", colour:"", q:"", view:"symbols",
             sunWasOpen:!$("sunpanel").classList.contains("min")};
   document.body.classList.add("designing");
   /* the sun card would sit on top of the bed; tuck it away while designing */
   if(design.sunWasOpen){ $("sunpanel").classList.add("min"); syncSunH(); }
-  rebuildPlantings(); syncLayers();
-  setView("vplan");
-  /* frame the bed in the space between the rail and the inspector */
-  const b = bbox(outlineWorld(o)), wide = window.innerWidth > 1020;
-  const availW = Math.max(240, window.innerWidth - (wide ? 480 : 0)), availH = Math.max(200, window.innerHeight*(wide ? 1 : .5) - 150);
-  const perPx = Math.max(b.w*1.3/availW, b.h*1.3/availH);            // feet per screen pixel
-  const dist = clamp(perPx*window.innerHeight/(2*Math.tan(perspectiveCamera.fov*DEG/2)), 12, 900);
-  const shift = wide ? 160*perPx : 0;
-  const a = orbit.az*DEG;
-  flyTo({tx:b.cx + Math.cos(a)*shift, tz:b.cy - Math.sin(a)*shift, ty:0, el:90, dist}, 500);
+  rebuildPlantings(); syncLayers(); applyDesignVisibility();
   updateSelection(); panelFor = null; drawPanel();
   if(window.innerWidth <= 1020) openSheet(true);
   toast("Pick a plant, then click in the bed. Drag a plant to move it.");
+  syncStampBar();
 }
 function exitDesign(quiet){
   if(!design) return;
   const changed = plantMode() !== (S.plantView === "symbols" ? "symbols" : "plants");
   if(design.sunWasOpen){ $("sunpanel").classList.remove("min"); syncSunH(); }
-  const back = design.back;
   design = null;
+  syncStampBar();
   document.body.classList.remove("designing");
   plantRing = dropHelper(plantRing); stampGhost = dropHelper(stampGhost);
   canvas.style.cursor = "default";
   if(changed) rebuildPlantings();
   syncLayers(); applyDesignVisibility();
   if(!quiet){ updateSelection(); panelFor = null; drawPanel(); }
-  /* back to the view and the spot the designer was opened from */
-  if(back && !restoreView){
-    if(back.view !== activeView) setView(back.view);
-    flyTo({...back.orbit}, 500);
-  }
   markDirty();
 }
 let restoreView = false;      // set while a plan loads: the camera is about to be reframed anyway
@@ -4083,9 +4100,10 @@ function designPanelHTML(o){
   return `<div class="isec dview"><div class="seg" role="group" aria-label="How plants are drawn">
         <button data-plantview="symbols" aria-pressed="${plantMode() === "symbols"}">Symbols</button>
         <button data-plantview="plants" aria-pressed="${plantMode() !== "symbols"}">Plants</button></div>
-      <label class="chk"><input type="checkbox" class="sw" data-plantlabels ${S.plantLabels ? "checked" : ""}>Numbers</label></div>`
+      <label class="chk"><input type="checkbox" class="sw" data-plantlabels ${S.plantLabels ? "checked" : ""}>Numbers</label>
+      <label class="chk" title="Show or hide the trees that reach over this bed"><input type="checkbox" class="sw" data-designtrees ${designTrees ? "checked" : ""}>Trees</label></div>`
     + (pl ? plantCardHTML(o, pl) : "")
-    + (stamp ? `<div class="isec stamping"><b>Placing ${escapeHTML(stamp.n)}</b><span>${plantSize(stamp)}. Click in the bed for each one. Esc when done.</span><button class="btn" data-stamp="">Stop</button>
+    + (stamp ? `<div class="isec stamping"><b>Placing ${escapeHTML(stamp.n)}</b><span>${plantSize(stamp)}. Click in the bed for each one. Press Esc, right-click, or use Done placing to go back to moving plants.</span><button class="btn solid" data-stamp="">Done placing</button>
         <button class="btn sizeit" data-custom="${escapeHTML(stamp.k)}">${stamp.custom ? "Edit size & colour" : "Customize size & colour"}</button></div>` : "")
     + (design.edit ? customEditorHTML(design.edit) : "")
     + `<div class="isec"><div class="fh"><h4>Plant palette</h4><span>Pick one, then click in the bed</span></div>
@@ -4107,11 +4125,11 @@ function plantKeyHTML(o){
 }
 function plantingPanelHTML(o, nameRow){
   const b = bbox(bedOutline(o));
-  return `<div class="btnrow" style="margin:14px 0 4px"><button class="btn solid" data-act="design">Edit this bed</button></div>`
-    + `<p class="hint" style="margin-top:6px">Opens the bed from above to place, move and swap plants. Double-clicking the bed does the same.</p>`
+  return `<div class="btnrow" style="margin:14px 0 4px"><button class="btn solid" data-act="design">Edit this bed</button>${outlineButtonHTML(o)}</div>`
+    + (nodeEdit ? outlineEditHTML(o) : `<p class="hint" style="margin-top:6px">Edit this bed places, moves and swaps plants, from whatever view you are in. Reshape outline moves the bed's edge. Double-clicking the bed also opens it for editing.</p>`)
     + `<div class="plkey">${plantKeyHTML(o)}</div>`
     + `<div class="bedins" style="margin-top:14px;border-top:1px solid var(--line-2)">${bedInsightsHTML(o)}</div>`
-    + `<h4 style="margin-top:18px">Bed shape</h4>` + outlineHTML(o)
+    + `<h4 style="margin-top:18px">Bed shape</h4>` + outlineHTML(o, true)
     + `<div class="swrow"><span>Lock in place</span><input type="checkbox" class="sw" data-key="locked" ${o.locked ? "checked" : ""} aria-label="Lock in place"></div>`
     + `<p class="hint" style="margin-top:2px">A locked bed cannot be dragged or reshaped by accident. You can still select it and design it.</p>`
     + `<div class="swrow"><span>Curved edge</span><input type="checkbox" class="sw" data-key="smooth" ${o.smooth ? "checked" : ""} aria-label="Curved edge"></div>`
@@ -4193,25 +4211,31 @@ function lineHTML(o){
   return `<div class="sub" style="margin-bottom:5px">Centre to the nearest lines</div>
           <div class="lines">${rows}</div>${note}`;
 }
-function outlineHTML(o){
-  const w = worldPoly(o), open = isOpenPath(o), pt = open ? "post" : "corner";
-  let html = `<div class="btnrow" style="margin-top:2px">
-      <button class="btn accent" data-act="nodes" aria-pressed="${nodeEdit}">${nodeEdit?"Done reshaping":open ? "Reshape fence" : "Reshape outline"}</button>
-    </div>`;
-  if(nodeEdit){
-    html += open
-      ? `<p class="hint">Drag a post. The + between posts adds a bend; the + past the last post extends the fence. Tap a length to type it. Double-tap a post to remove it.</p>`
-      : `<p class="hint">Drag a corner. The + between corners adds one. Tap any length to type an exact dimension. Double-tap a corner to remove it.</p>`;
-    if(activeNode != null && w[activeNode]){
-      const p = w[activeNode];
-      html += `<h4>${open ? "Post" : "Corner"} ${activeNode+1} of ${w.length}</h4>`
-        + numRow("Across", 'data-node="x"', p.x.toFixed(1), "ft", .5)
-        + numRow("Up–down", 'data-node="y"', p.y.toFixed(1), "ft", .5)
-        + `<div class="btnrow"><button class="btn" data-act="delnode" ${o.poly.length<(open?3:4)?"disabled":""}>Remove this ${pt}</button></div>`;
-    } else {
-      html += `<p class="hint">Tap a ${pt} to type its exact position.</p>`;
-    }
-  }
+function outlineButtonHTML(o){
+  return `<button class="btn accent" data-act="nodes" aria-pressed="${nodeEdit}">${nodeEdit ? "Done reshaping" : isOpenPath(o) ? "Reshape fence" : "Reshape outline"}</button>`;
+}
+/* what shows while the outline is being reshaped: how it works, and the picked corner */
+function outlineEditHTML(o){
+  if(!nodeEdit) return "";
+  const w = worldPoly(o), open = isOpenPath(o), pt = open ? "post" : "corner", dot = open ? "post" : "dot";
+  let html = `<ul class="howto">
+      <li><b>Drag</b> a ${dot} to move it. Hold <b>Alt</b> while dragging to move it freely, off the grid.</li>
+      <li><b>Double-click</b> a ${dot} to delete it.</li>
+      <li>The <b>+</b> between two ${dot}s adds one${open ? "; the + past the last post extends the fence" : ""}.</li>
+      <li>Click a ${dot}, then use the <b>arrow keys</b> to nudge it a tenth of a foot (Shift for a foot).</li>
+      <li>Tap any length to type an exact dimension.</li></ul>`;
+  if(activeNode != null && w[activeNode]){
+    const p = w[activeNode];
+    html += `<h4>${open ? "Post" : "Corner"} ${activeNode+1} of ${w.length}</h4>`
+      + numRow("Across", 'data-node="x"', p.x.toFixed(2), "ft", .1)
+      + numRow("Up–down", 'data-node="y"', p.y.toFixed(2), "ft", .1)
+      + `<div class="btnrow"><button class="btn" data-act="delnode" ${o.poly.length<(open?3:4)?"disabled":""}>Remove this ${pt}</button></div>`;
+  } else html += `<p class="hint">Click a ${pt} to type its exact position.</p>`;
+  return html;
+}
+function outlineHTML(o, statsOnly){
+  const w = worldPoly(o), open = isOpenPath(o);
+  let html = statsOnly ? "" : `<div class="btnrow" style="margin-top:2px">${outlineButtonHTML(o)}</div>` + outlineEditHTML(o);
   if(open) return html + readRow("Posts at bends", o.poly.length) + readRow("Length", uL(fenceLength(o)));
   html += readRow("Corners", o.poly.length)
        +  readRow("Area", uArea(polyArea(w)))
@@ -4567,6 +4591,7 @@ function computeBedSeason(o){
   return out;
 }
 
+let lastPanelId = null;
 function drawPanel(){
   const o = selected();
   const title = document.getElementById("seltitle");
@@ -4621,7 +4646,9 @@ function drawPanel(){
     syncRanges(props);
     return;
   }
-  if(!panelFor || String(panelFor).split("|")[0] !== String(o.id)) $("inspbody").scrollTop = 0;
+  const samePanel = lastPanelId === o.id, keepScroll = $("inspbody").scrollTop;
+  lastPanelId = o.id;
+  if(!samePanel) $("inspbody").scrollTop = 0;
   panelFor = key;
   let html = "";
   const nameRow = `<div class="field"><span class="lab">Name</span><span class="inp wide">`
@@ -4708,6 +4735,8 @@ function drawPanel(){
   const pal0 = design ? props.querySelector(".palette") : null, body = $("inspbody");
   const keep = pal0 ? {scroll:pal0.scrollTop, top:pal0.getBoundingClientRect().top, body:body.scrollTop} : null;
   props.innerHTML = html;
+  /* redrawing the same panel leaves it where it was scrolled to */
+  if(samePanel) body.scrollTop = keepScroll;
   if(keep){
     const pal = props.querySelector(".palette");
     if(pal){
@@ -4789,6 +4818,7 @@ props.addEventListener("input", e=>{
     return;
   }
   if(e.target.hasAttribute("data-cust")){ customInput(e.target); return; }
+  if(e.target.hasAttribute("data-designtrees")){ designTrees = e.target.checked; applyDesignVisibility(); return; }
   if(e.target.hasAttribute("data-plantlabels")){
     S.plantLabels = e.target.checked; scheduleHist(); markDirty();
     return;
@@ -4926,7 +4956,7 @@ props.addEventListener("click", e=>{
     if((S.locked || o.locked) && !nodeEdit){ lockedHint(!S.locked); return; }
     nodeEdit = !nodeEdit;
     if(!nodeEdit) activeNode = null;
-    else { exitDesign(true); setView("vplan"); }
+    else { exitDesign(true); setView("vplan"); toast("Drag a dot to move it. Double-click a dot to delete it. + adds one."); }
     panelFor = null; drawPanel(); markDirty();
   }
   if(act === "delnode" && o.poly && o.poly.length > (isOpenPath(o) ? 2 : 3) && activeNode != null){
@@ -5933,6 +5963,22 @@ document.addEventListener("keydown", e=>{
   if($("modal").classList.contains("on")) return;
   if(document.body.classList.contains("photo")){ if(e.key === "Escape") exitPhoto(); return; }
   if(houseEd){ houseKey(e); return; }
+  if(nodeEdit && activeNode != null && e.key.startsWith("Arrow") && $("library").hidden){
+    /* nudge the picked corner: a tenth of a foot, or a foot with Shift */
+    const o = selected(), step = e.shiftKey ? 1 : .1, mv = {ArrowLeft:[-step, 0], ArrowRight:[step, 0], ArrowUp:[0, -step], ArrowDown:[0, step]}[e.key];
+    if(mv && isPoly(o) && o.poly[activeNode] && !S.locked && !o.locked){
+      e.preventDefault();
+      const w = worldPoly(o)[activeNode] || (o.type === "boundary" ? S.boundary[activeNode] : null);
+      if(w){
+        /* along the screen's axes in plan view */
+        const a = -orbit.az*DEG, dx = mv[0]*Math.cos(a) - mv[1]*Math.sin(a), dy = mv[0]*Math.sin(a) + mv[1]*Math.cos(a);
+        o.poly[activeNode] = localOf(o, w.x + dx, w.y + dy);
+        if(o.type === "boundary") afterBoundaryChange(true); else { queueRebuild(o); updateSelection(); scheduleCompute(); }
+        panelFor = null; drawPanel(); markDirty();
+      }
+      return;
+    }
+  }
   if(!$("library").hidden){ if(e.key === "Escape") closeLibrary(); return; }
   if(obsMode){
     if(e.key === "Escape"){ e.preventDefault(); if(flying()) setObsMode("orbit"); else exitObserve(); return; }
@@ -6725,7 +6771,7 @@ const TOUR_STEPS = [
      <p>Nothing to add? Choose <b>Skip</b>.</p>`, next:"Skip",
    done:()=>builtCount() > (tourMark.built ?? 0)},
   {part:"3 · Plant your trees", title:"Open the tree library", target:"#railPlants",
-   body:`<p>148 hardy trees, from maples and lindens to spruces and junipers, each grown to its species' shape.</p>
+   body:`<p>153 hardy trees, from maples and lindens to spruces and junipers, each grown to its species' shape.</p>
      <p>Open <b>Plants</b>.</p>`,
    enter:()=>{ tourMark.trees = treeCount(); },
    done:()=>!$("library").hidden},
