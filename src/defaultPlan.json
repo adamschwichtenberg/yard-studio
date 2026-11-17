@@ -6,7 +6,7 @@
   "place": "Fargo, ND",
   "tzMode": "zone",
   "tzZone": "America/Chicago",
-  "date": "2026-08-13",
+  "date": "2026-08-02",
   "minutes": 783,
   "north": 180,
   "grid": 1,
@@ -245,23 +245,12 @@
       ],
       "openings": [
         {
-          "id": 3,
-          "wall": 2,
-          "t": 0.4688,
-          "y": 4.5,
-          "w": 8,
-          "h": 4,
-          "kind": "window",
-          "cols": 1,
-          "rows": 2
-        },
-        {
           "id": 4,
           "wall": 2,
-          "t": 0.4688,
+          "t": 0.5,
           "y": 13,
-          "w": 8,
-          "h": 4,
+          "w": 8.5,
+          "h": 4.5,
           "kind": "window",
           "cols": 1,
           "rows": 1
@@ -445,6 +434,17 @@
           "cols": 1,
           "rows": 1,
           "id": 28
+        },
+        {
+          "id": 29,
+          "wall": 2,
+          "t": 0.5,
+          "y": 4.75,
+          "w": 8.5,
+          "h": 4.5,
+          "kind": "window",
+          "cols": 1,
+          "rows": 1
         }
       ],
       "roofColor": "#1c1c1c",
@@ -1170,7 +1170,7 @@
       "plantH": 8
     },
     {
-      "id": 76,
+      "id": 36,
       "type": "planting",
       "name": "Planting bed",
       "x": -60.84413515039917,
@@ -1255,7 +1255,7 @@
       "plants": []
     },
     {
-      "id": 77,
+      "id": 37,
       "type": "planting",
       "name": "Planting bed",
       "x": -65.30842163664902,
@@ -1359,7 +1359,7 @@
       ]
     },
     {
-      "id": 78,
+      "id": 38,
       "type": "planting",
       "name": "Planting bed",
       "x": 2.998488261460908,
@@ -1833,7 +1833,7 @@
       ]
     },
     {
-      "id": 132,
+      "id": 39,
       "type": "planting",
       "name": "Planting bed",
       "x": -50.75530548943675,
@@ -1929,7 +1929,7 @@
       ]
     },
     {
-      "id": 145,
+      "id": 40,
       "type": "planting",
       "name": "Planting bed",
       "x": 57.100780192519764,
